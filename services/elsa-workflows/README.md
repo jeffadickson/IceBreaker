@@ -18,7 +18,7 @@ The bridge is **NOT internet-ready**. Run behind TLS and a private network or sa
 
 ## Integration and boundaries
 
-The existing Node workflow interpreter continues to validate and commit transitions in SQLite. `services/elsa-workflows/bridge-outbox.js` adds a transactional delivery queue for Elsa notification, which a worker retries. This is **real Elsa invocation**, but *not yet* a full migration of state orchestration to Elsa; the Elsa workflow currently logs accepted notifications. A further milestone must replace the logging activity with Elsa bookmarks, persistent workflow instances, branching approvals, scheduled reminders and a visual designer. The in-memory Elsa inbox is also not durable across crashes; the Node outbox retains the event for replay but accepted events may be repeated after Elsa restart.
+The existing Node workflow interpreter continues to validate and commit transitions in SQLite. `services/elsa-workflows/bridge-outbox.js` adds a transactional delivery queue for Elsa notification, which a worker retries. This is **real Elsa invocation**, but *not yet* a full migration of state orchestration to Elsa; the Elsa workflow currently logs accepted notifications. A further milestone must replace the logging activity with Elsa bookmarks, persistent workflow instances, branching approvals, scheduled reminders and a visual designer. The Elsa host now configures EF Core SQLite management/runtime persistence and a durable receipt inbox. A one-minute in-progress lease allows retry after host failure, but execution is not transactionally atomic with receiver receipts; therefore activity side effects must remain idempotent. Elsa currently observes workflow events, while IceBreaker still enforces referee approvals.
 
 ## Verify
 
@@ -33,3 +33,7 @@ The JavaScript tests exercise enqueue/claim/delivery/error/restart with a simula
 
 - https://www.elsaworkflows.io/get-started/elsa-server
 - https://docs.elsaworkflows.io/getting-started/hello-world
+
+## Demonstration and release gates
+
+See [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) and [public demonstration readiness](../../docs/DEMO_RELEASE_GATES.md). GitHub CI now compiles the Elsa service separately; a .NET build has not been run in this execution container.

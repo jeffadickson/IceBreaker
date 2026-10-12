@@ -3,8 +3,12 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Elsa" Version="3.8.0" />
+    <PackageReference Include="Elsa.Persistence.EFCore" Version="3.8.0" />
+    <PackageReference Include="Elsa.Persistence.EFCore.Sqlite" Version="3.8.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
   </ItemGroup>
 </Project>

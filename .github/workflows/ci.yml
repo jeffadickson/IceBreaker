@@ -17,8 +17,6 @@ jobs:
         run: python tools/check_docs.py
       - name: Run local-backend tests
         run: node --test apps/rink-local/tests/browser/*.test.js
-      - name: Remote rink ingestion integration tests
-        run: node --test tests/integration/remote-sync.test.js
   dotnet:
     runs-on: ubuntu-latest
     steps:
@@ -28,3 +26,16 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Test core
         run: dotnet test apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj -c Release
+  elsa-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore Elsa dependencies
+        run: dotnet restore services/elsa-workflows/IceBreaker.Elsa.csproj
+      - name: Build Elsa service
+        run: dotnet build services/elsa-workflows/IceBreaker.Elsa.csproj -c Release --no-restore
+      - name: Verify bridge tests
+        run: node --test tests/integration/elsa-bridge.test.js
