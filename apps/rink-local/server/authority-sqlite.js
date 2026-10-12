@@ -5,6 +5,7 @@ const {DatabaseSync}=require('node:sqlite');
 const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
+const {penaltyClock}=require('./penalty-clock');
 const validSide=x=>x==='home'||x==='away';
 const validAttr=(x,scorer=false)=>x==='TBD'||(!scorer&&x==='None')||/^\d{1,3}$/.test(String(x));
 const isInt=(x,lo,hi)=>Number.isInteger(x)&&x>=lo&&x<=hi;
@@ -21,6 +22,7 @@ function validate(c,state){if(!c||typeof c!=='object')throw Error('Invalid comma
   if(c.type==='GOAL_ATTRIBUTION_CORRECTED'&&!clean(c.reason))throw Error('Correction reason required');
  }else if(c.type==='PENALTY_ASSESSED'){
   if(!validSide(c.team)||!validAttr(c.player,true)||!clean(c.infraction)||!isInt(c.duration,1,3600))throw Error('Invalid penalty');
+  if(c.coincidental!==undefined&&typeof c.coincidental!=='boolean')throw Error('Invalid coincidental flag');
   if(c.classification!==undefined&&!['MINOR','DOUBLE_MINOR','MAJOR','MISCONDUCT','GAME_MISCONDUCT','MATCH','OTHER'].includes(c.classification))throw Error('Invalid penalty classification');
  }else if(c.type==='SHOT_RECORDED'){
   if(!validSide(c.team))throw Error('Invalid shot team');
@@ -37,8 +39,9 @@ function project(events){const state={revision:0,period:1,seconds:900,running:fa
   state.period=e.period;state.seconds=e.clock_seconds;
   if(e.event_type==='GOAL_RECORDED'){state.scores[d.teamId]++;state.shots[d.teamId]++;state.goals.set(e.event_id,{goalId:d.goalId,voided:false});item.details={scorer:unattr(d.scorer),assist1:unattr(d.assist1),assist2:unattr(d.assist2)};if(Math.abs(state.scores.home-state.scores.away)>=state.mercy.threshold)state.mercy.triggered=true;}
   if(e.event_type==='GOAL_ATTRIBUTION_CORRECTED'){const target=state.events.find(x=>x.type==='GOAL_RECORDED'&&state.goals.get(x.id)?.goalId===d.goalId);if(!target)throw Error('Missing correction target');item.details={originalEventId:target.id,scorer:unattr(d.scorer),assist1:unattr(d.assist1),assist2:unattr(d.assist2)};}
-  if(e.event_type==='PENALTY_ASSESSED')item.details={player:unattr(d.player),infraction:d.infraction,duration:d.durationSeconds,classification:d.classification||'MINOR'};
+  if(e.event_type==='PENALTY_ASSESSED')item.details={player:unattr(d.player),infraction:d.infraction,duration:d.durationSeconds,classification:d.classification||'MINOR',coincidental:d.coincidental===true};
   if(e.event_type==='SHOT_RECORDED'){state.shots[d.teamId]++;item.details={shotNumber:state.shots[d.teamId]};}
+  if(e.event_type==='CLOCK_UPDATED')item.details={action:d.action};
   if(e.event_type==='CLOCK_UPDATED')state.running=d.action==='START'?true:d.action==='STOP'?false:state.running;
   if(e.event_type==='PERIOD_ENDED'||e.event_type==='GAME_ENDED')state.running=false;
   if(e.event_type==='PERIOD_ADVANCED'){state.period=e.period;state.seconds=e.clock_seconds;state.running=false;}
@@ -54,8 +57,8 @@ class Authority{
  audit(action,details={}){const entry={at:new Date().toISOString(),action,details};fs.mkdirSync(path.dirname(this.auditPath),{recursive:true});fs.appendFileSync(this.auditPath,JSON.stringify(entry)+'\n');}
  repairMirror(){const lines=this.rows().map(e=>`${e.seq.toString().padStart(5,'0')} ${e.occurred_at_utc} P${e.period} ${String(Math.floor(e.clock_seconds/60)).padStart(2,'0')}:${String(e.clock_seconds%60).padStart(2,'0')} ${e.event_type} ${e.event_id} ${e.payload_json}`).join('\n');try{fs.writeFileSync(this.mirrorPath,lines+(lines?'\n':''));this.mirrorHealthy=true;}catch(err){this.mirrorHealthy=false;this.audit('TEXT_MIRROR_FAILURE',{message:err.message});}}
  currentSeconds(){if(!this.state.running||this.clockAnchor===null)return this.state.seconds;return Math.max(0,this.state.seconds-Math.floor(Number(process.hrtime.bigint()-this.clockAnchor)/1e9));}
- spectator(){const s=this.state;return {revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{...s.scores},shots:{...s.shots},ended:s.ended,events:s.events.filter(e=>['GOAL_RECORDED','PENALTY_ASSESSED','GOAL_ATTRIBUTION_CORRECTED','PERIOD_ENDED','PERIOD_ADVANCED','GAME_ENDED','SHOT_RECORDED'].includes(e.type)),teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'},connected:true,scorePolicy:'FULL_OFFICIAL'};}
- arena(){const s=this.state;let {home,away}=s.scores;const m=s.mercy;if(m.enabled&&(m.triggered||Math.abs(home-away)>=m.threshold)){if(home>away)home=Math.min(home,away+m.cap);else away=Math.min(away,home+m.cap);}return {revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{home,away},shots:{...s.shots},scorePolicy:'MERCY_DISPLAY_CAP',teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'}};}
+ spectator(){const s=this.state;const penalties=penaltyClock(s.events,s.period,this.currentSeconds());return {penalties,revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{...s.scores},shots:{...s.shots},ended:s.ended,events:s.events.filter(e=>['GOAL_RECORDED','PENALTY_ASSESSED','GOAL_ATTRIBUTION_CORRECTED','PERIOD_ENDED','PERIOD_ADVANCED','GAME_ENDED','SHOT_RECORDED'].includes(e.type)),teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'},connected:true,scorePolicy:'FULL_OFFICIAL'};}
+ arena(){const s=this.state;const penalties=penaltyClock(s.events,s.period,this.currentSeconds());let {home,away}=s.scores;const m=s.mercy;if(m.enabled&&(m.triggered||Math.abs(home-away)>=m.threshold)){if(home>away)home=Math.min(home,away+m.cap);else away=Math.min(away,home+m.cap);}return {penalties,revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{home,away},shots:{...s.shots},scorePolicy:'MERCY_DISPLAY_CAP',teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'}};}
  command(c,{actor='scorekeeper',key}={}){
   if(!key||!/^[-\w]{8,128}$/.test(key))throw Error('Idempotency key required');
   const duplicate=this.db.prepare('SELECT event_id,seq FROM game_events WHERE game_id=? AND idempotency_key=?').get(this.gameId,key);if(duplicate){this.audit('DUPLICATE_COMMAND',{key,eventId:duplicate.event_id});return {eventId:duplicate.event_id,revision:duplicate.seq,duplicate:true};}
@@ -63,7 +66,7 @@ class Authority{
   const id=crypto.randomUUID(),seq=this.state.revision+1,at=new Date().toISOString();let period=this.state.period,seconds=this.state.seconds,payload={};
   if(c.type==='GOAL_RECORDED')payload={goalId:id,teamId:c.team,scorer:attr(c.scorer),assist1:attr(c.assist1),assist2:attr(c.assist2)};
   if(c.type==='GOAL_ATTRIBUTION_CORRECTED')payload={goalId:this.state.goals.get(c.originalEventId).goalId,scorer:attr(c.scorer),assist1:attr(c.assist1),assist2:attr(c.assist2),reason:clean(c.reason,200)};
-  if(c.type==='PENALTY_ASSESSED')payload={penaltyId:id,teamId:c.team,player:attr(c.player),infraction:clean(c.infraction,80),durationSeconds:c.duration,classification:c.classification||'MINOR'};
+  if(c.type==='PENALTY_ASSESSED')payload={penaltyId:id,teamId:c.team,player:attr(c.player),infraction:clean(c.infraction,80),durationSeconds:c.duration,classification:c.classification||'MINOR',coincidental:c.coincidental===true};
   if(c.type==='SHOT_RECORDED')payload={teamId:c.team};
   if(c.type==='CLOCK_UPDATED'){seconds=c.action==='STOP'?this.currentSeconds():c.seconds;payload={action:c.action,secondsRemaining:seconds};}else if(this.state.running){seconds=this.currentSeconds();}
   if(c.type==='PERIOD_ADVANCED'){period++;seconds=isInt(c.seconds,0,3600)?c.seconds:900;}
