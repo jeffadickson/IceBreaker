@@ -1,0 +1,29 @@
+{
+  "id": "scaha-manager", "version": "2026-10-draft", "status": "sample-verify-current-league-policy",
+  "source": "https://scaha.com/scaha/mobile/managertools.xhtml",
+  "gameTypes": {
+    "exhibition": [
+      {"id":"EXH-01","phase":"before","label":"Request referees from Scrimmage@lahoa.com","evidence":"reference"},
+      {"id":"EXH-02","phase":"before","label":"Add exhibition game to SCAHA Managers Portal","evidence":"external_game_id"},
+      {"id":"EXH-03","phase":"before","label":"Verify current SCAHA exhibition permission/notification rules","evidence":"reference"},
+      {"id":"EXH-04","phase":"during","label":"Record game on a scoresheet","evidence":"scoresheet"},
+      {"id":"EXH-05","phase":"after","label":"Upload scoresheet to external SCAHA Managers Portal","evidence":"external_confirmation"}
+    ],
+    "tournament": [
+      {"id":"TRN-01","phase":"before","label":"Add tournament in Managers Portal","evidence":"external_tournament_id"},
+      {"id":"TRN-02","phase":"before","label":"Add tournament games in Managers Portal","evidence":"external_game_id"},
+      {"id":"TRN-03","phase":"before","label":"Verify current tournament permission/notification rules","evidence":"reference"},
+      {"id":"TRN-04","phase":"during","label":"Record each game on a scoresheet","evidence":"scoresheet"},
+      {"id":"TRN-05","phase":"after","label":"Acquire and upload each game's signed scoresheet","evidence":"external_confirmation"}
+    ],
+    "league": [
+      {"id":"LGE-01","phase":"before","label":"Update participating players' jersey numbers","evidence":"roster_revision"},
+      {"id":"LGE-02","phase":"before","label":"Assign game coaches when more than four are rostered","evidence":"coach_roster_revision"},
+      {"id":"LGE-03","phase":"before","label":"Print scoresheet copies","evidence":"scoresheet"},
+      {"id":"LGE-04","phase":"before","label":"Obtain participating coaches' scoresheet signatures","evidence":"signature_reference"},
+      {"id":"LGE-05","phase":"before","label":"Cross off nonparticipating players and coaches on all three copies","evidence":"roster_confirmation"},
+      {"id":"LGE-06","phase":"after","label":"Upload completed scoresheet to Managers Portal","evidence":"external_confirmation"},
+      {"id":"LGE-07","phase":"after","label":"Enter game details into SCAHA statistical game entry sheet","evidence":"external_confirmation"}
+    ]
+  }
+}

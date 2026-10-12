@@ -1,0 +1,8 @@
+{
+  "sample_interval_seconds": 0.5,
+  "fields": {
+    "home_score": {"digits": [[40, 60, 50, 85]], "polarity": "bright"},
+    "away_score": {"digits": [[160, 60, 50, 85]], "polarity": "bright"},
+    "clock": {"digits": [[40, 180, 50, 85], [95, 180, 50, 85], [160, 180, 50, 85], [215, 180, 50, 85]], "polarity": "bright"}
+  }
+}

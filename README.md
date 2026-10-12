@@ -72,3 +72,13 @@ The rink scorekeeper displays database-backed sync outbox counts, event-mirror h
 ## v1.9 broadcast video overlay (development)
 
 Open `http://127.0.0.1:8090/overlay.html` as a 1920×1080 browser source in OBS Studio or vMix. The page is transparent and renders the game clock, period, both scores, **both shots-on-goal counts**, and current penalty/strength indicators. Use `?layout=compact` for a slimmer scorebug or `?mode=arena` for the mercy-capped arena score; the default **full** mode never applies mercy score masking. The overlay is a local-only, read-only browser source and does not ingest or encode video. See `requirements/video/broadcast-overlay.md` for requirements and capacity validation gates.
+
+## v2.3: Camera scoreboard observer and manager checklists (experimental)
+
+- `tools/scoreboard-camera/`: OpenCV seven-segment camera capture/OCR, field confidence, mismatch flags, calibration example, synthetic tests. **Observations only**; never changes official scoring data.
+- `config/workflows/scaha-manager.json`: Proposed configurable exhibition, tournament and SCAHA league-game procedures, each with required evidence types.
+- `src/team-workflows/manager-checklist.js`: Versioned policy validation, task evidence recording, append-only checklist projection and reopening.
+- `docs/site/manager-workflows.html`: HTML manager manual.
+- `requirements/manager-camera-v2.3.md`: Requirement IDs, tests and integration limitations.
+
+These modules are testable proofs of concept, **not yet integrated into the authenticated team-manager backend or camera control panel**. Verify current league policies and obtain the official blank exhibition scoresheet from the SCAHA Manager Tools page.

@@ -1,0 +1,9 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const policy=require('../../config/workflows/scaha-manager.json');
+const {validatePolicy,openChecklist,recordEvidence,project}=require('../../src/team-workflows/manager-checklist');
+test('SCAHA configurable exhibition/tournament/league workflows validate',()=>{assert.equal(validatePolicy(policy),policy);assert.equal(Object.keys(policy.gameTypes).length,3)});
+test('exhibition tasks remain pending until evidence is recorded',()=>{const c=openChecklist(policy,'exhibition','game-42');assert.equal(project(c,policy).completed,0);const next=recordEvidence(c,policy,{taskId:'EXH-01',actorId:'team-manager-1',reference:'referee-request-123'});assert.equal(project(next,policy).completed,1);assert.equal(c.events.length,0)});
+test('manager action can be reopened without rewriting history',()=>{let c=openChecklist(policy,'league','game-3');c=recordEvidence(c,policy,{taskId:'LGE-04',actorId:'manager',reference:'signed-paper-scan'});c=recordEvidence(c,policy,{taskId:'LGE-04',actorId:'manager',action:'reopen'});assert.equal(c.events.length,2);assert.equal(project(c,policy).completed,0)});
+test('checklists reject unknown task and missing evidence',()=>{const c=openChecklist(policy,'league','game-3');assert.throws(()=>recordEvidence(c,policy,{taskId:'BAD',actorId:'manager',reference:'x'}));assert.throws(()=>recordEvidence(c,policy,{taskId:'LGE-06',actorId:'manager'}));});
+test('policy updates cannot retroactively redefine an in-progress checklist',()=>{const c=openChecklist(policy,'tournament','game-5');assert.throws(()=>recordEvidence(c,{...policy,version:'2027'}, {taskId:'TRN-01',actorId:'manager',reference:'T123'}));});
