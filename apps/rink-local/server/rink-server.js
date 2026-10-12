@@ -1,9 +1,9 @@
 'use strict';
 // Local-first development backend, not a public internet service.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const {URL}=require('node:url');const {snapshotForGame,assertGameRosterEligible}=require('./game-roster-policy');const {reportFromState,renderReport,topPenalties}=require('./game-report');const {createParentAuth}=require('./parent-auth');const {Authority}=require('./authority-sqlite');const {LeagueStore}=require('./league-store');const {TeamAccounts}=require('./team-accounts');
+const {URL}=require('node:url');const {ScoresheetCertification}=require('./scoresheet-certification');const {snapshotForGame,assertGameRosterEligible}=require('./game-roster-policy');const {reportFromState,renderReport,topPenalties}=require('./game-report');const {createParentAuth}=require('./parent-auth');const {Authority}=require('./authority-sqlite');const {LeagueStore}=require('./league-store');const {TeamAccounts}=require('./team-accounts');
 function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='127.0.0.1',port=8090,operatorKey=process.env.ICEBREAKER_OPERATOR_KEY||'local-development-key',leagueGameId=process.env.ICEBREAKER_LEAGUE_GAME_ID||null}={}){
- const parentAuth=createParentAuth({dbPath});const authority=new Authority({dbPath});const leagueStore=new LeagueStore(dbPath,{seedDemo:true});const teamAccounts=new TeamAccounts(dbPath);const clients=new Set();const root=path.resolve(__dirname,'../web');
+ const parentAuth=createParentAuth({dbPath});const authority=new Authority({dbPath});const leagueStore=new LeagueStore(dbPath,{seedDemo:true});const teamAccounts=new TeamAccounts(dbPath);const certification=new ScoresheetCertification(authority.db,authority);const clients=new Set();const root=path.resolve(__dirname,'../web');
  const send=(res,code,obj)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(obj));};
  const broadcast=()=>{const msg=`id: ${authority.state.revision}\nevent: snapshot\ndata: ${JSON.stringify(authority.spectator())}\n\n`;for(const r of clients){try{r.write(msg);}catch{clients.delete(r);}}};
  const auth=req=>{const k=req.headers['x-operator-key'];return typeof k==='string'&&k.length===operatorKey.length&&crypto.timingSafeEqual(Buffer.from(k),Buffer.from(operatorKey));};
@@ -23,6 +23,24 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
    if(req.method==='PUT')return send(res,200,teamAccounts.editRoster(teamId,user.user_id,await readBody(req)));
    return send(res,405,{error:'Method not allowed'});
   }catch(e){return send(res,/login|required|authorized|forbidden/i.test(e.message)?403:400,{error:e.message});}}
+  // Signed scoresheet endpoints are private; the rink's operator credential cannot sign as a referee.
+  if(pathname==='/api/scoresheet/v1/referees'&&req.method==='POST'){
+   if(!auth(req))return send(res,403,{error:'Administrator credential required'});
+   try{return send(res,201,certification.provisionReferee(await readBody(req)));}catch(e){return send(res,400,{error:e.message});}
+  }
+  if(pathname==='/api/scoresheet/v1/referee/login'&&req.method==='POST'){
+   try{const b=await readBody(req);return send(res,200,certification.login(b.refereeId,b.password));}catch(e){return send(res,401,{error:e.message});}
+  }
+  if(pathname==='/api/scoresheet/v1/submit'&&req.method==='POST'){
+   if(!auth(req))return send(res,403,{error:'Operator credential required'});
+   try{return send(res,201,certification.submit(String(req.headers['x-operator-id']||'scorekeeper')));}catch(e){return send(res,409,{error:e.message});}
+  }
+  if(pathname==='/api/scoresheet/v1/review'&&req.method==='GET'){
+   try{certification.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));const rev=certification.get();return rev?send(res,200,{...rev,signatures:certification.signatures(rev.revision)}):send(res,404,{error:'No scoresheet submitted'});}catch(e){return send(res,403,{error:e.message});}
+  }
+  if(pathname==='/api/scoresheet/v1/sign'&&req.method==='POST'){
+   try{const refereeId=certification.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));return send(res,200,certification.decide({...await readBody(req),refereeId}));}catch(e){return send(res,/authentication|assigned/i.test(e.message)?403:409,{error:e.message});}
+  }
   if(req.method==='GET'&&pathname==='/api/operator/status'){
    if(!auth(req))return send(res,403,{error:'Operator credential required'});
    const pending=authority.db.prepare('SELECT COUNT(*) AS count FROM sync_outbox WHERE delivered=0').get().count;

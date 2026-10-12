@@ -82,3 +82,9 @@ Open `http://127.0.0.1:8090/overlay.html` as a 1920×1080 browser source in OBS 
 - `requirements/manager-camera-v2.3.md`: Requirement IDs, tests and integration limitations.
 
 These modules are testable proofs of concept, **not yet integrated into the authenticated team-manager backend or camera control panel**. Verify current league policies and obtain the official blank exhibition scoresheet from the SCAHA Manager Tools page.
+
+## v2.4: Electronic scoresheet review (development slice)
+
+After `GAME_ENDED`, the scorekeeper can submit a hashed, immutable electronic scoresheet revision. An individually provisioned referee signs in at `/referee-review.html`, reviews goals/assists, penalty types and shots, and approves the exact revision or requests a correction. The individual referee's login is separate from the operator key. See `requirements/certification/electronic-scoresheet-v2.4.md` and `apps/rink-local/tests/browser/scoresheet-certification.test.js`.
+
+**Not production certification:** This release lacks the full correction/resubmission loop, legally reviewed electronic signatures, automatic final publication into the league database, configured multi-signer workflows, and TLS-hardened public identity infrastructure. Keep the HTTP server on loopback.
