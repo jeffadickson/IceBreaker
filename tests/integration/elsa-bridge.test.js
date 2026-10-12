@@ -1,0 +1,9 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {DatabaseSync}=require('node:sqlite');
+const {ensureSchema,enqueue,pending,flush}=require('../../services/elsa-workflows/bridge-outbox');
+const secret='a'.repeat(40),url='http://127.0.0.1:8094/api/icebreaker/workflow-events';
+test('stable ID deduplicates same transition',()=>{const db=new DatabaseSync(':memory:');ensureSchema(db);const r={gameId:'G1',action:'approve',revision:2,definitionDigest:'abc'};assert.equal(enqueue(db,r),enqueue(db,r));assert.equal(pending(db).length,1);db.close();});
+test('delivery acknowledges only a successful HTTP response',async()=>{const db=new DatabaseSync(':memory:');enqueue(db,{gameId:'G2',action:'submit',revision:1,definitionDigest:'abc'});let calls=0;const fake=async()=>({ok:++calls>1,status:503});let r=await flush(db,{url,key:secret,fetchImpl:fake});assert.deepEqual(r,{sent:0,failed:1});assert.equal(pending(db).length,1);r=await flush(db,{url,key:secret,fetchImpl:fake});assert.deepEqual(r,{sent:1,failed:0});assert.equal(pending(db).length,0);db.close();});
+test('outbox persists across process-like database reopen',()=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'icebreaker-elsa-'));const f=path.join(dir,'db.sqlite');try{let db=new DatabaseSync(f);enqueue(db,{gameId:'G3',action:'correct',revision:4,definitionDigest:'abc'});db.close();db=new DatabaseSync(f);assert.equal(pending(db).length,1);db.close();}finally{fs.rmSync(dir,{recursive:true,force:true});}});
+test('refuses cleartext off-host endpoint',async()=>{const db=new DatabaseSync(':memory:');await assert.rejects(()=>flush(db,{url:'http://example.com/workflows',key:secret}),/HTTPS or loopback/);db.close();});
