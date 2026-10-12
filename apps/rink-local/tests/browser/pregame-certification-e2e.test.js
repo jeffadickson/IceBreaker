@@ -21,7 +21,7 @@ test('bound game refuses unsigned lineups, then signs exact confirmed lineup rev
     team.confirmLineup(tid,game.id,manager.id,{playerIds:roster.slice(0,2).map(x=>x.id),expectedRosterRevision:team.currentRevision(tid)});
   }
   const pre=await fetch(base+'/api/scoresheet/v1/pregame',{headers:{'X-Operator-Key':'test-operator'}});assert.equal((await pre.json()).ready,true);
-  const resp=await op('/api/scoresheet/v1/submit',{});assert.equal(resp.status,201);const submitted=await resp.json();
+  const resp=await op('/api/scoresheet/v1/submit',{});assert.equal(resp.status,201,await resp.clone().text());const submitted=await resp.json();
   assert.equal(submitted.document.pregameEvidence.ready,true);
   assert.match(submitted.document.pregameDigest,/^[a-f0-9]{64}$/);
  }finally{await app.stop();team.close();fs.rmSync(dir,{recursive:true,force:true});}
