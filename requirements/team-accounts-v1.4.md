@@ -22,3 +22,15 @@ A **local development implementation** of TEAM-001 through TEAM-004 and TEAM-006
 ## Suggested workflow
 
 League admin grants account → manager updates season roster → coach chooses attending players → authenticated representative confirms lineup and revision → rink station imports lineup → officials review discrepancies → game certification compares against signed lineup. Separate pregame deadlines, roster locks and emergency amendments should be defined by a versioned league workflow policy.
+
+
+## v1.5 Scorekeeper eligibility extension
+
+- **TEAM-013 (P0)** If a rink authority is bound to a league game, neither team may submit roster-dependent official commands until both game-day lineups are confirmed.
+- **TEAM-014 (P0)** The scorekeeper shall resolve goal scorer, assists, and penalized-player jersey numbers against the respective team's confirmed game-day roster, rejecting missing and ambiguous numbers before journal commit.
+- **TEAM-015 (P0)** TBD attribution shall remain valid pending later authorized correction.
+- **TEAM-016 (P0)** Goal-attribution corrections shall be validated against the *original goal's* team, not an operator-supplied team.
+- **TEAM-017 (P1)** Authorized operators shall have a read-only game-day lineup display with confirmation status and revision.
+- **TEAM-018 (P0, not yet implemented)** Production game-scoped authority shall bind the roster snapshot and sequence atomically, resolve permanent player IDs, and support signed, audited post-start lineup amendments.
+
+Verification: `apps/rink-local/tests/browser/game-roster-policy.test.js`. Current prototype enforces jersey numbers before commit but stores the original jersey-based event payload; permanent-player-ID resolution is still pending.
