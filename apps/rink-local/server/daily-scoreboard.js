@@ -2,10 +2,12 @@
 // Public read-only multi-division daily board. Dates are calendar days at the configured league timezone.
 const assertDate=s=>{if(typeof s!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)||new Date(s+'T00:00:00Z').toISOString().slice(0,10)!==s)throw Error('Invalid calendar date');return s;};
 function dayAt(date,zone){const parts=new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);const obj=Object.fromEntries(parts.map(p=>[p.type,p.value]));return obj.year+'-'+obj.month+'-'+obj.day;}
-function dailyBoard(db,{date,seasonId,divisionId,timezone='America/Los_Angeles',liveGameId=null,liveSnapshot=null}={}){
- date=assertDate(date);if(typeof timezone!=='string'||timezone.length>100)throw Error('Invalid timezone');
+function dailyBoard(db,{date,leagueId='demo-league',seasonId,divisionId,timezone=null,liveGameId=null,liveSnapshot=null}={}){
+ const league=db.prepare('SELECT id,name,public_scoreboard_enabled AS enabled,timezone FROM leagues WHERE id=?').get(leagueId);
+ if(!league)throw Error('Unknown league');if(!league.enabled)throw Error('Public scoreboard disabled for league');
+ timezone=timezone||league.timezone;date=assertDate(date);if(typeof timezone!=='string'||timezone.length>100)throw Error('Invalid timezone');
  try{new Intl.DateTimeFormat('en-US',{timeZone:timezone});}catch{throw Error('Invalid timezone');}
- const seasons=db.prepare('SELECT id,name FROM seasons ORDER BY start_date DESC,id').all();
+ const seasons=db.prepare('SELECT s.id,s.name FROM seasons s JOIN league_seasons ls ON ls.season_id=s.id WHERE ls.league_id=? ORDER BY s.start_date DESC,s.id').all(leagueId);
  const season=seasonId||seasons[0]?.id||null;
  if(season&&!seasons.some(s=>s.id===season))throw Error('Unknown season');
  const divisions=season?db.prepare('SELECT id,name,rules_version AS rulesVersion FROM divisions WHERE season_id=? ORDER BY name,id').all(season):[];
@@ -23,7 +25,7 @@ function dailyBoard(db,{date,seasonId,divisionId,timezone='America/Los_Angeles',
    period:live?liveSnapshot.period:null,seconds:live?liveSnapshot.seconds:null,
    publication:g.certifiedAt?'CERTIFIED':g.status==='final'?'UNVERIFIED_FINAL':g.status==='live'?'PROVISIONAL':'SCHEDULED'};
  });
- return {schema:'icebreaker.daily-board.v1',date,timezone,seasonId:season,divisionId:divisionId||null,seasons,divisions,games,
+ return {schema:'icebreaker.daily-board.v1',league:{id:league.id,name:league.name,publicScoreboardEnabled:true},date,timezone,seasonId:season,divisionId:divisionId||null,seasons,divisions,games,
   counts:{games:games.length,live:games.filter(x=>x.status==='live').length,final:games.filter(x=>x.status==='final').length}};
 }
 module.exports={dailyBoard,assertDate,dayAt};
