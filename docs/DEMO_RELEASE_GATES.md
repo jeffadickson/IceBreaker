@@ -6,11 +6,11 @@
 
 | Gate | Proof / action | State |
 |---|---|---|
-| Source/CI | Clone from GitHub; Node, Elsa .NET, docs CI green | Needs GitHub CI run and local Elsa build |
+| Source/CI | Clone from GitHub; Node, Elsa .NET, docs CI green | GitHub Actions run 38313525584 passed (Node, C# core, Elsa build and HTTP restart smoke); clean Windows smoke still recommended |
 | Operator journey | Start/stop clock, goals/TBD, assists, shots, penalties, undo via audit corrections | Needs browser E2E + manual dry run |
 | League display | Same goal shown once in parent tracker; full score under mercy | Needs multi-device smoke test |
 | Game lifecycle | Game end, provisional scoresheet, referee correction and fresh signed revision | Development path exists; live end-to-end demo check needed |
-| Workflow runtime | Elsa receives event and persists receipt; Node approval journal unchanged | Elsa host C# build and restart test pending |
+| Workflow runtime | Elsa receives event and persists receipt; Node approval journal unchanged | Elsa build and restart/dedup HTTP smoke passed on GitHub CI; Windows multi-service E2E remains pending |
 | Local sync | Disconnect/reconnect without double scoring or losing shots | Existing test coverage; real network disruption exercise pending |
 | Accessibility/mobile | Touch check on iOS/Android, readability, input focus | Not measured |
 | Privacy | Only fictional players; do not expose private audit/keys | Must enforce for demo |
