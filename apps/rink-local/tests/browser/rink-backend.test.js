@@ -19,3 +19,15 @@ test('mercy cap only affects arena scoreboard; parent always gets all goals',asy
 test('journal is SQLite compatible and survives restart without duplicate goals',async()=>{const before=await snap();const dbPath=path.join(dir,'rink.db');await app.stop();app=createRinkServer({dbPath,port:0,operatorKey:key});const addr=await app.start();base='http://127.0.0.1:'+addr.port;const after=await snap();assert.equal(after.scores.home,before.scores.home);assert.equal(after.revision,before.revision);assert.equal(app.authority.db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');});
 test('interrupted clock recovery records STOP without extrapolating downtime',async()=>{assert.equal((await cmd({type:'CLOCK_UPDATED',action:'START',seconds:500})).status,200);const before=await snap();const dbPath=path.join(dir,'rink.db');await app.stop();app=createRinkServer({dbPath,port:0,operatorKey:key});const addr=await app.start();base='http://127.0.0.1:'+addr.port;const after=await snap();assert.equal(after.running,false);assert.equal(after.seconds,500);assert.equal(after.revision,before.revision+1);assert.match(fs.readFileSync(dbPath+'.actions.jsonl','utf8'),/system-recovery/);});
 test('two browser clients see new committed goal via SSE without refresh',async()=>{const ac=new AbortController();const r=await fetch(base+'/api/games/demo/events',{signal:ac.signal});const reader=r.body.getReader();await reader.read();const previous=(await snap()).revision;const result=await cmd({type:'GOAL_RECORDED',team:'away',scorer:'22',assist1:'None',assist2:'None'});assert.equal(result.status,200);const {value}=await reader.read();const message=new TextDecoder().decode(value);assert.match(message,/event: snapshot/);assert.match(message,new RegExp('"revision":'+(previous+1)));ac.abort();});
+test('operator readiness status requires credentials and counts committed outbox entries',async()=>{
+ const unauth=await fetch(base+'/api/operator/status');assert.equal(unauth.status,403);
+ const r=await fetch(base+'/api/operator/status',{headers:{'X-Operator-Key':key}});assert.equal(r.status,200);
+ const d=await r.json();assert.equal(d.gameId,'demo');assert.equal(d.roster.bound,false);
+ assert.equal(d.outbox.pending,app.authority.db.prepare('SELECT COUNT(*) AS n FROM sync_outbox WHERE delivered=0').get().n);
+ assert.equal(d.outbox.delivered,0);assert.equal(typeof d.mirrorHealthy,'boolean');
+});
+test('operator page includes visible sync and roster readiness indicators',async()=>{
+ const html=await (await fetch(base+'/operator.html')).text();const js=await (await fetch(base+'/operator.js')).text();
+ for(const id of ['rosterStatus','syncStatus','logStatus','reloadRoster'])assert.match(html,new RegExp(`id="${id}"`));
+ assert.match(js,/api\/operator\/game-rosters/);assert.match(js,/confirmedRosters/);
+});

@@ -12,7 +12,7 @@
 - **Run Node test suite:** `node --test apps/rink-local/tests/browser/*.test.js`.
 - **Run .NET tests when .NET SDK 8+ is installed:** `dotnet test apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj`.
 
-**GitHub publication:** The complete 158-file v1.5 expanded source package was published to `main` on 2026-10-12. See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for implementation maturity and deployment limitations.
+See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for source inventory, incomplete features, and safe push procedure.
 
 ## Repository map
 
@@ -64,3 +64,7 @@ Open `/team.html` from the running rink server. The backend provides separate te
 ## v1.5: Game-day roster validation (development opt-in)
 
 Set `ICEBREAKER_LEAGUE_GAME_ID` to the ID of a scheduled game in the local league database before starting the rink backend. Then the operator may inspect `http://127.0.0.1:8090/game-rosters.html`. Once bound, goals, assists, their corrections, and player penalties require both teams to have confirmed lineups. Jersey numbers are checked against the confirmed snapshot; TBD remains valid. The normal unbound demo retains its original behavior. This prototype uses one bound game per backend instance; it does not yet support multi-rink production game assignment or the administrator late-amendment workflow.
+
+## v1.8: operator readiness and lineup-based fast entry
+
+The rink scorekeeper displays database-backed sync outbox counts, event-mirror health, and game-day roster readiness. When the server is bound to a league fixture and both lineups are confirmed, jersey-number quick-pick buttons use the confirmed lineups instead of fixed demo rosters. TBD is always available. The status endpoint `/api/operator/status` requires the development operator credential. See `requirements/scoring-operator-readiness-v1.8.md`. The interface is still a development prototype; it is not authenticated for public deployment.

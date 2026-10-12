@@ -23,6 +23,14 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
    if(req.method==='PUT')return send(res,200,teamAccounts.editRoster(teamId,user.user_id,await readBody(req)));
    return send(res,405,{error:'Method not allowed'});
   }catch(e){return send(res,/login|required|authorized|forbidden/i.test(e.message)?403:400,{error:e.message});}}
+  if(req.method==='GET'&&pathname==='/api/operator/status'){
+   if(!auth(req))return send(res,403,{error:'Operator credential required'});
+   const pending=authority.db.prepare('SELECT COUNT(*) AS count FROM sync_outbox WHERE delivered=0').get().count;
+   const delivered=authority.db.prepare('SELECT COUNT(*) AS count FROM sync_outbox WHERE delivered=1').get().count;
+   let roster={bound:false,confirmed:false,teams:null};
+   if(leagueGameId){try{const state=snapshotForGame(teamAccounts.db,leagueGameId);roster={bound:true,gameId:leagueGameId,confirmed:state.confirmed,teams:Object.fromEntries(Object.entries(state.teams).map(([side,t])=>[side,{confirmed:t.confirmed,count:t.players.length,revision:t.revision}]))};}catch(e){roster={bound:true,gameId:leagueGameId,confirmed:false,error:e.message};}}
+   return send(res,200,{gameId:authority.gameId,revision:authority.state.revision,mirrorHealthy:authority.mirrorHealthy,outbox:{pending,delivered},roster});
+  }
   if(req.method==='GET'&&pathname==='/api/operator/game-rosters'){if(!auth(req))return send(res,403,{error:'Operator credential required'});if(!leagueGameId)return send(res,409,{error:'No league game bound; set ICEBREAKER_LEAGUE_GAME_ID'});try{return send(res,200,snapshotForGame(teamAccounts.db,leagueGameId));}catch(e){return send(res,400,{error:e.message});}}
   if(req.method==='GET'&&pathname==='/api/league/v1/overview')return send(res,200,leagueStore.snapshot(authority));
   if(req.method==='GET'&&pathname==='/api/league/v1/audit')return send(res,403,{error:'Administrative audit is not public'});
