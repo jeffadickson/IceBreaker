@@ -1,0 +1,9 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {DatabaseSync}=require('node:sqlite');
+const {pregameSnapshot,requirePregameSnapshot,snapshotDigest}=require('../../server/pregame-gate');
+function setup(){const db=new DatabaseSync(':memory:');db.exec(`CREATE TABLE games(id TEXT PRIMARY KEY,home_team_id TEXT,away_team_id TEXT,status TEXT);CREATE TABLE game_roster_confirmations(game_id TEXT,team_id TEXT,roster_revision INTEGER,player_ids_json TEXT,confirmed_by TEXT,confirmed_at TEXT,PRIMARY KEY(game_id,team_id));INSERT INTO games VALUES('G','H','A','scheduled');`);return db;}
+test('two team confirmations required',()=>{const db=setup();assert.equal(pregameSnapshot(db,'G').ready,false);assert.throws(()=>requirePregameSnapshot(db,'G'),/Both teams/);db.close();});
+test('record immutable evidence inputs, stable players and signers',()=>{const db=setup();for(const team of ['H','A'])db.prepare('INSERT INTO game_roster_confirmations VALUES(?,?,?,?,?,?)').run('G',team,1,JSON.stringify(['P2','P1']),'manager-'+team,'2026-10-12T00:00:00Z');const snap=requirePregameSnapshot(db,'G');assert.equal(snap.ready,true);assert.deepEqual(snap.teams.home.playerIds,['P1','P2']);assert.equal(snap.teams.away.confirmedBy,'manager-A');const first=snapshotDigest(snap);db.prepare("UPDATE game_roster_confirmations SET roster_revision=2 WHERE team_id='H'").run();assert.notEqual(snapshotDigest(requirePregameSnapshot(db,'G')),first);db.close();});
+test('unknown game rejected',()=>{const db=setup();assert.throws(()=>pregameSnapshot(db,'missing'),/Unknown league game/);db.close();});
+test('duplicate players in stored confirmation rejected',()=>{const db=setup();db.prepare('INSERT INTO game_roster_confirmations VALUES(?,?,?,?,?,?)').run('G','H',1,'["P1","P1"]','m','now');assert.throws(()=>pregameSnapshot(db,'G'),/Invalid stored lineup/);db.close();});
