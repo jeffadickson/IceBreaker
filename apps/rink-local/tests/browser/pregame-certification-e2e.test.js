@@ -14,7 +14,8 @@ test('bound game refuses unsigned lineups, then signs exact confirmed lineup rev
  const op=(route,body)=>fetch(base+route,{method:'POST',headers:{'Content-Type':'application/json','X-Operator-Key':'test-operator','Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(body)});
  try{
   const unready=await fetch(base+'/api/scoresheet/v1/pregame',{headers:{'X-Operator-Key':'test-operator'}});assert.equal((await unready.json()).ready,false);
-  // Simulate a completed imported game to exercise the certification gate independently of pregame operator checks.\n  app.authority.command({type:'GAME_ENDED'},{actor:'test-harness',key:crypto.randomUUID()});
+  // Simulate a completed imported game to exercise the certification gate independently of pregame operator checks.
+  app.authority.command({type:'GAME_ENDED'},{actor:'test-harness',key:crypto.randomUUID()});
   const blocked=await op('/api/scoresheet/v1/submit',{});assert.equal(blocked.status,409);
   for(const tid of [game.home_team_id,game.away_team_id]){
     const roster=team.roster(tid);assert.ok(roster.length>0);const manager=team.createUser(tid+'@test.invalid','sample-secret-password',tid);
