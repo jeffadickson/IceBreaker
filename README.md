@@ -28,6 +28,10 @@ See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for source inventory, incomplet
 | `tools/` | Local integrity and link check utilities | Included |
 | `.github/workflows/` | CI for Node tests and docs links; separate .NET tests | Configured; run results depend on GitHub |
 
+## Workflow engine
+
+**Default: embedded and lightweight.** Electronic scoresheet submission, correction, referee approval and result publication are coordinated by the existing version-pinned JSON interpreter and SQLite records in the rink backend. No Elsa server is required. See [lightweight workflow guide](docs/LIGHTWEIGHT_WORKFLOWS.md). The Elsa experiment under `services/elsa-workflows/` is optional and excluded from normal CI and deployment.
+
 ## Engineering principles
 
 1. SQLite authoritative rink journal; no silent overwrites or clock extrapolation.
