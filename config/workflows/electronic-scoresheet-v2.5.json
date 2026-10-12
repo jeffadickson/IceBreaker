@@ -1,15 +1,58 @@
 {
   "id": "icebreaker.scoresheet-approval",
   "version": "2.5.0",
-  "status": "proposed-adapter-not-executed-by-Elsa",
+  "status": "executable-icebreaker-runtime-not-elsa",
   "sportNeutral": true,
-  "states": ["LIVE", "FINAL_UNOFFICIAL", "SUBMITTED", "CORRECTION_REQUESTED", "AMENDED", "CERTIFIED"],
-  "transitions": [
-    {"from":"FINAL_UNOFFICIAL","to":"SUBMITTED","action":"submit","role":"scorekeeper","guard":"no-unresolved-attribution"},
-    {"from":"SUBMITTED","to":"CORRECTION_REQUESTED","action":"request-correction","role":"assigned-referee","guard":"digest-matches"},
-    {"from":"CORRECTION_REQUESTED","to":"AMENDED","action":"correct-event","role":"scorekeeper","guard":"requested-revision-and-audited-change"},
-    {"from":"AMENDED","to":"SUBMITTED","action":"resubmit","role":"scorekeeper","guard":"new-source-sequence-and-digest"},
-    {"from":"SUBMITTED","to":"CERTIFIED","action":"approve-and-sign","role":"assigned-referee","guard":"digest-matches-and-explicit-attestation"}
+  "states": [
+    "LIVE",
+    "FINAL_UNOFFICIAL",
+    "SUBMITTED",
+    "CORRECTION_REQUESTED",
+    "AMENDED",
+    "CERTIFIED"
   ],
-  "immutableInvariants": ["append-only-game-journal", "audited-corrections", "signature-bound-to-revision", "authenticated-official", "stale-signature-rejected"]
+  "transitions": [
+    {
+      "from": "FINAL_UNOFFICIAL",
+      "to": "SUBMITTED",
+      "action": "submit",
+      "role": "scorekeeper",
+      "guard": "no-unresolved-attribution"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "CORRECTION_REQUESTED",
+      "action": "request-correction",
+      "role": "assigned-referee",
+      "guard": "digest-matches"
+    },
+    {
+      "from": "CORRECTION_REQUESTED",
+      "to": "AMENDED",
+      "action": "correct-event",
+      "role": "scorekeeper",
+      "guard": "requested-revision-and-audited-change"
+    },
+    {
+      "from": "AMENDED",
+      "to": "SUBMITTED",
+      "action": "resubmit",
+      "role": "scorekeeper",
+      "guard": "new-source-sequence-and-digest"
+    },
+    {
+      "from": "SUBMITTED",
+      "to": "CERTIFIED",
+      "action": "approve-and-sign",
+      "role": "assigned-referee",
+      "guard": "digest-matches-and-explicit-attestation"
+    }
+  ],
+  "immutableInvariants": [
+    "append-only-game-journal",
+    "audited-corrections",
+    "signature-bound-to-revision",
+    "authenticated-official",
+    "stale-signature-rejected"
+  ]
 }

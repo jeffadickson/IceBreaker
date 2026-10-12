@@ -1,9 +1,9 @@
 'use strict';
 // Local-first development backend, not a public internet service.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const {URL}=require('node:url');const {ScoresheetCertification}=require('./scoresheet-certification');const {snapshotForGame,assertGameRosterEligible}=require('./game-roster-policy');const {reportFromState,renderReport,topPenalties}=require('./game-report');const {createParentAuth}=require('./parent-auth');const {Authority}=require('./authority-sqlite');const {LeagueStore}=require('./league-store');const {TeamAccounts}=require('./team-accounts');
+const {URL}=require('node:url');const {CertifiedDelivery}=require('./certified-delivery');const {ScoresheetCertification}=require('./scoresheet-certification');const {snapshotForGame,assertGameRosterEligible}=require('./game-roster-policy');const {reportFromState,renderReport,topPenalties}=require('./game-report');const {createParentAuth}=require('./parent-auth');const {Authority}=require('./authority-sqlite');const {LeagueStore}=require('./league-store');const {TeamAccounts}=require('./team-accounts');
 function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='127.0.0.1',port=8090,operatorKey=process.env.ICEBREAKER_OPERATOR_KEY||'local-development-key',leagueGameId=process.env.ICEBREAKER_LEAGUE_GAME_ID||null}={}){
- const parentAuth=createParentAuth({dbPath});const authority=new Authority({dbPath});const leagueStore=new LeagueStore(dbPath,{seedDemo:true});const teamAccounts=new TeamAccounts(dbPath);const certification=new ScoresheetCertification(authority.db,authority);const clients=new Set();const root=path.resolve(__dirname,'../web');
+ const parentAuth=createParentAuth({dbPath});const authority=new Authority({dbPath});const leagueStore=new LeagueStore(dbPath,{seedDemo:true});const teamAccounts=new TeamAccounts(dbPath);const certification=new ScoresheetCertification(authority.db,authority);const delivery=new CertifiedDelivery({db:authority.db,workflow:certification.workflow,certification,leagueStore,leagueGameId});const clients=new Set();const root=path.resolve(__dirname,'../web');
  const send=(res,code,obj)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(obj));};
  const broadcast=()=>{const msg=`id: ${authority.state.revision}\nevent: snapshot\ndata: ${JSON.stringify(authority.spectator())}\n\n`;for(const r of clients){try{r.write(msg);}catch{clients.delete(r);}}};
  const auth=req=>{const k=req.headers['x-operator-key'];return typeof k==='string'&&k.length===operatorKey.length&&crypto.timingSafeEqual(Buffer.from(k),Buffer.from(operatorKey));};
@@ -44,6 +44,18 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
   }
   if(pathname==='/api/scoresheet/v1/sign'&&req.method==='POST'){
    try{const refereeId=certification.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));return send(res,200,certification.decide({...await readBody(req),refereeId}));}catch(e){return send(res,/authentication|assigned/i.test(e.message)?403:409,{error:e.message});}
+  }
+  if(req.method==='GET'&&pathname==='/api/scoresheet/v1/workflow'){
+   if(!auth(req))return send(res,403,{error:'Operator credential required'});
+   return send(res,200,{instance:certification.workflow.current(),history:certification.workflow.history(),deliveries:certification.workflow.deliveries()});
+  }
+  if(req.method==='POST'&&pathname==='/api/scoresheet/v1/deliver/retry'){
+   if(!auth(req))return send(res,403,{error:'Administrator credential required'});
+   return send(res,200,certification.workflow.retryBlocked());
+  }
+  if(req.method==='POST'&&pathname==='/api/scoresheet/v1/deliver'){
+   if(!auth(req))return send(res,403,{error:'Administrator credential required'});
+   return send(res,200,delivery.run());
   }
   if(req.method==='GET'&&pathname==='/api/operator/status'){
    if(!auth(req))return send(res,403,{error:'Operator credential required'});
