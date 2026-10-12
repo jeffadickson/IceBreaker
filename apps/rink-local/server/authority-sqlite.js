@@ -32,6 +32,9 @@ function validate(c,state){if(!c||typeof c!=='object')throw Error('Invalid comma
   if(!validSide(c.team))throw Error('Invalid shot team');
  }else if(c.type==='CLOCK_UPDATED'){
   if(!['START','STOP','SET'].includes(c.action)||!isInt(c.seconds,0,3600))throw Error('Invalid clock action');
+ }else if(c.type==='CLOCK_SYNCED'){
+  if(state.running)throw Error('Stop the game clock before syncing to arena clock');
+  if(!isInt(c.seconds,0,3600)||!clean(c.reason)||String(c.reason).length>200)throw Error('Clock synchronization requires valid time and reason');
  }else if(['PERIOD_ENDED','PERIOD_ADVANCED','GAME_ENDED'].includes(c.type)){
   if(c.type==='PERIOD_ADVANCED'&&state.period>=9)throw Error('Period limit');
  }else if(c.type==='MERCY_MODE_CHANGED'){
@@ -47,6 +50,7 @@ function project(events){const state={revision:0,period:1,seconds:900,running:fa
   if(e.event_type==='PENALTY_DELAYED_WAVED')item.details={delayedEventId:d.delayedEventId};
   if(e.event_type==='SHOT_RECORDED'){state.shots[d.teamId]++;item.details={shotNumber:state.shots[d.teamId]};}
   if(e.event_type==='CLOCK_UPDATED')item.details={action:d.action};
+  if(e.event_type==='CLOCK_SYNCED')item.details={action:'SYNC_TO_ARENA',previousSeconds:d.previousSeconds,secondsRemaining:d.secondsRemaining,reason:d.reason};
   if(e.event_type==='CLOCK_UPDATED')state.running=d.action==='START'?true:d.action==='STOP'?false:state.running;
   if(e.event_type==='PERIOD_ENDED'||e.event_type==='GAME_ENDED')state.running=false;
   if(e.event_type==='PERIOD_ADVANCED'){state.period=e.period;state.seconds=e.clock_seconds;state.running=false;}
@@ -75,7 +79,7 @@ class Authority{
   if(c.type==='PENALTY_DELAYED_WAVED')payload={delayedEventId:clean(c.delayedEventId,80)};
   if(c.type==='PENALTY_WHISTLE')payload={delayedEventIds:Array.isArray(c.delayedEventIds)?c.delayedEventIds.map(x=>clean(x,80)):null};
   if(c.type==='SHOT_RECORDED')payload={teamId:c.team};
-  if(c.type==='CLOCK_UPDATED'){seconds=c.action==='STOP'?this.currentSeconds():c.seconds;payload={action:c.action,secondsRemaining:seconds};}else if(this.state.running){seconds=this.currentSeconds();}
+  if(c.type==='CLOCK_UPDATED'){seconds=c.action==='STOP'?this.currentSeconds():c.seconds;payload={action:c.action,secondsRemaining:seconds};}else if(c.type==='CLOCK_SYNCED'){seconds=c.seconds;payload={previousSeconds:this.currentSeconds(),secondsRemaining:seconds,reason:clean(c.reason,200)};}else if(this.state.running){seconds=this.currentSeconds();}
   if(c.type==='PERIOD_ADVANCED'){period++;seconds=isInt(c.seconds,0,3600)?c.seconds:900;}
   if(c.type==='PERIOD_ENDED'||c.type==='GAME_ENDED'){seconds=isInt(c.seconds,0,3600)?c.seconds:seconds;}
   if(c.type==='MERCY_MODE_CHANGED')payload={active:c.active,hasTriggered:c.hasTriggered,reason:clean(c.reason,200)};
