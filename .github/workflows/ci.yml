@@ -17,6 +17,8 @@ jobs:
         run: python tools/check_docs.py
       - name: Run local-backend tests
         run: node --test apps/rink-local/tests/browser/*.test.js
+      - name: Remote rink ingestion integration tests
+        run: node --test tests/integration/remote-sync.test.js
   dotnet:
     runs-on: ubuntu-latest
     steps:
