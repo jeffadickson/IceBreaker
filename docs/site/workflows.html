@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Configurable league-specific state machine and safety boundaries"><title>Workflow &amp; Policies · IceBreaker Manual</title><link rel="stylesheet" href="style.css"></head><body><div class="app"><aside class="sidebar"><a href="index.html" class="brand">❄ Ice<span>Breaker</span></a><div class="edition">OPERATOR + ENGINEERING MANUAL · v1</div><div class="nav-title">Getting started</div><a class="nav " href="index.html">Overview</a><a class="nav " href="quickstart.html">Quick start</a><a class="nav " href="scorekeeper.html">Scorekeeper</a><a class="nav " href="live.html">Parent Live</a><a class="nav " href="league.html">League Center</a><a class="nav " href="parents.html">Parent accounts</a><div class="nav-title">Game operations</div><a class="nav " href="officials.html">Officials &amp; signing</a><a class="nav current" href="workflows.html">Workflows &amp; policy</a><a class="nav " href="sync.html">Remote rink sync</a><a class="nav " href="audit.html">Logging &amp; recovery</a><a class="nav " href="mercy.html">Mercy rules</a><a class="nav " href="pa.html">PA announcer</a><div class="nav-title">Engineering</div><a class="nav " href="architecture.html">Architecture</a><a class="nav " href="api.html">Local API</a><a class="nav " href="security.html">Security &amp; privacy</a><a class="nav " href="requirements.html">Requirements</a><a class="nav " href="testing.html">Testing &amp; release</a><a class="nav " href="deployment.html">Operations</a></aside><div class="main"><header class="topbar"><button id="menu" class="menu-btn" aria-label="Open navigation">☰</button><small>ICEBREAKER / WORKFLOW &amp; POLICIES</small><div style="position:relative"><input aria-label="Search manuals" id="search" placeholder="Search manuals… (/)"><div id="searchResults"></div></div></header><main class="content"><h1>Workflow and league policies</h1><p>The recommended future engine is Elsa Workflows for server-side, durable .NET workflows. A league may use a versioned JSON policy as the user-facing configuration, compiled/validated into an approved workflow definition.</p><h2>Configurable</h2><ul><li>Eligible approver role(s) and number of signatures.</li><li>Review timeout, escalation, disputed/reopened states.</li><li>Certification notifications and event publication timing.</li><li>Mercy thresholds, eligible periods, latched/dynamic activation.</li><li>Report delivery options and tiebreaker policies.</li></ul><h2>Never configurable away</h2><p>Authentication, game assignment authorization, event sequencing, immutable audit, cryptographic revision binding, youth data access policy, and idempotency checks remain enforced in the core.</p><h2>Example file</h2><pre><code>{
+  &quot;policyId&quot;: &quot;youth-hockey-standard&quot;,
+  &quot;version&quot;: 1,
+  &quot;schemaVersion&quot;: &quot;1.0&quot;,
+  &quot;gameCertification&quot;: {
+    &quot;livePublication&quot;: &quot;provisional&quot;,
+    &quot;onFinalSubmission&quot;: &quot;pending_review&quot;,
+    &quot;requiredApprovals&quot;: [{&quot;role&quot;: &quot;referee&quot;, &quot;count&quot;: 1}],
+    &quot;requireAllEventsSynchronized&quot;: true,
+    &quot;allowUnresolvedAttributions&quot;: false,
+    &quot;requestCorrectionOnDiscrepancy&quot;: true,
+    &quot;officialApprovalDueHours&quot;: 48,
+    &quot;escalationRole&quot;: &quot;league_administrator&quot;,
+    &quot;sendReportOn&quot;: &quot;certified&quot;,
+    &quot;reopenRoles&quot;: [&quot;league_administrator&quot;]
+  },
+  &quot;parentPortal&quot;: {
+    &quot;followTeams&quot;: true,
+    &quot;followPlayersWithGuardianPrivacyEnforcement&quot;: true,
+    &quot;showFullOfficialLiveScore&quot;: true,
+    &quot;dailyEmailLimit&quot;: 5,
+    &quot;gameReportEmail&quot;: &quot;opt_in&quot;,
+    &quot;reportCorrectionPolicy&quot;: &quot;send_revision_notice&quot;,
+    &quot;playerVisibility&quot;: &quot;league_approved&quot;,
+    &quot;guardianConsentRequiredForMinorProfile&quot;: true
+  }
+}
+</code></pre><p>The included configuration is an <strong>example policy, not a functioning Elsa workflow</strong>. New definitions require review, tests, and version pinning to each game.</p><div class="footer">IceBreaker documentation · Development prototype · Some features are planned and identified as such · <a href="security.html">Security guidance</a></div></main></div></div><script src="manual.js"></script></body></html>

@@ -1,0 +1,32 @@
+requirement_id,implementation,test,verification_status
+PARENT-001,server/live-server.js;web/live.html,tests/browser/live-server.test.js,Automated development test
+PARENT-002,server/live-server.js;web/live.js,tests/browser/live-server.test.js,Automated development test
+PARENT-003,web/tracker-model.js,tests/browser/tracker-model.test.js,Automated unit test
+PARENT-004,web/tracker-model.js;server/live-server.js,tests/browser/live-server.test.js,Automated development test
+PARENT-005,web/live.js;server/live-server.js,tests/browser/live-server.test.js,Automated development test
+PARENT-006,web/live.js;server/live-server.js,tests/browser/live-server.test.js,Automated development test
+PARENT-007,server/live-server.js;web/tracker-model.js,tests/browser/full-score-policy.test.js;tests/browser/tracker-model.test.js,Automated development test
+PARENT-008,web/tracker-model.js,tests/browser/tracker-model.test.js,Automated unit test
+PARENT-009,server/live-server.js;web/live.js,tests/browser/live-server.test.js,Development SSE test; real network pending
+PARENT-010,server/live-server.js,tests/browser/live-server.test.js,Development privacy test; production authorization pending
+PARENT-012,web/live.js,tests/browser/live-server.test.js,Partial; browser end-to-end pending
+LOG-001,src/Icebreaker.Core/Audit/OperatorActionLog.cs,tests/Icebreaker.Core.Tests/OperatorActionLogTests.cs,Uncompiled .NET test
+LOG-002,src/Icebreaker.Core/GameStore.cs,tests/Icebreaker.Core.Tests/GameStoreTests.cs,Uncompiled .NET test
+LOG-003,src/Icebreaker.Core/GameStore.cs,tests/Icebreaker.Core.Tests/GameStoreTests.cs,Uncompiled .NET test
+LOG-004,src/Icebreaker.Core/Audit/OperatorActionLog.cs,tests/Icebreaker.Core.Tests/OperatorActionLogTests.cs,Uncompiled .NET test
+TEST-001,requirements/icebreaker-live.sdoc;requirements/traceability.csv,tests/browser/requirements.test.js,Automated coverage lint
+ARENA-001,server/live-server.js,tests/browser/full-score-policy.test.js;tests/browser/live-server.test.js,Automated development test
+PARENT-013,server/live-server.js;web/live.html,tests/browser/full-score-policy.test.js,Automated development test
+BACKEND-001,server/authority-sqlite.js,tests/browser/rink-backend.test.js,Automated SQLite transaction test
+BACKEND-002,server/rink-server.js;web/operator.js,tests/browser/rink-backend.test.js,Automated audit isolation test
+BACKEND-003,server/authority-sqlite.js,tests/browser/rink-backend.test.js,Automated idempotency test
+BACKEND-004,server/authority-sqlite.js;web/live.js,tests/browser/rink-backend.test.js,Automated mercy isolation test
+BACKEND-005,server/authority-sqlite.js,tests/browser/rink-backend.test.js,Automated restart recovery test
+LEAGUE-001,server/rink-server.js;web/league.html,tests/browser/league.test.js,implemented-development
+LEAGUE-002,server/league-data.js,tests/browser/league.test.js,implemented-fixture-only
+LEAGUE-003,server/league-data.js,tests/browser/league.test.js,partial-fixture-stable-id-no-production-correction-rollup
+LEAGUE-004,server/league-data.js,tests/browser/league.test.js,partial-demo-rules-only
+LEAGUE-005,server/league-data.js,tests/browser/league.test.js,partial-schedule-revision-pending
+LEAGUE-006,web/league.html;web/league.js,tests/browser/league.test.js,partial-browser-e2e-pending
+LEAGUE-007,server/league-data.js;web/league.html,tests/browser/league.test.js,partial-production-permissions-pending
+LEAGUE-008,requirements/traceability.csv,tests/browser/league.test.js,partial-expanded-gates-pending

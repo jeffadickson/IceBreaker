@@ -1,0 +1,92 @@
+[
+  {
+    "title": "Manual Home",
+    "description": "Role-based documentation for every IceBreaker interface and service",
+    "url": "index.html"
+  },
+  {
+    "title": "Quick Start",
+    "description": "Install, test, launch and explore the local prototype",
+    "url": "quickstart.html"
+  },
+  {
+    "title": "Scorekeeper",
+    "description": "Touch-first goals, assists, penalties, clock and confirmation",
+    "url": "scorekeeper.html"
+  },
+  {
+    "title": "Parent Live Tracker",
+    "description": "Full score, goal feed, penalties, periods and corrections",
+    "url": "live.html"
+  },
+  {
+    "title": "League Center",
+    "description": "Teams, standings, rosters, scores, schedules and statistics",
+    "url": "league.html"
+  },
+  {
+    "title": "Parent Accounts",
+    "description": "Accounts, followed teams/players and report preferences",
+    "url": "parents.html"
+  },
+  {
+    "title": "Officials & Signing",
+    "description": "Review, dispute and authenticate game scoresheets",
+    "url": "officials.html"
+  },
+  {
+    "title": "Workflow & Policies",
+    "description": "Configurable league-specific state machine and safety boundaries",
+    "url": "workflows.html"
+  },
+  {
+    "title": "Remote Rink Sync",
+    "description": "Device identity, partial results, idempotency and recovery",
+    "url": "sync.html"
+  },
+  {
+    "title": "Event Log & Recovery",
+    "description": "Full operator action logging, immutable official events and exports",
+    "url": "audit.html"
+  },
+  {
+    "title": "Mercy Rules",
+    "description": "Arena-only score cap and configurable running clock",
+    "url": "mercy.html"
+  },
+  {
+    "title": "PA Announcer",
+    "description": "Goals, penalties, final minute and voice providers",
+    "url": "pa.html"
+  },
+  {
+    "title": "Local APIs",
+    "description": "Documented development HTTP endpoints and trust boundaries",
+    "url": "api.html"
+  },
+  {
+    "title": "Architecture",
+    "description": "Platform boundaries, authorities, modules and deployment targets",
+    "url": "architecture.html"
+  },
+  {
+    "title": "Security & Privacy",
+    "description": "Roles, youth privacy, credential design and deployment controls",
+    "url": "security.html"
+  },
+  {
+    "title": "Testing & Release",
+    "description": "Unit, contract, end-to-end, fault-injection and requirement traceability",
+    "url": "testing.html"
+  },
+  {
+    "title": "Operations & Deployment",
+    "description": "Local startup, backups, logs and production readiness",
+    "url": "deployment.html"
+  },
+  {
+    "title": "Requirements & Decisions",
+    "description": "StrictDoc, priority, approval and test mapping",
+    "url": "requirements.html"
+  }
+]

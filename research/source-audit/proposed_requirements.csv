@@ -1,0 +1,18 @@
+id,priority,requirement,acceptance_test
+LOG-001,P0,"On each committed authoritative game event, write a deterministic human-readable text mirror with event ID, game ID, event sequence, UTC wall time, period, game clock, operator ID, event type and before/after values.",Unit+integration: 100-event game log matches ordered journal projection.
+LOG-002,P0,Text mirror is append-only; never overwrite or delete original event entries when corrected.,Unit: correction appends referencing original event ID; original bytes unchanged.
+LOG-003,P0,SQLite event journal and outbox commit atomically before acknowledging a scoring action; text mirror is a secondary recoverable projection.,"Crash injection between commit, mirror write and ACK; exactly-once journal effect."
+LOG-004,P0,"If text mirror write fails, surface a persistent degraded-logging alert and enqueue retry; do not silently claim dual logging succeeded.",Inject disk-full and permissions error; alert + rebuild from journal.
+LOG-005,P0,Allow full or selected game log export to .txt and .jsonl with integrity metadata and no unnecessary personal information.,Export/parse/round-trip; privacy policy verification.
+LOG-006,P0,"On startup, compare last mirrored sequence against journal sequence and rebuild missing lines idempotently.",Kill after journal commit before text append; restart and reconcile.
+LOG-007,P1,Allow configured independent secondary destination for exports/backups; report storage health and ensure no direct network path can block clock operations.,Unplug secondary drive midgame; authoritative scoring continues.
+ATTR-001,P0,"Goal scorer shall be roster player or TBD; assist 1 and assist 2 shall independently be roster player, TBD or None.",Unit/UI: all supported combinations persist and render.
+ATTR-002,P0,"None means no credited assist; TBD means attribution unresolved. They must remain distinct in storage, statistics and scoresheet.",Unit: no assists counted for None or TBD; TBD remains visible.
+ATTR-003,P0,Entering a goal with TBD shall immediately adjust team score exactly once and preserve an immutable goal event ID.,Duplicate-command/retry and replay tests.
+ATTR-004,P0,"Later attribution shall append a correction linked to goal event ID, retaining prior attribution, actor, reason and timestamp without creating another goal.",Integration: score unchanged; projection reflects corrected scorer.
+ATTR-005,P0,Unresolved attributions shall be filterable in scorekeeper and read-only Game Review and reviewed before certification.,UI/acceptance: unresolved queue and certification gate.
+ATTR-006,P0,"Validate team membership at game roster snapshot, duplicate assists, scorer-as-assist, and team/period constraints; override requires permission and audit.",Property tests and authorized override test.
+REV-011,P0,"Read-only live Game Review shall show ordered goals, penalties, corrections, clock actions and provisional/final status without permitting game mutations.",E2E: observer cannot invoke game command endpoints.
+REV-012,P1,"Authorized questions shall target an immutable event ID, be rate-limited and remain separate from official corrections; notifications nonblocking.",E2E: coach question queued; no clock impact.
+OPS-013,P0,Single active operator authority shall be enforced across browser/native clients using expiring lease and fencing token.,Concurrent client command rejection and lease failover test.
+SPORT-013,P0,"Shared platform data contracts shall not assume goals, periods, ice sheets or hockey-specific penalties; hockey module implements those.",Architecture test prevents platform->hockey project reference.

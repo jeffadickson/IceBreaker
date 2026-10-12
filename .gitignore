@@ -1,0 +1,20 @@
+# runtime / local secrets
+node_modules/
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+*.actions.jsonl
+*.events.log
+*.events.jsonl
+/data/
+**/data/
+**/bin/
+**/obj/
+coverage/
+__pycache__/
+.DS_Store
+.vscode/
+.idea/

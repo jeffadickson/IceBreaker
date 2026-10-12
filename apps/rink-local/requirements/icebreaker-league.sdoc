@@ -1,0 +1,91 @@
+[DOCUMENT]
+TITLE: Icebreaker League Website — Requirement Baseline Draft
+
+[SECTION]
+TITLE: Public league information
+
+[REQUIREMENT]
+UID: LEAGUE-001
+TITLE: Public schedules
+STATEMENT: The system shall publish scheduled, live and finalized games with a clear status, local start time, teams and venue.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-002
+TITLE: Certified standings
+STATEMENT: The system shall compute league standings exclusively from certified finalized games using a versioned standings rule set.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-003
+TITLE: Reconciled player statistics
+STATEMENT: The system shall derive player goals, assists and points from certified records with validation against the official final game score.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-004
+TITLE: Stable player identifiers
+STATEMENT: The system shall associate statistics with immutable player identifiers rather than mutable jersey numbers.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-005
+TITLE: Team and roster pages
+STATEMENT: The public website shall expose team records, published schedules and privacy-approved roster attributes, with league-specific publication controls.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-006
+TITLE: Game detail views
+STATEMENT: The public website shall provide game detail views distinguishing finalized and provisional statistics and linking live games to the spectator tracker.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-007
+TITLE: Filterable discovery
+STATEMENT: A parent shall be able to filter schedules by team and status and player statistics by team and name or number.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-008
+TITLE: Protected minor information
+STATEMENT: Public league endpoints shall exclude sensitive child profile fields, private notes and the operator audit stream.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-009
+TITLE: Mercy independence
+STATEMENT: Parent and league live displays shall use the full official score independent of the arena-only mercy cap.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-010
+TITLE: Honest sample labeling
+STATEMENT: Demonstration data shall be clearly marked and never presented as official real-world league results.
+VERIFICATION: tests/browser/league.test.js
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-011
+TITLE: Accessible responsive UI
+STATEMENT: The website shall be usable at phone and desktop widths, with keyboard operable controls and visible focus indicators.
+VERIFICATION: Visual browser acceptance test pending
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: LEAGUE-012
+TITLE: Publication and revision provenance
+STATEMENT: Published results and standings shall identify the certification state and calculation policy version; a correction shall trigger recalculation.
+VERIFICATION: Future integration test required
+[/REQUIREMENT]
+
+[/DOCUMENT]

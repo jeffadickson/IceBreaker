@@ -1,0 +1,11 @@
+{
+  "name": "icebreaker-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "IceBreaker hockey-first scoring platform development monorepo",
+  "scripts": {
+    "test": "node --test apps/rink-local/tests/browser/*.test.js",
+    "docs:check": "python tools/check_docs.py",
+    "start": "node apps/rink-local/server/rink-server.js"
+  }
+}

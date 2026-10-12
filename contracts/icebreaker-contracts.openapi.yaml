@@ -1,0 +1,125 @@
+openapi: 3.1.0
+info:
+  title: Icebreaker API — Initial Sync Contract
+  version: 0.1.0
+  description: >
+    Initial implementation contract. Authentication, all endpoints and official rule schemas
+    require security and domain review before production deployment.
+servers:
+  - url: https://icebreaker.example/api/v1
+paths:
+  /sync/batches:
+    post:
+      operationId: uploadGameEvents
+      summary: Idempotent submission of locally committed game events
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncBatch'
+      responses:
+        '200':
+          description: Per-event durable server acknowledgment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncAcknowledgment'
+        '401': { description: Authentication required }
+        '403': { description: Invalid game or organization assignment }
+        '409': { description: Event sequence divergence }
+        '422': { description: Invalid event schema or domain payload }
+        '429': { description: Backoff required }
+  /sync/changes:
+    get:
+      operationId: downloadChanges
+      summary: Download changes scoped to authenticated organization/device
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: Versioned server objects and next cursor
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ServerChange' }
+                  nextCursor: { type: string }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  schemas:
+    GameEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, gameId, sequence, eventType, schemaVersion, ruleProfileId, payload, occurredGameClockMs, occurredUtc, actorId, causationCommandId]
+      properties:
+        eventId: { type: string, format: uuid }
+        gameId: { type: string, format: uuid }
+        sequence: { type: integer, minimum: 1 }
+        eventType: { type: string, minLength: 1 }
+        schemaVersion: { type: integer, minimum: 1 }
+        ruleProfileId: { type: string, minLength: 1 }
+        payload: { type: object }
+        occurredGameClockMs: { type: integer, minimum: 0 }
+        occurredUtc: { type: string, format: date-time }
+        actorId: { type: string, minLength: 1 }
+        causationCommandId: { type: string, format: uuid }
+        correlationId: { type: [string, 'null'], format: uuid }
+    SyncBatch:
+      type: object
+      additionalProperties: false
+      required: [batchId, clientId, organizationId, gameId, firstSequence, events]
+      properties:
+        batchId: { type: string, format: uuid }
+        clientId: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        gameId: { type: string, format: uuid }
+        firstSequence: { type: integer, minimum: 1 }
+        knownServerRevision: { type: [integer, 'null'], minimum: 0 }
+        events:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: '#/components/schemas/GameEvent' }
+    SyncAcknowledgment:
+      type: object
+      additionalProperties: false
+      required: [batchId, acceptedEventIds, rejected, nextExpectedSequence, serverRevision]
+      properties:
+        batchId: { type: string, format: uuid }
+        acceptedEventIds:
+          type: array
+          items: { type: string, format: uuid }
+          uniqueItems: true
+        rejected:
+          type: array
+          items:
+            type: object
+            required: [eventId, code]
+            properties:
+              eventId: { type: string, format: uuid }
+              code: { type: string }
+              detail: { type: string }
+        nextExpectedSequence: { type: integer, minimum: 1 }
+        serverRevision: { type: integer, minimum: 0 }
+    ServerChange:
+      type: object
+      required: [objectType, objectId, revision, deleted, payload]
+      properties:
+        objectType: { type: string }
+        objectId: { type: string, format: uuid }
+        revision: { type: integer, minimum: 1 }
+        deleted: { type: boolean }
+        payload: { type: object }

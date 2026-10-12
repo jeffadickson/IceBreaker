@@ -1,0 +1,13 @@
+# Architecture recommendation
+
+Use Elsa Workflows for the league-office approval and notification orchestration, not for authoritative rink scoring, clock ticks, identity enforcement, or transaction integrity. The game engine remains the single writer to official event history. Signed policy versions are published through an admin review gate; only allowlisted application activities run. Read the Elsa workflow definition from JSON via official Elsa APIs after pinned-version resolution. The supplied policy JSON is an *Icebreaker domain configuration example*, not directly an executable Elsa JSON schema.
+
+Credential service (ASP.NET Core Identity / external OIDC) -> role and game assignment authorization -> scoresheet canonicalizer / hash -> signed approval record -> event-backed publication snapshot -> outbox -> parent digest renderer -> email provider. Persist one notification idempotency key per (account_id, game_id, report_revision, notification_type). No direct email from game event handlers.
+
+Parent tables: accounts (identity system), favorites(account_id, target_type, stable_target_id), guardian_links(guardian_id, player_id, verified_status), notification_preferences(account_id, mode, consent_timestamp), result_reports(report_id, game_id, certified_revision, template_version, digest, created_at), email_deliveries(report_id, recipient_id, provider_message_id, delivery_status, attempts), signing_approvals(game_id, revision, signer_id, role, digest, intent_text_version, signed_at). Unique and foreign key constraints mandatory.
+
+Workflow lifecycle: LIVE -> FINAL_UNVERIFIED -> PENDING_REVIEW -> CERTIFIED; REQUEST_CORRECTION and DISPUTED/REOPENED may branch with explicit authorization. A signature binds exactly one revision and does not implicitly sign future corrections. Report generation is triggered by the *certified revision* event, not by clock expiration or Submit Final.
+
+Security: never publish guardian email addresses or full birthdates; use parental consent and narrow league visibility policies for minors. Emails should contain concise permitted results, not sensitive information, and link back to an authenticated page for restricted player details. Use rate limiting, verified email, explicit opt-in, unsubscribe and bounce handling. Perform privacy and e-signature legal review before production rollout.
+
+Operational limits: Elsa adds process/persistence and version-migration complexity; benchmark and verify the chosen Elsa release for deployed .NET version. Dev-server JavaScript and sample workflows are not equivalent to verified production integration.

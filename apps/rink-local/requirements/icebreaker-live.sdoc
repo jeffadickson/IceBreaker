@@ -1,0 +1,179 @@
+[DOCUMENT]
+TITLE: Icebreaker Live Tracker and Audit Requirements
+
+[SECTION]
+TITLE: Public live tracker
+
+[REQUIREMENT]
+UID: PARENT-001
+TITLE: Read-only public scoreboard
+STATEMENT: Icebreaker shall expose a read-only live spectator scoreboard that contains the full official score, period, and game clock.
+
+[REQUIREMENT]
+UID: PARENT-002
+TITLE: Public goal timeline
+STATEMENT: Icebreaker shall display every committed goal with stable event identity, team, period, game time, and approved scorer and assist attribution.
+
+[REQUIREMENT]
+UID: PARENT-003
+TITLE: TBD distinct from None
+STATEMENT: Icebreaker shall distinguish unknown goal attribution (TBD) from an officially uncredited assist (None) on every display and in every stored event.
+
+[REQUIREMENT]
+UID: PARENT-004
+TITLE: Correction of existing goal
+STATEMENT: Icebreaker shall apply attribution corrections to the original goal in the public timeline without creating an additional goal or changing the score.
+
+[REQUIREMENT]
+UID: PARENT-005
+TITLE: Public penalty timeline
+STATEMENT: Icebreaker shall display committed penalties with the penalized team, player, infraction, duration, period, and game time.
+
+[REQUIREMENT]
+UID: PARENT-006
+TITLE: Period transition timeline
+STATEMENT: Icebreaker shall publish period end and start events in chronological game history.
+
+[REQUIREMENT]
+UID: PARENT-007
+TITLE: Full spectator score independent of mercy cap
+STATEMENT: Icebreaker shall publish the full official score and every approved goal in the parent Live Game Tracker regardless of arena scoreboard mercy-display policy. A mercy score cap shall affect only the arena scoreboard projection, never the spectator projection.
+
+[REQUIREMENT]
+UID: PARENT-008
+TITLE: Deduplicate spectator events
+STATEMENT: Icebreaker shall not display the same event more than once when event messages are replayed or repeated.
+
+[REQUIREMENT]
+UID: PARENT-009
+TITLE: Live reconnect and recovery
+STATEMENT: Icebreaker shall deliver a complete public snapshot on initial connection and after reconnect so the spectator can recover from missed updates without duplicated events.
+
+[REQUIREMENT]
+UID: PARENT-010
+TITLE: Public information boundary
+STATEMENT: Icebreaker shall not expose operator audit logs, canceled drafts, privileged actions, or private player information through public spectator endpoints.
+
+[REQUIREMENT]
+UID: PARENT-012
+TITLE: Visible connection state
+STATEMENT: Icebreaker shall distinguish live, reconnecting, and offline or sample data from an authoritative live game feed.
+
+[SECTION]
+TITLE: Operator and event logging
+
+[REQUIREMENT]
+UID: LOG-001
+TITLE: All meaningful game actions logged
+STATEMENT: Icebreaker shall append a timestamped operator-action record for every meaningful game action, including opening, modifying, confirming, rejecting, correcting, and canceling an event, plus clock, settings, and export actions.
+
+[REQUIREMENT]
+UID: LOG-002
+TITLE: Official events separate from actions
+STATEMENT: Icebreaker shall distinguish confirmed authoritative game events from draft and canceled operator interactions and shall never increment a score for an unconfirmed draft.
+
+[REQUIREMENT]
+UID: LOG-003
+TITLE: Immutable audit correction history
+STATEMENT: Icebreaker shall preserve original official events and record any subsequent correction as a separate referenced event.
+
+[REQUIREMENT]
+UID: LOG-004
+TITLE: Audit failure visible
+STATEMENT: Icebreaker shall report audit storage failures explicitly and shall not falsely report successful durable recording.
+
+[SECTION]
+TITLE: Verification
+
+[REQUIREMENT]
+UID: TEST-001
+TITLE: Automated requirements traceability
+STATEMENT: Each P0 requirement shall have a stable ID, linked implementation artifacts, automated verification, and recorded passing results before a production release.
+
+[REQUIREMENT]
+UID: ARENA-001
+TITLE: Arena-only mercy cap
+STATEMENT: Icebreaker shall apply the configured mercy display differential cap only to the arena scoreboard projection, while preserving official goal totals in the authoritative event journal and live spectator projections.
+
+[REQUIREMENT]
+UID: PARENT-013
+TITLE: Explicit spectator score policy
+STATEMENT: Icebreaker shall label its spectator score policy FULL_OFFICIAL and shall never include operator audit records or private mercy-rule configuration in spectator responses.
+
+[REQUIREMENT]
+UID: BACKEND-001
+TITLE: Atomic official-event journal
+STATEMENT: The backend shall atomically persist each accepted official game event and its sync-outbox record before acknowledging the command.
+VERIFICATION: tests/browser/rink-backend.test.js — goal commits transactionally and is idempotent
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: BACKEND-002
+TITLE: Isolated operator audit
+STATEMENT: The backend shall record draft interactions, cancellations, confirmation requests, rejected commands, and accepted commands in a private operator-action log, distinct from the official journal and spectator projection.
+VERIFICATION: tests/browser/rink-backend.test.js — all confirmed events are in readable text mirror; draft actions are private
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: BACKEND-003
+TITLE: Idempotent scoring commands
+STATEMENT: Repeating an official scoring command with the same idempotency key shall return its original event identifier and shall not increment the score again.
+VERIFICATION: tests/browser/rink-backend.test.js — goal commits transactionally and is idempotent
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: BACKEND-004
+TITLE: Spectator mercy isolation
+STATEMENT: The spectator API shall expose the full official score and all approved goal events regardless of the arena mercy display cap.
+VERIFICATION: tests/browser/rink-backend.test.js — mercy cap only affects arena scoreboard; parent always gets all goals
+[/REQUIREMENT]
+
+[REQUIREMENT]
+UID: BACKEND-005
+TITLE: Crash recovery clock safety
+STATEMENT: If the backend restarts after an interrupted running clock, it shall resume with the clock stopped at its last committed value and record the recovery transition.
+VERIFICATION: tests/browser/rink-backend.test.js — interrupted clock recovery (planned)
+[/REQUIREMENT]
+
+[SECTION]
+TITLE: League website and season statistics
+
+[REQUIREMENT]
+UID: LEAGUE-001
+TITLE: Read-only league web pages
+STATEMENT: Icebreaker shall publish responsive read-only league overview, schedule, standings, and player scoring pages without exposing operator or private audit records.
+
+[REQUIREMENT]
+UID: LEAGUE-002
+TITLE: Certified results only
+STATEMENT: League standings and certified player statistics shall be derived only from published finalized game records; scheduled, provisional, and live games shall be excluded until certification.
+
+[REQUIREMENT]
+UID: LEAGUE-003
+TITLE: Player attribution and identity
+STATEMENT: Player scoring statistics shall use stable participant identifiers independent of jersey number, reflecting certified scoring and attribution corrections while preserving the official correction history.
+
+[REQUIREMENT]
+UID: LEAGUE-004
+TITLE: Published ruleset
+STATEMENT: League standings shall disclose the versioned points and tiebreaker policies used in their calculation; ranking results shall be deterministic for identical inputs.
+
+[REQUIREMENT]
+UID: LEAGUE-005
+TITLE: Schedule identity and status
+STATEMENT: Each published game shall expose a stable game ID, both team IDs, planned start with timezone, venue, rink, schedule revision, and a status of scheduled, live, provisional, or final.
+
+[REQUIREMENT]
+UID: LEAGUE-006
+TITLE: Website filtering
+STATEMENT: The public league website shall allow filtering by team and schedule status, and searching player statistics by approved public player name or jersey number.
+
+[REQUIREMENT]
+UID: LEAGUE-007
+TITLE: Publication and privacy
+STATEMENT: The public league website shall publish only league-approved player details and shall distinguish fictional sample data, provisional games, and finalized records.
+
+[REQUIREMENT]
+UID: LEAGUE-008
+TITLE: Test traceability
+STATEMENT: Every release-blocking league requirement shall have linked automated tests for ranking, goals-to-statistics reconciliation, excluded live events, read-only API behavior, and privacy.

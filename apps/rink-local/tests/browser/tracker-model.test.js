@@ -1,0 +1,15 @@
+const test=require('node:test');const assert=require('node:assert/strict');const m=require('../../web/tracker-model.js');
+const ev=(id,type,details={},period=2,seconds=763,team='home')=>({id,type,details,period,seconds,team});
+test('PARENT-001 scoreboard projects public clock and period',()=>{const x=m.project({scores:{home:3,away:1},period:2,seconds:763});assert.deepEqual([x.home,x.away,x.period,x.seconds],[3,1,2,763]);});
+test('PARENT-002 goal carries team, period and attribution',()=>{const x=m.eventFeed([ev('g1','GOAL_RECORDED',{scorer:'17',assist1:'8',assist2:'None'})])[0];assert.deepEqual([x.team,x.period,x.seconds,x.scorer,x.assist1,x.assist2],['home',2,763,'17','8','None']);});
+test('PARENT-003 TBD distinct from None',()=>{const x=m.eventFeed([ev('g1','GOAL_RECORDED',{scorer:'TBD',assist1:'TBD',assist2:'None'})])[0];assert.equal(x.scorer,'TBD');assert.equal(x.assist2,'None');});
+test('PARENT-004 correction updates original without duplicate goal',()=>{const feed=m.eventFeed([ev('g1','GOAL_RECORDED',{scorer:'TBD'}),ev('c1','GOAL_ATTRIBUTION_CORRECTED',{originalEventId:'g1',scorer:'17',assist1:'8',assist2:'None'})]);assert.equal(feed.length,1);assert.equal(feed[0].scorer,'17');assert.equal(feed[0].corrected,true);});
+test('PARENT-005 penalty preserves player, infraction and duration',()=>{const x=m.eventFeed([ev('p1','PENALTY_ASSESSED',{player:'22',infraction:'Tripping',duration:120})])[0];assert.deepEqual([x.player,x.infraction,x.duration],['22','Tripping',120]);});
+test('PARENT-006 period end is shown',()=>{assert.equal(m.eventFeed([ev('end','PERIOD_ENDED',{period:2})])[0].type,'PERIOD_ENDED');});
+test('ARENA-001 mercy caps arena display score',()=>{const x=m.scoreView({home:9,away:2},{enabled:true,threshold:5,cap:5});assert.deepEqual([x.home,x.away],[7,2]);});
+test('ARENA-001 no mercy cap before threshold',()=>{const x=m.scoreView({home:6,away:2},{enabled:true,threshold:5,cap:5});assert.deepEqual([x.home,x.away],[6,2]);});
+test('PARENT-008 duplicate events collapse',()=>{const g=ev('g1','GOAL_RECORDED',{scorer:'17'});assert.equal(m.eventFeed([g,g]).length,1);});
+test('PARENT-010 draft and operator events excluded',()=>{assert.equal(m.eventFeed([ev('x','DRAFT_OPENED',{}),ev('y','CLOCK_START',{})]).length,0);});
+test('PARENT-011 void preserves goal and marks it',()=>{const x=m.eventFeed([ev('g1','GOAL_RECORDED',{scorer:'17'}),ev('v1','GOAL_VOIDED',{originalEventId:'g1'})]);assert.equal(x.length,1);assert.equal(x[0].voided,true);});
+test('PARENT-004 correction arriving before goal has visible fallback',()=>{const x=m.eventFeed([ev('c1','GOAL_ATTRIBUTION_CORRECTED',{originalEventId:'g1',scorer:'17'})]);assert.equal(x[0].type,'CORRECTION');});
+test('PARENT-007 parent projection shows FULL official score even in mercy mode',()=>{const x=m.project({scores:{home:9,away:2},mercy:{enabled:true,threshold:5,cap:5},period:2,seconds:600});assert.equal(x.home,9);assert.equal(x.away,2);});

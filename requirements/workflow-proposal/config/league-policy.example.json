@@ -1,0 +1,27 @@
+{
+  "policyId": "youth-hockey-standard",
+  "version": 1,
+  "schemaVersion": "1.0",
+  "gameCertification": {
+    "livePublication": "provisional",
+    "onFinalSubmission": "pending_review",
+    "requiredApprovals": [{"role": "referee", "count": 1}],
+    "requireAllEventsSynchronized": true,
+    "allowUnresolvedAttributions": false,
+    "requestCorrectionOnDiscrepancy": true,
+    "officialApprovalDueHours": 48,
+    "escalationRole": "league_administrator",
+    "sendReportOn": "certified",
+    "reopenRoles": ["league_administrator"]
+  },
+  "parentPortal": {
+    "followTeams": true,
+    "followPlayersWithGuardianPrivacyEnforcement": true,
+    "showFullOfficialLiveScore": true,
+    "dailyEmailLimit": 5,
+    "gameReportEmail": "opt_in",
+    "reportCorrectionPolicy": "send_revision_notice",
+    "playerVisibility": "league_approved",
+    "guardianConsentRequiredForMinorProfile": true
+  }
+}

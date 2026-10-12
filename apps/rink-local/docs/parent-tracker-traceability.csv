@@ -1,0 +1,13 @@
+requirement_id,priority,requirement,verification_level,test_artifact,status
+PARENT-001,P0,Public scoreboard and read-only controls,unit+browser,tracker-model.test.js; parent.html,Implemented demo
+PARENT-002,P0,Goals displayed with period clock and attribution,unit+browser,tracker-model.test.js; parent.js,Implemented demo
+PARENT-003,P0,Preserve TBD vs None,unit,tracker-model.test.js,Implemented demo
+PARENT-004,P0,Corrections modify existing goal presentation,unit,tracker-model.test.js,Implemented demo
+PARENT-005,P0,Penalties displayed with infraction and duration,unit,tracker-model.test.js,Implemented demo
+PARENT-006,P0,Period end appears in timeline,unit,tracker-model.test.js,Implemented demo
+PARENT-007,P0,Public score cap without official-score leakage,unit,tracker-model.test.js,Implemented demo; production DTO pending
+PARENT-008,P0,Deduplicate repeated event IDs,unit,tracker-model.test.js,Implemented demo
+PARENT-009,P0,Revision-based reconnect and catch-up,integration,not yet implemented,Pending server
+PARENT-010,P0,Public feed authorization and privacy,security,not yet implemented,Pending server
+PARENT-011,P1,Rescinded goal remains visible as rescinded,unit,tracker-model.test.js,Implemented demo
+PARENT-012,P0,Accurate connection/stale status,integration,not yet implemented,Pending server

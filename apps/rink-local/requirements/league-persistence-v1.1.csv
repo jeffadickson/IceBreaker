@@ -1,0 +1,7 @@
+requirement_id,priority,description,test_reference,status
+LEAGUE-DB-001,P0,Persist season division teams rosters games and goals,LEAGUE-DB-001;LEAGUE-DB-002,development
+LEAGUE-DB-002,P0,Derive standings and player stats from certified games only,LEAGUE-DB-003,development
+LEAGUE-DB-003,P0,Certification must reject mismatched goal counts and invalid roster attribution atomically,LEAGUE-DB-004;LEAGUE-DB-005,development
+LEAGUE-DB-004,P0,Use player IDs independent of jersey number,LEAGUE-DB-002,partial
+LEAGUE-DB-005,P0,Protect and audit league mutations,LEAGUE-HTTP-001;LEAGUE-DB-006,development
+LEAGUE-DB-006,P0,Parent tracker always shows official uncapped score,PARENT-007,development
