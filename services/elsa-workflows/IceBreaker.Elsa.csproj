@@ -9,6 +9,6 @@
     <PackageReference Include="Elsa" Version="3.8.0" />
     <PackageReference Include="Elsa.Persistence.EFCore" Version="3.8.0" />
     <PackageReference Include="Elsa.Persistence.EFCore.Sqlite" Version="3.8.0" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.17" />
   </ItemGroup>
 </Project>
