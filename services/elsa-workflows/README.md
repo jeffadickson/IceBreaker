@@ -37,3 +37,6 @@ The JavaScript tests exercise enqueue/claim/delivery/error/restart with a simula
 ## Demonstration and release gates
 
 See [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) and [public demonstration readiness](../../docs/DEMO_RELEASE_GATES.md). GitHub CI now compiles the Elsa service separately; a .NET build has not been run in this execution container.
+### v2.8 verification
+
+GitHub Actions run 38313525584 compiled Elsa 3.8 and passed its authenticated HTTP/restart smoke test. The workflow engine is available as a durable transition observer. IceBreaker's own Node/SQLite workflow remains responsible for referee decision authorization. This is not production deployment.
