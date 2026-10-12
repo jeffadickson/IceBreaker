@@ -68,3 +68,7 @@ Set `ICEBREAKER_LEAGUE_GAME_ID` to the ID of a scheduled game in the local leagu
 ## v1.8: operator readiness and lineup-based fast entry
 
 The rink scorekeeper displays database-backed sync outbox counts, event-mirror health, and game-day roster readiness. When the server is bound to a league fixture and both lineups are confirmed, jersey-number quick-pick buttons use the confirmed lineups instead of fixed demo rosters. TBD is always available. The status endpoint `/api/operator/status` requires the development operator credential. See `requirements/scoring-operator-readiness-v1.8.md`. The interface is still a development prototype; it is not authenticated for public deployment.
+
+## v1.9 broadcast video overlay (development)
+
+Open `http://127.0.0.1:8090/overlay.html` as a 1920×1080 browser source in OBS Studio or vMix. The page is transparent and renders the game clock, period, both scores, **both shots-on-goal counts**, and current penalty/strength indicators. Use `?layout=compact` for a slimmer scorebug or `?mode=arena` for the mercy-capped arena score; the default **full** mode never applies mercy score masking. The overlay is a local-only, read-only browser source and does not ingest or encode video. See `requirements/video/broadcast-overlay.md` for requirements and capacity validation gates.
