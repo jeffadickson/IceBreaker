@@ -54,7 +54,7 @@ function penaltyClock(events,currentPeriod,currentSeconds,periodSeconds=900,poli
  }
  for(const e of events){
    if(!Number.isInteger(e.period)||!Number.isFinite(e.seconds))continue;
-   advance(e.period,e.seconds,e.type==='CLOCK_UPDATED'&&e.details?.action==='SET');
+   advance(e.period,e.seconds,(e.type==='CLOCK_UPDATED'&&e.details?.action==='SET')||e.type==='CLOCK_SYNCED');
    const d=e.details||{};
    if(e.type==='PENALTY_DELAYED'){
      if(['home','away'].includes(e.team))delayed.push({id:e.id,team:e.team,details:d});
