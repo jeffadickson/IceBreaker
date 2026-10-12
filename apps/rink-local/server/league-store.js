@@ -10,6 +10,8 @@ class LeagueStore {
   fs.mkdirSync(path.dirname(file),{recursive:true});this.db=new DatabaseSync(file);
   this.db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
    CREATE TABLE IF NOT EXISTS seasons(id TEXT PRIMARY KEY,name TEXT NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL);
+   CREATE TABLE IF NOT EXISTS leagues(id TEXT PRIMARY KEY,name TEXT NOT NULL,public_scoreboard_enabled INTEGER NOT NULL DEFAULT 1 CHECK(public_scoreboard_enabled IN (0,1)),timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles');
+   CREATE TABLE IF NOT EXISTS league_seasons(league_id TEXT NOT NULL REFERENCES leagues(id),season_id TEXT NOT NULL REFERENCES seasons(id),PRIMARY KEY(league_id,season_id),UNIQUE(season_id));
    CREATE TABLE IF NOT EXISTS divisions(id TEXT PRIMARY KEY,season_id TEXT NOT NULL REFERENCES seasons(id),name TEXT NOT NULL,rules_version TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS teams(id TEXT PRIMARY KEY,division_id TEXT NOT NULL REFERENCES divisions(id),name TEXT NOT NULL,short TEXT NOT NULL,city TEXT NOT NULL,tone TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY,display_name TEXT NOT NULL,privacy_status TEXT NOT NULL DEFAULT 'PUBLIC_ALIAS');
@@ -21,6 +23,9 @@ class LeagueStore {
    CREATE INDEX IF NOT EXISTS ix_goals_game ON goal_attributions(game_id);
   `);
   if(seedDemo&&this.db.prepare('SELECT count(*) n FROM seasons').get().n===0)this.seedDemo();
+  // Backward-compatible mapping for existing single-league prototype databases.
+  this.db.prepare("INSERT OR IGNORE INTO leagues(id,name,public_scoreboard_enabled,timezone) VALUES('demo-league','Demonstration League',1,'America/Los_Angeles')").run();
+  this.db.prepare("INSERT OR IGNORE INTO league_seasons(league_id,season_id) SELECT 'demo-league',id FROM seasons WHERE id NOT IN (SELECT season_id FROM league_seasons)").run();
  }
  tx(action){this.db.exec('BEGIN IMMEDIATE');try{const value=action();this.db.exec('COMMIT');return value;}catch(e){this.db.exec('ROLLBACK');throw e;}}
  audit(action,id,payload,actor='system'){this.db.prepare('INSERT INTO league_audit VALUES(?,?,?,?,?,?)').run(crypto.randomUUID(),new Date().toISOString(),actor,action,id,JSON.stringify(payload));}
