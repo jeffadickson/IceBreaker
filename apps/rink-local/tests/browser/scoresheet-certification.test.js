@@ -19,3 +19,24 @@ test('referee approves exact immutable revision with explicit attestation',async
 });
 test('correction request never certifies; restart retains approval and exact hash',async()=>{const token=await setUpReferee();await event({type:'GAME_ENDED'});const sub=await (await operator('/api/scoresheet/v1/submit',{})).json();const hdr={Authorization:'Bearer '+token};const outcome=await post('/api/scoresheet/v1/sign',{revision:sub.revision,digest:sub.digest,decision:'REQUEST_CORRECTION',reason:'Penalty incorrectly assigned'},hdr);assert.equal((await outcome.json()).status,'CORRECTION_REQUESTED');assert.equal(app.authority.db.prepare('SELECT status FROM scoresheet_revisions').get().status,'SUPERSEDED');const db=path.join(dir,'rink.db');await app.stop();app=createRinkServer({dbPath:db,port:0,operatorKey:op});base='http://127.0.0.1:'+(await app.start()).port;const view=await request('/api/scoresheet/v1/review','GET',null,hdr);const review=await view.json();assert.equal(review.digest,sub.digest);assert.equal(review.signatures.length,1);});
 test('mobile review HTML is served, uses text-only DOM insertion',async()=>{const html=await (await request('/referee-review.html')).text();const script=await (await request('/referee-review.js')).text();assert.match(html,/Approve & sign/);assert.match(script,/textContent/);assert.doesNotMatch(script,/innerHTML\s*=/);});
+test('referee correction request permits audited postgame attribution revision and fresh signing',async()=>{
+ const token=await setUpReferee();
+ const goal=await (await event({type:'GOAL_RECORDED',team:'home',scorer:'17',assist1:'None',assist2:'None'})).json();
+ await event({type:'GAME_ENDED'});
+ const original=await (await operator('/api/scoresheet/v1/submit',{})).json();
+ const referee={Authorization:'Bearer '+token};
+ const correction=await post('/api/scoresheet/v1/sign',{revision:original.revision,digest:original.digest,decision:'REQUEST_CORRECTION',reason:'Add assist'},referee);
+ assert.equal(correction.status,200);
+ const proposed={revision:original.revision,digest:original.digest,originalEventId:goal.eventId,scorer:'17',assist1:'8',assist2:'None',reason:'Verified assist with officials',idempotencyKey:crypto.randomUUID()};
+ assert.equal((await post('/api/scoresheet/v1/correct',{...proposed,revision:2}, {'X-Operator-Key':op})).status,409);
+ const amended=await post('/api/scoresheet/v1/correct',proposed,{'X-Operator-Key':op});
+ assert.equal(amended.status,200);assert.equal((await amended.json()).requiresResubmission,true);
+ const replacement=await (await operator('/api/scoresheet/v1/submit',{})).json();
+ assert.equal(replacement.revision,2);assert.notEqual(replacement.digest,original.digest);
+ assert.equal((await post('/api/scoresheet/v1/sign',{revision:original.revision,digest:original.digest,decision:'APPROVE',attestation:'I have reviewed this exact scoresheet and intend to sign it'},referee)).status,409);
+ const approval=await post('/api/scoresheet/v1/sign',{revision:replacement.revision,digest:replacement.digest,decision:'APPROVE',attestation:'I have reviewed this exact scoresheet and intend to sign it'},referee);
+ assert.equal(approval.status,200);
+ assert.equal(app.authority.state.scores.home,1);assert.equal(app.authority.state.shots.home,1);
+ assert.equal(app.authority.db.prepare("SELECT COUNT(*) AS n FROM game_events WHERE event_type='GOAL_ATTRIBUTION_CORRECTED'").get().n,1);
+ assert.equal(app.authority.db.prepare("SELECT status FROM scoresheet_revisions WHERE revision=1").get().status,'SUPERSEDED');
+});

@@ -35,6 +35,10 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
    if(!auth(req))return send(res,403,{error:'Operator credential required'});
    try{return send(res,201,certification.submit(String(req.headers['x-operator-id']||'scorekeeper')));}catch(e){return send(res,409,{error:e.message});}
   }
+  if(pathname==='/api/scoresheet/v1/correct'&&req.method==='POST'){
+   if(!auth(req))return send(res,403,{error:'Operator credential required'});
+   try{return send(res,200,certification.amend({...await readBody(req),actor:String(req.headers['x-operator-id']||'scorekeeper')}));}catch(e){return send(res,409,{error:e.message});}
+  }
   if(pathname==='/api/scoresheet/v1/review'&&req.method==='GET'){
    try{certification.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));const rev=certification.get();return rev?send(res,200,{...rev,signatures:certification.signatures(rev.revision)}):send(res,404,{error:'No scoresheet submitted'});}catch(e){return send(res,403,{error:e.message});}
   }

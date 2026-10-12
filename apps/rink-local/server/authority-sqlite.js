@@ -64,10 +64,10 @@ class Authority{
  currentSeconds(){if(!this.state.running||this.clockAnchor===null)return this.state.seconds;return Math.max(0,this.state.seconds-Math.floor(Number(process.hrtime.bigint()-this.clockAnchor)/1e9));}
  spectator(){const s=this.state;const penalties=penaltyClock(s.events,s.period,this.currentSeconds());return {penalties,revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{...s.scores},shots:{...s.shots},ended:s.ended,events:s.events.filter(e=>['GOAL_RECORDED','PENALTY_ASSESSED','PENALTY_DELAYED','PENALTY_WHISTLE','PENALTY_DELAYED_WAVED','GOAL_ATTRIBUTION_CORRECTED','PERIOD_ENDED','PERIOD_ADVANCED','GAME_ENDED','SHOT_RECORDED'].includes(e.type)),teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'},connected:true,scorePolicy:'FULL_OFFICIAL'};}
  arena(){const s=this.state;const penalties=penaltyClock(s.events,s.period,this.currentSeconds());let {home,away}=s.scores;const m=s.mercy;if(m.enabled&&(m.triggered||Math.abs(home-away)>=m.threshold)){if(home>away)home=Math.min(home,away+m.cap);else away=Math.min(away,home+m.cap);}return {penalties,revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{home,away},shots:{...s.shots},scorePolicy:'MERCY_DISPLAY_CAP',teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'}};}
- command(c,{actor='scorekeeper',key}={}){
+ command(c,{actor='scorekeeper',key,authorizedPostgameCorrection=false}={}){
   if(!key||!/^[-\w]{8,128}$/.test(key))throw Error('Idempotency key required');
   const duplicate=this.db.prepare('SELECT event_id,seq FROM game_events WHERE game_id=? AND idempotency_key=?').get(this.gameId,key);if(duplicate){this.audit('DUPLICATE_COMMAND',{key,eventId:duplicate.event_id});return {eventId:duplicate.event_id,revision:duplicate.seq,duplicate:true};}
-  if(this.state.ended)throw Error('Game is final');validate(c,this.state);
+  if(this.state.ended && !(c.type==='GOAL_ATTRIBUTION_CORRECTED'&&authorizedPostgameCorrection===true))throw Error('Game is final');validate(c,this.state);
   const id=crypto.randomUUID(),seq=this.state.revision+1,at=new Date().toISOString();let period=this.state.period,seconds=this.state.seconds,payload={};
   if(c.type==='GOAL_RECORDED')payload={goalId:id,teamId:c.team,scorer:attr(c.scorer),assist1:attr(c.assist1),assist2:attr(c.assist2)};
   if(c.type==='GOAL_ATTRIBUTION_CORRECTED')payload={goalId:this.state.goals.get(c.originalEventId).goalId,scorer:attr(c.scorer),assist1:attr(c.assist1),assist2:attr(c.assist2),reason:clean(c.reason,200)};

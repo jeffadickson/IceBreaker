@@ -26,6 +26,19 @@ class ScoresheetCertification {
  publicRevision(r){return {gameId:r.game_id,revision:r.revision,sourceRevision:r.source_seq,digest:r.digest,status:r.status,submittedAt:r.submitted_at,document:JSON.parse(r.document_json)};}
  get(revision){const r=revision?this.db.prepare('SELECT * FROM scoresheet_revisions WHERE game_id=? AND revision=?').get(this.authority.gameId,revision):this.db.prepare('SELECT * FROM scoresheet_revisions WHERE game_id=? ORDER BY revision DESC LIMIT 1').get(this.authority.gameId);return r?this.publicRevision(r):null;}
  decide({refereeId,revision,digest,decision,reason,attestation}){if(!['APPROVE','REQUEST_CORRECTION'].includes(decision)||!Number.isInteger(revision)||!/^([a-f0-9]{64})$/.test(digest)||clean(reason).length>500)throw Error('Invalid decision');if(decision==='APPROVE'&&attestation!=='I have reviewed this exact scoresheet and intend to sign it')throw Error('Explicit intent to sign required');if(decision==='REQUEST_CORRECTION'&&!clean(reason))throw Error('Correction reason required');const r=this.db.prepare('SELECT * FROM scoresheet_revisions WHERE game_id=? AND revision=?').get(this.authority.gameId,revision);if(!r||r.status!=='SUBMITTED'||r.digest!==digest)throw Error('Stale or mismatched scoresheet');if(r.source_seq!==this.authority.state.revision)throw Error('Underlying journal has changed');const at=new Date().toISOString();this.db.exec('BEGIN IMMEDIATE');try{this.db.prepare('INSERT INTO scoresheet_signatures VALUES(?,?,?,?,?,?,?)').run(this.authority.gameId,revision,refereeId,digest,decision,clean(reason),at);if(decision==='APPROVE')this.db.prepare("UPDATE scoresheet_revisions SET status='CERTIFIED' WHERE game_id=? AND revision=? AND digest=?").run(this.authority.gameId,revision,digest);else this.db.prepare("UPDATE scoresheet_revisions SET status='SUPERSEDED' WHERE game_id=? AND revision=?").run(this.authority.gameId,revision);this.db.exec('COMMIT');}catch(e){this.db.exec('ROLLBACK');throw e;}this.authority.audit('SCORESHEET_REFEREE_DECISION',{refereeId,revision,digest,decision,at});return {status:decision==='APPROVE'?'CERTIFIED':'CORRECTION_REQUESTED',refereeId,revision,digest,at};}
+ // Corrections are new official events; original journal entries and signed revisions remain intact.
+ amend({actor,revision,digest,originalEventId,scorer,assist1,assist2,reason,idempotencyKey}){
+  const previous=this.db.prepare('SELECT * FROM scoresheet_revisions WHERE game_id=? AND revision=?').get(this.authority.gameId,revision);
+  if(!previous||previous.digest!==digest||previous.status!=='SUPERSEDED')throw Error('Correction requires a superseded scoresheet revision');
+  const request=this.db.prepare("SELECT 1 AS ok FROM scoresheet_signatures WHERE game_id=? AND revision=? AND decision='REQUEST_CORRECTION'").get(this.authority.gameId,revision);
+  if(!request)throw Error('Referee correction request required');
+  const latest=this.get();if(latest.revision!==revision)throw Error('Correction revision has been replaced');
+  if(previous.source_seq>this.authority.state.revision)throw Error('Invalid journal revision');
+  const result=this.authority.command({type:'GOAL_ATTRIBUTION_CORRECTED',originalEventId,scorer,assist1,assist2,reason},
+    {actor:clean(actor)||'scorekeeper',key:idempotencyKey,authorizedPostgameCorrection:true});
+  this.authority.audit('POSTGAME_CORRECTION_RECORDED',{actor,revision,originalEventId,newEventId:result.eventId});
+  return {eventId:result.eventId,sourceRevision:this.authority.state.revision,requiresResubmission:true};
+ }
  signatures(revision){return this.db.prepare('SELECT referee_id,decision,reason,at,document_digest FROM scoresheet_signatures WHERE game_id=? AND revision=? ORDER BY at').all(this.authority.gameId,revision);}
 }
 module.exports={ScoresheetCertification};
