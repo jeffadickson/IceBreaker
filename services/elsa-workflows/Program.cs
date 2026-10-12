@@ -7,7 +7,6 @@ using Elsa.Persistence.EFCore.Modules.Management;
 using Elsa.Persistence.EFCore.Modules.Runtime;
 using Elsa.Workflows;
 using Elsa.Workflows.Activities;
-using Elsa.Workflows.Contracts;
 using Microsoft.Data.Sqlite;
 
 // Orchestration adapter, NOT IceBreaker's scoring/signature authority.
