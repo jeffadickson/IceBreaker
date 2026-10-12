@@ -12,7 +12,7 @@
 - **Run Node test suite:** `node --test apps/rink-local/tests/browser/*.test.js`.
 - **Run .NET tests when .NET SDK 8+ is installed:** `dotnet test apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj`.
 
-See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for source inventory, incomplete features, and safe push procedure.
+**GitHub publication:** The complete 158-file v1.5 expanded source package was published to `main` on 2026-10-12. See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for implementation maturity and deployment limitations.
 
 ## Repository map
 

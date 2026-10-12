@@ -1,6 +1,6 @@
 # Deployment and GitHub state
 
-This is a **locally prepared repository**, not evidence of a remote GitHub push or production deployment.
+**Source publication:** The complete 158-file v1.5 expanded repository was pushed to `jeffadickson/IceBreaker` on 2026-10-12 and its remote Git tree was verified (158 blobs). This is **not** a production deployment or security certification.
 
 ## Implemented
 
@@ -19,7 +19,7 @@ This is a **locally prepared repository**, not evidence of a remote GitHub push 
 
 ## GitHub upload
 
-The intended owner/repo is `jeffadickson/IceBreaker` but actual remote existence/access must be checked before pushing. Use an authenticated Git installation; never force-push without inspecting history.
+The GitHub repository is [jeffadickson/IceBreaker](https://github.com/jeffadickson/IceBreaker). The initial complete source publication is finished. For future updates, use an authenticated Git installation and never force-push without inspecting history.
 
 ```powershell
 git remote add origin https://github.com/jeffadickson/IceBreaker.git
