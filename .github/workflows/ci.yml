@@ -39,3 +39,5 @@ jobs:
         run: dotnet build services/elsa-workflows/IceBreaker.Elsa.csproj -c Release --no-restore
       - name: Verify bridge tests
         run: node --test tests/integration/elsa-bridge.test.js
+      - name: Elsa HTTP and restart smoke test
+        run: node services/elsa-workflows/smoke-test.js
