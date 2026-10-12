@@ -39,3 +39,22 @@ node --test tests/integration/remote-sync.test.js
 ```
 
 Tests cover signed uploads, assigned-game access, replay deduplication, sequence gaps, atomicity, persistence/restart, tampering, unauthorized requests, and the actual rink SQLite outbox.
+
+## Exclusive station ownership and revocation (v1.7)
+
+A game now has exactly one designated writer in `game_owners`. Ordinary station
+assignment returns HTTP 409 if a second station attempts to claim the game.
+To hand a game to a replacement station, the administrator explicitly calls
+`POST /admin/games/transfer` with `{ "gameId": "...", "stationId": "..." }`.
+The transfer increments a durable ownership epoch and writes an audit record.
+The old station is rejected for all subsequent uploads, including retries.
+To disable a compromised station key, call `POST /admin/stations/revoke` with
+`{ "stationId": "..." }`. Both endpoints require the existing `x-admin-key`.
+
+**Limitations:** This is an exclusive assignment with explicit transfer, not a
+renewable lease. An administrator must verify that an old rink has stopped
+recording before transfer; otherwise its locally queued events cannot be
+accepted after handover. No clock skew assumptions are needed, but there is
+not yet an automatic lease expiry, station key rotation, or seamless split-brain
+reconciliation. Use TLS, protected administrator credentials, and a restricted
+private network during testing; do not expose this service publicly.

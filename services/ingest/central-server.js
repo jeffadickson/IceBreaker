@@ -17,6 +17,7 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
  const db=new DatabaseSync(dbPath);db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;');
  db.exec(`CREATE TABLE IF NOT EXISTS stations(id TEXT PRIMARY KEY, public_key TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1);
  CREATE TABLE IF NOT EXISTS assignments(game_id TEXT NOT NULL, station_id TEXT NOT NULL REFERENCES stations(id), PRIMARY KEY(game_id,station_id));
+ CREATE TABLE IF NOT EXISTS game_owners(game_id TEXT PRIMARY KEY, station_id TEXT NOT NULL REFERENCES stations(id), epoch INTEGER NOT NULL DEFAULT 1);
  CREATE TABLE IF NOT EXISTS game_events(game_id TEXT NOT NULL, seq INTEGER NOT NULL, event_id TEXT NOT NULL, station_id TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL, digest TEXT NOT NULL, received_at TEXT NOT NULL, PRIMARY KEY(game_id,seq), UNIQUE(game_id,event_id));
  CREATE TABLE IF NOT EXISTS ingestion_audit(id INTEGER PRIMARY KEY AUTOINCREMENT, happened_at TEXT NOT NULL, action TEXT NOT NULL, game_id TEXT, station_id TEXT, detail TEXT);`);
  const listeners=new Map();
@@ -27,6 +28,8 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
  function ingest(batch, signature){
   if(!batch||!validId(batch.gameId)||!validId(batch.stationId)||!Array.isArray(batch.events)||batch.events.length<1||batch.events.length>MAX_EVENTS)throw Object.assign(new Error('Invalid batch'),{status:400});
   const station=db.prepare('SELECT * FROM stations WHERE id=?').get(batch.stationId);
+  const owner=db.prepare('SELECT station_id,epoch FROM game_owners WHERE game_id=?').get(batch.gameId);
+  if(owner && owner.station_id!==batch.stationId){audit('DENIED',batch.gameId,batch.stationId,'fenced: another station owns game');throw Object.assign(new Error('Another station owns this game'),{status:409});}
   if(!station||!station.enabled||!db.prepare('SELECT 1 FROM assignments WHERE game_id=? AND station_id=?').get(batch.gameId,batch.stationId)){audit('DENIED',batch.gameId,batch.stationId,'unassigned station');throw Object.assign(new Error('Station not authorized for game'),{status:403});}
   let verified=false;try{verified=crypto.verify(null,Buffer.from(canonical(batch)),crypto.createPublicKey(station.public_key),Buffer.from(String(signature||''),'base64'));}catch{}
   if(!verified){audit('DENIED',batch.gameId,batch.stationId,'invalid signature');throw Object.assign(new Error('Invalid signature'),{status:401});}
@@ -52,11 +55,41 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
  const server=http.createServer(async(req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;
   try{
    if(req.method==='GET'&&pathname==='/health')return json(res,200,{status:'ok'});
-   if(req.method==='POST'&&(pathname==='/admin/stations'||pathname==='/admin/assignments')){
+   if(req.method==='POST'&&(pathname==='/admin/stations'||pathname==='/admin/assignments'||pathname==='/admin/stations/revoke'||pathname==='/admin/games/transfer')){
     const supplied=String(req.headers['x-admin-key']||'');if(supplied.length!==adminKey.length||!crypto.timingSafeEqual(Buffer.from(supplied),Buffer.from(adminKey)))return json(res,403,{error:'Denied'});
     const b=await body(req);
     if(pathname==='/admin/stations'){if(!validId(b.stationId)||typeof b.publicKey!=='string')throw Object.assign(new Error('Invalid station'),{status:400});crypto.createPublicKey(b.publicKey);db.prepare('INSERT INTO stations(id,public_key) VALUES(?,?)').run(b.stationId,b.publicKey);audit('STATION_REGISTERED',null,b.stationId,'registered');return json(res,201,{stationId:b.stationId});}
-    if(!validId(b.stationId)||!validId(b.gameId))throw Object.assign(new Error('Invalid assignment'),{status:400});db.prepare('INSERT INTO assignments(game_id,station_id) VALUES(?,?)').run(b.gameId,b.stationId);audit('GAME_ASSIGNED',b.gameId,b.stationId,'assigned');return json(res,201,{assigned:true});
+    if(pathname==='/admin/stations/revoke'){
+     if(!validId(b.stationId))throw Object.assign(new Error('Invalid station'),{status:400});
+     const changed=db.prepare('UPDATE stations SET enabled=0 WHERE id=? AND enabled=1').run(b.stationId);
+     audit('STATION_REVOKED',null,b.stationId,changed.changes?'revoked':'already revoked or missing');
+     return json(res,200,{revoked:changed.changes===1});
+    }
+    if(!validId(b.stationId)||!validId(b.gameId))throw Object.assign(new Error('Invalid assignment'),{status:400});
+    if(pathname==='/admin/games/transfer'){
+     const dest=db.prepare('SELECT enabled FROM stations WHERE id=?').get(b.stationId);
+     if(!dest||!dest.enabled)throw Object.assign(new Error('Target station unavailable'),{status:409});
+     const owner=db.prepare('SELECT * FROM game_owners WHERE game_id=?').get(b.gameId);
+     if(!owner)throw Object.assign(new Error('Game has no owner'),{status:404});
+     if(owner.station_id===b.stationId)throw Object.assign(new Error('Station already owns game'),{status:409});
+     db.exec('BEGIN IMMEDIATE');try{
+      db.prepare('INSERT OR IGNORE INTO assignments(game_id,station_id) VALUES(?,?)').run(b.gameId,b.stationId);
+      db.prepare('UPDATE game_owners SET station_id=?,epoch=epoch+1 WHERE game_id=?').run(b.stationId,b.gameId);
+      audit('GAME_TRANSFERRED',b.gameId,b.stationId,`from=${owner.station_id};epoch=${owner.epoch+1}`);
+      db.exec('COMMIT');
+     }catch(e){db.exec('ROLLBACK');throw e;}
+     return json(res,200,{transferred:true,epoch:owner.epoch+1});
+    }
+    const station=db.prepare('SELECT enabled FROM stations WHERE id=?').get(b.stationId);
+    if(!station||!station.enabled)throw Object.assign(new Error('Station unavailable'),{status:409});
+    const previous=db.prepare('SELECT station_id,epoch FROM game_owners WHERE game_id=?').get(b.gameId);
+    if(previous && previous.station_id!==b.stationId)throw Object.assign(new Error('Game already assigned to a station; use transfer'),{status:409});
+    db.exec('BEGIN IMMEDIATE');try{
+     db.prepare('INSERT OR IGNORE INTO game_owners(game_id,station_id,epoch) VALUES(?,?,1)').run(b.gameId,b.stationId);
+     db.prepare('INSERT OR IGNORE INTO assignments(game_id,station_id) VALUES(?,?)').run(b.gameId,b.stationId);
+     audit('GAME_ASSIGNED',b.gameId,b.stationId,'exclusive owner');db.exec('COMMIT');
+    }catch(e){db.exec('ROLLBACK');throw e;}
+    return json(res,201,{assigned:true,epoch:previous?.epoch||1});
    }
    if(req.method==='POST'&&pathname==='/api/ingest/v1/batches'){const b=await body(req);return json(res,200,ingest(b,req.headers['x-station-signature']));}
    const match=pathname.match(/^\/api\/public\/v1\/games\/([a-zA-Z0-9_-]+)(\/events)?$/);

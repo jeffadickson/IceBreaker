@@ -25,3 +25,26 @@ test('real rink SQLite outbox uploads and survives duplicate acknowledgement',as
  const db=rink.db;db.exec('UPDATE sync_outbox SET delivered=0');const again=await c.flush();assert.deepEqual(again.duplicates,[1,2]);
  const snapshot=await(await fetch(f.base+'/api/public/v1/games/'+f.gameId)).json();assert.deepEqual(snapshot.score,{home:0,away:1});assert.equal(snapshot.events.length,2);
 });
+
+test('exclusive game ownership requires explicit administrative transfer',async t=>{
+ const f=await fixture(t);
+ const keys=crypto.generateKeyPairSync('ed25519');
+ const admin={'x-admin-key':adminKey};
+ assert.equal((await f.send('/admin/stations',{stationId:'rink-b',publicKey:keys.publicKey.export({format:'pem',type:'spki'})},admin)).status,201);
+ assert.equal((await f.send('/admin/assignments',{gameId:f.gameId,stationId:'rink-b'},admin)).status,409);
+ assert.equal((await f.push([ev(1,'SHOT_RECORDED',{team:'home'})])).status,200);
+ assert.equal((await f.send('/admin/games/transfer',{gameId:f.gameId,stationId:'rink-b'},admin)).status,200);
+ assert.equal((await f.push([ev(2,'SHOT_RECORDED',{team:'home'})])).status,409);
+ const batch={gameId:f.gameId,stationId:'rink-b',events:[ev(2,'SHOT_RECORDED',{team:'away'})]};
+ assert.equal((await f.send('/api/ingest/v1/batches',batch,{'x-station-signature':signBatch(keys.privateKey,batch)})).status,200);
+ const snap=await (await fetch(f.base+'/api/public/v1/games/'+f.gameId)).json();
+ assert.deepEqual(snap.shots,{home:1,away:1});
+});
+
+test('station revocation blocks subsequent signed uploads',async t=>{
+ const f=await fixture(t);const admin={'x-admin-key':adminKey};
+ assert.equal((await f.push([ev(1,'SHOT_RECORDED',{team:'home'})])).status,200);
+ assert.equal((await f.send('/admin/stations/revoke',{stationId:'rink-a'},admin)).body.revoked,true);
+ assert.equal((await f.push([ev(2,'SHOT_RECORDED',{team:'home'})])).status,403);
+ assert.equal((await f.send('/admin/assignments',{stationId:'rink-a',gameId:'another'},admin)).status,409);
+});
