@@ -1,8 +1,8 @@
 'use strict';
 // Local-first development backend, not a public internet service.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const {URL}=require('node:url');const {reportFromState,renderReport,topPenalties}=require('./game-report');const {createParentAuth}=require('./parent-auth');const {Authority}=require('./authority-sqlite');const {LeagueStore}=require('./league-store');const {TeamAccounts}=require('./team-accounts');
-function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='127.0.0.1',port=8090,operatorKey=process.env.ICEBREAKER_OPERATOR_KEY||'local-development-key'}={}){
+const {URL}=require('node:url');const {snapshotForGame,assertGameRosterEligible}=require('./game-roster-policy');const {reportFromState,renderReport,topPenalties}=require('./game-report');const {createParentAuth}=require('./parent-auth');const {Authority}=require('./authority-sqlite');const {LeagueStore}=require('./league-store');const {TeamAccounts}=require('./team-accounts');
+function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='127.0.0.1',port=8090,operatorKey=process.env.ICEBREAKER_OPERATOR_KEY||'local-development-key',leagueGameId=process.env.ICEBREAKER_LEAGUE_GAME_ID||null}={}){
  const parentAuth=createParentAuth({dbPath});const authority=new Authority({dbPath});const leagueStore=new LeagueStore(dbPath,{seedDemo:true});const teamAccounts=new TeamAccounts(dbPath);const clients=new Set();const root=path.resolve(__dirname,'../web');
  const send=(res,code,obj)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(obj));};
  const broadcast=()=>{const msg=`id: ${authority.state.revision}\nevent: snapshot\ndata: ${JSON.stringify(authority.spectator())}\n\n`;for(const r of clients){try{r.write(msg);}catch{clients.delete(r);}}};
@@ -23,6 +23,7 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
    if(req.method==='PUT')return send(res,200,teamAccounts.editRoster(teamId,user.user_id,await readBody(req)));
    return send(res,405,{error:'Method not allowed'});
   }catch(e){return send(res,/login|required|authorized|forbidden/i.test(e.message)?403:400,{error:e.message});}}
+  if(req.method==='GET'&&pathname==='/api/operator/game-rosters'){if(!auth(req))return send(res,403,{error:'Operator credential required'});if(!leagueGameId)return send(res,409,{error:'No league game bound; set ICEBREAKER_LEAGUE_GAME_ID'});try{return send(res,200,snapshotForGame(teamAccounts.db,leagueGameId));}catch(e){return send(res,400,{error:e.message});}}
   if(req.method==='GET'&&pathname==='/api/league/v1/overview')return send(res,200,leagueStore.snapshot(authority));
   if(req.method==='GET'&&pathname==='/api/league/v1/audit')return send(res,403,{error:'Administrative audit is not public'});
   if(req.method==='POST'&&pathname==='/api/league/v1/games'){if(!auth(req))return send(res,403,{error:'Operator credential required'});try{return send(res,201,leagueStore.createGame(await readBody(req),{actor:req.headers['x-operator-id']||'league-admin'}));}catch(e){return send(res,400,{error:e.message});}}
@@ -37,7 +38,7 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
   if(req.method==='GET'&&pathname==='/api/games/demo/events'){res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store, no-transform','X-Accel-Buffering':'no'});clients.add(res);res.write('retry: 1500\n\n');res.write(`id: ${authority.state.revision}\nevent: snapshot\ndata: ${JSON.stringify(authority.spectator())}\n\n`);req.on('close',()=>clients.delete(res));return;}
   if(req.method==='POST'&&pathname==='/api/operator/command'){
    if(!auth(req)){authority.audit('COMMAND_REJECTED',{reason:'unauthorized'});return send(res,403,{error:'Operator credential required'});}
-   try{const cmd=await readBody(req);const result=authority.command(cmd,{actor:req.headers['x-operator-id']||'scorekeeper',key:req.headers['idempotency-key']});if(!result.duplicate)broadcast();return send(res,200,result);}catch(e){authority.audit('COMMAND_REJECTED',{reason:e.message});return send(res,400,{error:e.message});}
+   try{const cmd=await readBody(req);if(leagueGameId){const snapshot=snapshotForGame(teamAccounts.db,leagueGameId);const goalSide=(eventId)=>authority.state.events.find(e=>e.id===eventId&&e.type==='GOAL_RECORDED')?.team;assertGameRosterEligible(snapshot,cmd,goalSide);}const result=authority.command(cmd,{actor:req.headers['x-operator-id']||'scorekeeper',key:req.headers['idempotency-key']});if(!result.duplicate)broadcast();return send(res,200,result);}catch(e){authority.audit('COMMAND_REJECTED',{reason:e.message});return send(res,400,{error:e.message});}
   }
   if(req.method==='POST'&&pathname==='/api/operator/action'){
    if(!auth(req))return send(res,403,{error:'Operator credential required'});

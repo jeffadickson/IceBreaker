@@ -60,3 +60,7 @@ The local server exposes `/api/games/demo/unofficial-report`, `/api/games/demo/u
 ## Team Manager portal (v1.4 development preview)
 
 Open `/team.html` from the running rink server. The backend provides separate team login, team-scoped season roster updates and signed-in game-day lineup confirmations. A development league operator can provision a team account through `POST /api/team/v1/admin/accounts`. See `requirements/team-accounts-v1.4.md`. This is not production-ready identity management.
+
+## v1.5: Game-day roster validation (development opt-in)
+
+Set `ICEBREAKER_LEAGUE_GAME_ID` to the ID of a scheduled game in the local league database before starting the rink backend. Then the operator may inspect `http://127.0.0.1:8090/game-rosters.html`. Once bound, goals, assists, their corrections, and player penalties require both teams to have confirmed lineups. Jersey numbers are checked against the confirmed snapshot; TBD remains valid. The normal unbound demo retains its original behavior. This prototype uses one bound game per backend instance; it does not yet support multi-rink production game assignment or the administrator late-amendment workflow.
