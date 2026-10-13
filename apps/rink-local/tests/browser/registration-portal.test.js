@@ -43,6 +43,7 @@ test('league admin cannot approve another league request or link another league 
  const req=x.portal.submit(x.a,{playerId,teamId:'maple',jersey:23,position:'F'});
  assert.throws(()=>x.portal.decide(other,req.requestId,{decision:'APPROVED',reason:'Wrong league'}),/access denied/);
  assert.throws(()=>x.portal.linkExisting(other,'club-a',playerId),/access denied/);
+ assert.throws(()=>x.portal.linkExisting(other,'second-club',playerId),/cross-league transfer review/);
  assert.equal(x.portal.requests(other).length,0);
  assert.equal(x.portal.canRead(other,playerId),false);
 });
