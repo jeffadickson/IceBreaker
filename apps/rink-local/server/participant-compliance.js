@@ -36,7 +36,7 @@ function linkExternalId(db,{subjectType,subjectId,issuer,identifier,seasonId=''}
  if(!fieldKey())throw Error('Private-field key required for external identifiers');
  const issuerKey=issuer.trim().toUpperCase(),number=identifier.trim(),id=uuid();
  const token=indexFor(issuerKey,number,seasonId);
- db.prepare('INSERT INTO participant_external_ids VALUES(?,?,?,?,?,?,?,?)').run(id,subjectType,subjectId,issuerKey,seasonId,encryptField(number,id,'externalIdentifier'),token,actor,new Date().toISOString());
+ db.prepare('INSERT INTO participant_external_ids VALUES(?,?,?,?,?,?,?,?,?)').run(id,subjectType,subjectId,issuerKey,seasonId,encryptField(number,id,'externalIdentifier'),token,actor,new Date().toISOString());
  audit(db,'EXTERNAL_ID_LINKED',subjectId,actor,{issuer:issuerKey,seasonId,subjectType});
  return {id,subjectType,subjectId,issuer:issuerKey,seasonId};
 }
