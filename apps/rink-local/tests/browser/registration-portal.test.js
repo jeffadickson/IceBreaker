@@ -68,6 +68,24 @@ test('club-managed team manager cannot bypass league approval with roster edit',
  assert.throws(()=>x.teamAccounts.editRoster('maple','manager',{playerId:'rogue-player',displayName:'Rogue',jersey:77,position:'F',expectedRevision:0}),/League-approved club roster/);
  assert.equal(x.teamAccounts.roster('maple').some(p=>p.id==='rogue-player'),false);
 });
+test('annual rollover proposes same permanent ID into next-season club team',t=>{
+ const x=setup();t.after(()=>x.close());
+ const {playerId}=x.portal.createPlayer(x.a,{displayName:'Rollover Alias',legalName:'Private Rollover',birthDate:'2016-03-03'});
+ const request=x.portal.submit(x.a,{playerId,teamId:'maple',jersey:16,position:'F'});
+ x.portal.decide(x.admin,request.requestId,{decision:'APPROVED',reason:'Approved'});
+ x.league.db.prepare('INSERT INTO seasons VALUES(?,?,?,?)').run('demo-2027','Demo 2027','2027-09-01','2027-12-31');
+ x.league.db.prepare('INSERT INTO league_seasons VALUES(?,?)').run('demo-league','demo-2027');
+ x.league.db.prepare('INSERT INTO divisions VALUES(?,?,?,?)').run('division-2027','demo-2027','12U','v1');
+ x.league.db.prepare('INSERT INTO teams VALUES(?,?,?,?,?,?)').run('club-a-2027','division-2027','Club A 12U','A 12U','Demo','blue');
+ x.portal.assignTeam('club-a','club-a-2027');
+ const rows=x.portal.rolloverPreview(x.a,{fromTeamId:'maple',toTeamId:'club-a-2027'});
+ assert.equal(rows.length,1);assert.equal(rows[0].playerId,playerId);assert.equal(rows[0].valid,true);
+ const next=x.portal.submitBatch(x.a,rows)[0];
+ assert.equal(x.portal.registry.history(playerId).length,1);
+ x.portal.decide(x.admin,next.requestId,{decision:'APPROVED',reason:'Approved next season'});
+ assert.deepEqual(x.portal.registry.history(playerId).map(h=>h.seasonId),['demo-2026','demo-2027']);
+ assert.throws(()=>x.portal.rolloverPreview(x.b,{fromTeamId:'maple',toTeamId:'club-a-2027'}),/scope/);
+});
 test('hashed expiring sessions and role-bound scope prevent credential crossover',t=>{
  const x=setup();t.after(()=>x.close());
  assert.throws(()=>x.portal.login('a@example.invalid','wrong'),/Invalid credentials/);
