@@ -43,3 +43,12 @@ test('mercy running mode recomputes from authoritative goal differential',t=>{
  for(let i=0;i<2;i++)cmd({type:'GOAL_RECORDED',team:'away',scorer:'7',assist1:'None',assist2:'None'});
  assert.equal(a.spectator().clockMode,'STOP');
 });
+
+test('hybrid mode switches at configured final-period threshold',t=>{
+ const {a,cmd}=game(t,{periodCount:1,periodSeconds:600,clockMode:'HYBRID',hybridStopSeconds:120});
+ assert.equal(a.spectator().clockMode,'RUNNING');
+ cmd({type:'CLOCK_UPDATED',action:'SET',seconds:120});
+ assert.equal(a.spectator().clockMode,'STOP');
+ cmd({type:'CLOCK_UPDATED',action:'SET',seconds:121});
+ assert.equal(a.spectator().clockMode,'RUNNING');
+});
