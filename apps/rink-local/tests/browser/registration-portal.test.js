@@ -31,6 +31,19 @@ test('club scope blocks private reads, team access and self-approval',t=>{
  assert.equal(x.portal.db.prepare('SELECT COUNT(*) n FROM roster_memberships WHERE player_id=?').get(playerId).n,0);
  assert.equal(JSON.stringify(x.league.snapshot()).includes('123 Private St'),false);
 });
+test('league admin cannot approve another league request or link another league club',t=>{
+ const x=setup();t.after(()=>x.close());
+ x.league.db.prepare('INSERT INTO leagues(id,name) VALUES(?,?)').run('second-league','Second League');
+ x.portal.createClub({id:'second-club',name:'Second Club',leagueId:'second-league'});
+ x.portal.createUser({email:'other-league@example.invalid',password:'another-long-password',role:'LEAGUE_ADMIN',scopeId:'second-league'});
+ const other=x.portal.authenticate(x.portal.login('other-league@example.invalid','another-long-password').token);
+ const {playerId}=x.portal.createPlayer(x.a,{displayName:'League Scope',legalName:'Private League Scope',birthDate:'2016-03-03'});
+ const req=x.portal.submit(x.a,{playerId,teamId:'maple',jersey:23,position:'F'});
+ assert.throws(()=>x.portal.decide(other,req.requestId,{decision:'APPROVED',reason:'Wrong league'}),/access denied/);
+ assert.throws(()=>x.portal.linkExisting(other,'club-a',playerId),/access denied/);
+ assert.equal(x.portal.requests(other).length,0);
+ assert.equal(x.portal.canRead(other,playerId),false);
+});
 test('guardian contact can be reused for siblings in same club but not another club',t=>{
  const x=setup();t.after(()=>x.close());
  const a1=x.portal.createPlayer(x.a,{displayName:'Sibling A',legalName:'Private A',birthDate:'2016-01-02'}).playerId;
