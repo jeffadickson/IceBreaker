@@ -17,6 +17,8 @@ Status: development implementation; **do not enter real minors' PII** until encr
 - REG-013 (P0): Registrars can preview CSV roster imports and submit valid rows; reject malformed, duplicate or ambiguous player identifiers before any enrollment. Imports never auto-create identities from names alone.
 - REG-014 (P1): Annual rollover proposes existing club players into new season teams, with explicit human confirmation and eligibility checks.
 - REG-015 (P1): Bulk upload supports validation summary, per-row errors and dry-run, with no partial approvals.
+- REG-016 (P0): Related persons can be linked across siblings only within an authorized club scope; linking a contact is not proof of guardianship.
+- REG-017 (P0): League admins can revoke a former club's access after transfer, with audit and protection against unlinking a player still on that club's roster.
 
 ## League administration
 - REG-020 (P0): League administrators can view pending requests within their league and approve/reject them with a reason and actor audit.
