@@ -89,6 +89,12 @@ test('private player and related-person fields encrypt with opt-in field key',t=
  const raw=x.portal.db.prepare('SELECT * FROM player_related_people WHERE id=?').get(person.personId);
  assert.match(raw.email,/^enc:v1:/);
  assert.equal(x.portal.registry.relatedPeople(playerId)[0].email,'private@example.invalid');
+ const personId=x.portal.registry.relatedPeople(playerId)[0].personId;
+ const user={personId,accountId:'fictional-family-test'};
+ x.portal.family.updateDetails(user,{preferredName:'Private Parent',address:{street:'Sensitive Address'},contactByEmail:true,contactBySms:false});
+ const stored=x.portal.db.prepare('SELECT private_json FROM family_person_details WHERE person_id=?').get(personId).private_json;
+ assert.match(stored,/^enc:v1:/);assert.equal(stored.includes('Sensitive Address'),false);
+ assert.equal(x.portal.family.ownContact(user).details.address.street,'Sensitive Address');
  delete process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;
  assert.throws(()=>x.portal.registry.relatedPeople(playerId),/requires configured key/);
  assert.throws(()=>x.portal.registry.privateProfile(playerId),/requires configured key/);
