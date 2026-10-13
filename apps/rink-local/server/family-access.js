@@ -3,6 +3,7 @@
 // A contact link alone is NEVER authorization to see a child's private data.
 const crypto=require('node:crypto');
 const uid=()=>crypto.randomUUID(),digest=s=>crypto.createHash('sha256').update(s).digest('hex');
+const {encryptField,decryptField}=require('./private-fields');
 const valid=(x,n=200)=>typeof x==='string'&&x.trim()&&x.length<=n;
 function passwordHash(p){
  if(!valid(p,256)||p.length<12)throw Error('Password too short');
@@ -69,12 +70,12 @@ class FamilyAccess{
  ownContact(user){
   const p=this.db.prepare('SELECT id personId,full_name fullName,email,phone FROM player_related_people WHERE id=?').get(user.personId);
   if(!p)throw Error('Contact not found');
-  this.audit('FAMILY_CONTACT_READ',user.personId,user.accountId);return p;
+  this.audit('FAMILY_CONTACT_READ',user.personId,user.accountId);return {...p,fullName:decryptField(p.fullName,user.personId,'fullName'),email:p.email===null?null:decryptField(p.email,user.personId,'email'),phone:p.phone===null?null:decryptField(p.phone,user.personId,'phone')};
  }
  updateContact(user,{phone,email}){
   if(phone!==undefined&&phone!==null&&!valid(phone,50)||email!==undefined&&email!==null&&(!valid(email,254)||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)))throw Error('Invalid contact details');
   const old=this.ownContact(user);
-  this.db.prepare('UPDATE player_related_people SET phone=?,email=? WHERE id=?').run(phone===undefined?old.phone:phone,email===undefined?old.email:email,user.personId);
+  this.db.prepare('UPDATE player_related_people SET phone=?,email=? WHERE id=?').run((phone===undefined?old.phone:phone)===null?null:encryptField(phone===undefined?old.phone:phone,user.personId,'phone'),(email===undefined?old.email:email)===null?null:encryptField(email===undefined?old.email:email,user.personId,'email'),user.personId);
   this.audit('FAMILY_CONTACT_UPDATED',user.personId,user.accountId);return {updated:true};
  }
 }
