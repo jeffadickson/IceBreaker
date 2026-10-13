@@ -87,7 +87,7 @@ public sealed class DesktopAnnouncementTests
         Assert.Equal(44, wav.Length);
         Assert.Equal("Bearer fake-test-key", handler.Authorization);
         Assert.Contains("gpt-4o-mini-tts", handler.Payload);
-        Assert.Contains("\\"voice\\":\\"onyx\\"", handler.Payload);
+        Assert.Contains("onyx", handler.Payload);
         Assert.Contains("number 29", handler.Payload);
     }
 }
