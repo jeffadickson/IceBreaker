@@ -186,6 +186,13 @@ public sealed class TimekeeperWindow : Window
             Text = "Select the original committed goal. This appends a new correction event; the original remains in the journal. A correction reason is mandatory. Goal voiding and penalty reversals are not available here.",
             TextWrapping = TextWrapping.Wrap
         });
+        _correctionGoal.SelectionChanged += (_, _) =>
+        {
+            if (_correctionGoal.SelectedItem is not GoalChoice selected) return;
+            _correctScorer.Text = selected.Scorer;
+            _correctAssist1.Text = selected.Assist1;
+            _correctAssist2.Text = selected.Assist2;
+        };
         correctionBody.Children.Add(_correctionGoal);
         correctionBody.Children.Add(Buttons(_correctScorer, _correctAssist1, _correctAssist2));
         correctionBody.Children.Add(_correctReason);
@@ -334,19 +341,34 @@ public sealed class TimekeeperWindow : Window
         return panel;
     }
 
-    private sealed record GoalChoice(string Id, string Description)
+    private sealed record GoalChoice(string Id, string Description, string Scorer, string Assist1, string Assist2)
     {
         public override string ToString() => Description;
     }
 
+    private static string EventDetail(RinkEvent ev, string key)
+    {
+        using var json = System.Text.Json.JsonDocument.Parse(ev.DetailsJson);
+        return json.RootElement.TryGetProperty(key, out var field) && field.ValueKind == System.Text.Json.JsonValueKind.String
+            ? field.GetString() ?? "NONE" : "NONE";
+    }
+
     private void PopulateGoalCorrections()
     {
-        _correctionGoal.ItemsSource = (_latest?.Events ?? [])
-            .Where(ev => ev.Type == "GOAL_RECORDED")
+        var events = _latest?.Events ?? [];
+        var corrections = events.Where(ev => ev.Type == "GOAL_ATTRIBUTION_CORRECTED").ToArray();
+        var choices = events.Where(ev => ev.Type == "GOAL_RECORDED")
             .Reverse().Take(30)
-            .Select(ev => new GoalChoice(ev.Id, $"{(ev.Team ?? "game").ToUpperInvariant()} · {ev.DetailsJson}"))
-            .ToArray();
-        _correctionGoal.SelectedIndex = _correctionGoal.ItemCount > 0 ? 0 : -1;
+            .Select(goal =>
+            {
+                // Prefill from the most recent correction, if one exists.
+                var latest = corrections.LastOrDefault(ev => EventDetail(ev, "originalEventId") == goal.Id) ?? goal;
+                return new GoalChoice(goal.Id,
+                    $"{(goal.Team ?? "game").ToUpperInvariant()} · {latest.DetailsJson}",
+                    EventDetail(latest, "scorer"), EventDetail(latest, "assist1"), EventDetail(latest, "assist2"));
+            }).ToArray();
+        _correctionGoal.ItemsSource = choices;
+        _correctionGoal.SelectedIndex = choices.Length > 0 ? 0 : -1;
     }
 
     private Button PopupButton(string text, string title, Control panel, Action? beforeOpen = null, int width = 0)
