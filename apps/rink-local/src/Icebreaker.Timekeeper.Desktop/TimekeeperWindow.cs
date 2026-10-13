@@ -45,6 +45,7 @@ public sealed class TimekeeperWindow : Window
     private readonly ListBox _announcements = new() { Height = 140, Width = 850 };
     private readonly ComboBox _voiceMode = new() { ItemsSource = new[] { "Offline Windows voice", "AI arena announcer (cloud)" }, SelectedIndex = 0, Width = 245 };
     private readonly ComboBox _aiVoice = new() { ItemsSource = new[] { "onyx", "marin", "cedar", "echo", "alloy", "nova" }, SelectedIndex = 0, Width = 115 };
+    private readonly ComboBox _paStyle = new() { ItemsSource = new[] { "Classic arena PA", "High-energy goal call", "Calm and precise" }, SelectedIndex = 0, Width = 205 };
     private readonly TextBlock _paStatus = Label("PA is manual-approval only; AI speech is synthetic.", 14);
     private readonly HashSet<string> _seenPaEvents = new(StringComparer.Ordinal);
     private bool _paBusy;
@@ -116,7 +117,7 @@ public sealed class TimekeeperWindow : Window
                    "Only committed event scripts using jersey numbers are sent to the provider.",
             TextWrapping = TextWrapping.Wrap
         });
-        body.Children.Add(Buttons(_voiceMode, _aiVoice));
+        body.Children.Add(Buttons(_voiceMode, _aiVoice, _paStyle));
         body.Children.Add(_announcements);
         body.Children.Add(Buttons(
             PaButton("PREVIEW / PLAY SELECTED", PlaySelectedAsync),
@@ -196,8 +197,14 @@ public sealed class TimekeeperWindow : Window
         // Playback may be uncertain after a crash, so claim before sending audio.
         var ai = _voiceMode.SelectedIndex == 1;
         _paStatus.Text = ai ? "Generating synthetic AI speech…" : "Generating offline speech…";
+        var style = _paStyle.SelectedIndex switch
+        {
+            1 => "Energetic hockey arena PA voice. Excited but intelligible, with strong emphasis on the goal or penalty. No additional words.",
+            2 => "Calm, clear and precise hockey arena PA delivery. No additional words.",
+            _ => AnnouncementSpeech.DefaultInstructions
+        };
         var wav = await _speech.SynthesizeAsync(item.Script, ai,
-            _aiVoice.SelectedItem?.ToString() ?? "onyx");
+            _aiVoice.SelectedItem?.ToString() ?? "onyx", style);
         _paQueue.Mark(item.Id, "PLAYING", "PENDING", "NEEDS_REVIEW");
         try
         {
