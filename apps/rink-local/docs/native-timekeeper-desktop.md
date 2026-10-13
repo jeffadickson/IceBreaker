@@ -45,3 +45,11 @@ The redesigned native console has a fixed scoreboard/clock header and tabs for c
 The official clock and score remain visible while changing tabs; the desktop still has no local authoritative countdown. The scoring tab can submit GOAL_RECORDED with scorer and up to two assists (NONE permitted), basic PENALTY_ASSESSED, and GOALIE_CHANGED including EMPTY. Goal entry requires explicit verification. Events are shown only after being committed to the backend. Referee mobile signing is a separate page; see [iterative UI and signing requirements](../../../requirements/operator-ui-and-mobile-signing.md).
 
 Next: roster-backed jersey picker, more complete penalty operations, amendment workflow, laptop/touchscreen field usability tests and signed desktop installer.
+
+## UI iteration 2 — main-screen first, minimal presses
+
+The operator no longer navigates tabs for routine scoring. The main dashboard keeps the authoritative scoreboard and clock visible and exposes team-specific HOME/AWAY GOAL, PENALTY, and GOALIE buttons. Each opens an editable modal overlay with the team preselected; CANCEL makes no journal change. Only the explicit RECORD/ASSESS action commits a backend event. Successful submission closes the popup; validation errors keep it open for correction. Clock/period details, event history, and PA are secondary popups accessible directly from the dashboard.
+
+An audited **CORRECT GOAL** popup lists recent committed goals and preloads the latest scorer/assist attribution. It submits `GOAL_ATTRIBUTION_CORRECTED` with `originalEventId` and mandatory reason, preserving the original journal event. This applies to supported in-game attribution corrections; postgame referee-requested amendments use the separate certified scoresheet workflow. Generic goal voids, penalty edits and score reversals are **not yet available** and must not be presented as operational capabilities.
+
+Interaction-count targets and acceptance tests are in [operator UI requirements](../../../requirements/operator-ui-and-mobile-signing.md). The native console still needs hands-on 1366×768 laptop testing, touch-target measurements and operator feedback.
