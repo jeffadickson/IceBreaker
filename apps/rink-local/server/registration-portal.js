@@ -6,6 +6,8 @@ const {DatabaseSync}=require('node:sqlite');
 const {PlayerRegistry}=require('./player-registry');
 const {FamilyAccess}=require('./family-access');
 const {EncryptedDocuments,MAX_BYTES}=require('./encrypted-documents');
+const {encryptField,decryptField,fieldKey}=require('./private-fields');
+const totp=require('./mfa-totp');
 const path=require('node:path');
 const uid=()=>crypto.randomUUID(),hash=s=>crypto.createHash('sha256').update(s).digest('hex');
 const good=(x,n=160)=>typeof x==='string'&&x.trim().length>0&&x.length<=n;
@@ -27,6 +29,10 @@ class RegistrationPortal{
    "CREATE UNIQUE INDEX IF NOT EXISTS registration_open_request ON registration_requests(club_id,player_id,team_id) WHERE status='SUBMITTED'",
    'CREATE TABLE IF NOT EXISTS registration_division_age_rules(division_id TEXT PRIMARY KEY REFERENCES divisions(id),cutoff_date TEXT NOT NULL,min_age INTEGER NOT NULL,max_age INTEGER NOT NULL,CHECK(min_age>=0 AND max_age>=min_age AND max_age<=99))'
   ].join(';')+';');
+  const columns=new Set(this.db.prepare('PRAGMA table_info(registration_users)').all().map(c=>c.name));
+  if(!columns.has('mfa_secret'))this.db.exec('ALTER TABLE registration_users ADD COLUMN mfa_secret TEXT');
+  if(!columns.has('mfa_enabled'))this.db.exec('ALTER TABLE registration_users ADD COLUMN mfa_enabled INTEGER NOT NULL DEFAULT 0');
+  if(!columns.has('mfa_last_counter'))this.db.exec('ALTER TABLE registration_users ADD COLUMN mfa_last_counter INTEGER NOT NULL DEFAULT -1');
  }
  tx(fn){this.db.exec('BEGIN IMMEDIATE');try{const x=fn();this.db.exec('COMMIT');return x;}catch(e){this.db.exec('ROLLBACK');throw e;}}
  audit(action,entity,actor,details={}){this.db.prepare('INSERT INTO league_audit VALUES(?,?,?,?,?,?)').run(uid(),new Date().toISOString(),actor,action,entity,JSON.stringify(details));}
@@ -40,13 +46,42 @@ class RegistrationPortal{
  createUser({email,password,role,scopeId}){
   if(!good(email,254)||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)||!['CLUB_REGISTRAR','LEAGUE_ADMIN'].includes(role))throw Error('Invalid account');
   if(role==='CLUB_REGISTRAR')this.club(scopeId);else if(!this.db.prepare('SELECT 1 FROM leagues WHERE id=?').get(scopeId))throw Error('Unknown league');
-  const userId=uid();this.db.prepare('INSERT INTO registration_users VALUES(?,?,?,?,?,?)').run(userId,email.toLowerCase(),secret(password),role,scopeId,new Date().toISOString());return {userId,role,scopeId};
+  const userId=uid();this.db.prepare('INSERT INTO registration_users(id,email,password_hash,role,scope_id,created_at) VALUES(?,?,?,?,?,?)').run(userId,email.toLowerCase(),secret(password),role,scopeId,new Date().toISOString());return {userId,role,scopeId};
  }
- login(email,password){
+ login(email,password,mfaCode=null){
   const u=this.db.prepare('SELECT * FROM registration_users WHERE email=?').get(String(email||'').toLowerCase());
   if(!u||!verify(password,u.password_hash))throw Error('Invalid credentials');
+  if(u.mfa_enabled){
+   const seed=decryptField(u.mfa_secret,u.id,'mfaTotp');
+   const counter=totp.match(seed,mfaCode,{lastCounter:u.mfa_last_counter});
+   if(counter===null)throw Error('MFA code required or invalid');
+   const changed=this.db.prepare('UPDATE registration_users SET mfa_last_counter=? WHERE id=? AND mfa_last_counter<?').run(counter,u.id,counter);
+   if(changed.changes!==1)throw Error('MFA code already used');
+  }
   const token=crypto.randomBytes(32).toString('base64url');this.db.prepare('INSERT INTO registration_sessions VALUES(?,?,?)').run(hash(token),u.id,Date.now()+8*3600_000);
   return {token,role:u.role,scopeId:u.scope_id,expiresInSeconds:28800};
+ }
+ beginMfa(user){
+  const u=this.db.prepare('SELECT * FROM registration_users WHERE id=?').get(user.id);
+  if(!u||u.mfa_enabled)throw Error('MFA already enabled or account missing');
+  if(!fieldKey())throw Error('Private-field key required for encrypted MFA seed');
+  const seed=totp.generateSecret();
+  this.db.prepare('UPDATE registration_users SET mfa_secret=? WHERE id=?').run(encryptField(seed,user.id,'mfaTotp'),user.id);
+  this.audit('MFA_ENROLLMENT_STARTED',user.id,user.id);
+  return {secret:seed,otpauthUrl:'otpauth://totp/IceBreaker:'+encodeURIComponent(u.email)+'?secret='+seed+'&issuer=IceBreaker&digits=6&period=30'};
+ }
+ confirmMfa(user,code){
+  const u=this.db.prepare('SELECT * FROM registration_users WHERE id=?').get(user.id);
+  if(!u||u.mfa_enabled||!u.mfa_secret)throw Error('MFA enrollment not pending');
+  const seed=decryptField(u.mfa_secret,user.id,'mfaTotp');
+  const counter=totp.match(seed,code);
+  if(counter===null)throw Error('Invalid MFA confirmation code');
+  return this.tx(()=>{
+   this.db.prepare('UPDATE registration_users SET mfa_enabled=1,mfa_last_counter=? WHERE id=? AND mfa_enabled=0').run(counter,user.id);
+   this.db.prepare('DELETE FROM registration_sessions WHERE user_id=?').run(user.id);
+   this.audit('MFA_ENABLED',user.id,user.id);
+   return {enabled:true,signInAgain:true};
+  });
  }
  logout(token){if(typeof token!=='string'||token.length<30)return {signedOut:true};this.db.prepare('DELETE FROM registration_sessions WHERE token_hash=?').run(hash(token));return {signedOut:true};}
  authenticate(token){
