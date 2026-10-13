@@ -18,7 +18,10 @@ function encryptField(value,playerId,field){
  return PREFIX+Buffer.concat([nonce,cipher.getAuthTag(),ciphertext]).toString('base64');
 }
 function decryptField(value,playerId,field){
- if(typeof value!=='string'||!value.startsWith(PREFIX))return value;
+ if(typeof value!=='string'||!value.startsWith(PREFIX)){
+  if(process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION==='1'&&value!==null)throw Error('Unencrypted legacy private field requires migration');
+  return value;
+ }
  const key=fieldKey();if(!key)throw Error('Encrypted private field requires configured key');
  const bytes=Buffer.from(value.slice(PREFIX.length),'base64');
  if(bytes.length<29)throw Error('Invalid encrypted private field');
