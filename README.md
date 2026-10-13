@@ -10,6 +10,10 @@ Run `START_ICEBREAKER_DESKTOP_WINDOWS.cmd` on a Windows laptop with Node.js 22.1
 
 See [native timekeeper guide](apps/rink-local/docs/native-timekeeper-desktop.md) and [desktop requirements](requirements/desktop-timekeeper.md). GitHub CI compiles the native app and publishes a Windows x64 artifact. The current shared development operator key, incomplete hardware drivers and unperformed physical-machine crash testing mean this is **not yet a production deployment**.
 
+## Native operator UI and mobile referee review — iterative redesign
+
+The Avalonia rink console now keeps the official score and clock visible above tabs for **clock/periods**, **goals/penalties/goalies**, **committed events**, and **PA**. Basic native goal/assist and goalie-change entry uses the same independently running local authority and audited event journal. The mobile-friendly referee review now displays the signed revision/digest, requires explicit signing intent, prevents double submissions, and checks for stale revisions before approval. See [UI and signing requirements](requirements/operator-ui-and-mobile-signing.md). This is a development increment: roster pickers, advanced penalties, production multi-referee signing, cryptographic PDF signatures, and physical rink usability testing remain.
+
 ## Optional AI arena announcer
 
 The native Windows timekeeper has a manual-approval PA queue for committed goal and penalty events. Select the **Offline Windows voice** (default) or an optional **AI arena announcer** voice, then choose an announcement to play or skip. The AI voice requires an `OPENAI_API_KEY` in the desktop process environment and internet access; it does not alter scoring or send credentials to the rink backend. Player jersey numbers are used by default, not youth names. See [AI PA announcer guide](apps/rink-local/docs/ai-pa-announcer.md) and [requirements](requirements/ai-pa-announcer.md). Arena speaker playback and cloud provider integration still need physical acceptance testing.
