@@ -30,6 +30,8 @@ class LeagueStore {
   // Backward-compatible mapping for existing single-league prototype databases.
   this.db.prepare("INSERT OR IGNORE INTO leagues(id,name,public_scoreboard_enabled,timezone) VALUES('demo-league','Demonstration League',1,'America/Los_Angeles')").run();
   this.db.prepare("INSERT OR IGNORE INTO league_seasons(league_id,season_id) SELECT 'demo-league',id FROM seasons WHERE id NOT IN (SELECT season_id FROM league_seasons)").run();
+  // Install private identity, related-person, training and transfer-history tables.
+  require('./player-registry').initPlayerRegistry(this.db);
   // Existing divisions acquire a default versioned regulation timing policy.
   const {DEFAULT_TIMING}=require('./game-timing-rules');
   const addTiming=this.db.prepare('INSERT OR IGNORE INTO division_timing_rules(division_id,version,rules_json) VALUES(?,?,?)');
