@@ -77,11 +77,11 @@ class PlayerRegistry{
   if(!good(actor,100)||!['PARENT','GUARDIAN','EMERGENCY_CONTACT','OTHER'].includes(relationship)||!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Invalid person link');
   if(personId===null&&(!good(fullName)||email!==null&&(!good(email,250))||phone!==null&&!good(phone,50)))throw Error('Invalid related person');
   return this.tx(()=>{const relatedId=personId||uuid();if(personId){if(!this.db.prepare('SELECT 1 FROM player_related_people WHERE id=?').get(personId))throw Error('Unknown related person');}
-   else this.db.prepare('INSERT INTO player_related_people VALUES(?,?,?,?)').run(relatedId,fullName.trim(),email,phone);
+   else this.db.prepare('INSERT INTO player_related_people VALUES(?,?,?,?)').run(relatedId,encryptField(fullName.trim(),relatedId,'fullName'),email===null?null:encryptField(email,relatedId,'email'),phone===null?null:encryptField(phone,relatedId,'phone'));
    this.db.prepare('INSERT INTO player_person_links VALUES(?,?,?)').run(playerId,relatedId,relationship);
    this.audit('PERSON_LINKED',playerId,{personId:relatedId,relationship},actor);return {personId:relatedId};});
  }
- relatedPeople(playerId){return this.db.prepare("SELECT p.id personId,p.full_name fullName,p.email,p.phone,l.relationship FROM player_person_links l JOIN player_related_people p ON p.id=l.person_id WHERE l.player_id=?").all(playerId);}
+ relatedPeople(playerId){return this.db.prepare("SELECT p.id personId,p.full_name fullName,p.email,p.phone,l.relationship FROM player_person_links l JOIN player_related_people p ON p.id=l.person_id WHERE l.player_id=?").all(playerId).map(p=>({...p,fullName:decryptField(p.fullName,p.personId,'fullName'),email:p.email===null?null:decryptField(p.email,p.personId,'email'),phone:p.phone===null?null:decryptField(p.phone,p.personId,'phone')}));}
  requireTraining({leagueId,seasonId,code,title,requiredBy=null,blocksLineup=true},actor){
   if(!good(actor,100)||!good(code,60)||!good(title)||typeof blocksLineup!=='boolean'||requiredBy!==null&&!validDate(requiredBy)||!this.db.prepare('SELECT 1 FROM league_seasons WHERE league_id=? AND season_id=?').get(leagueId,seasonId))throw Error('Invalid annual training requirement');
   return this.tx(()=>{const requirementId=uuid();this.db.prepare('INSERT INTO season_training_requirements VALUES(?,?,?,?,?,?,?)').run(requirementId,leagueId,seasonId,code,title,requiredBy,blocksLineup?1:0);this.audit('TRAINING_REQUIRED',requirementId,{leagueId,seasonId,code},actor);return {requirementId};});
