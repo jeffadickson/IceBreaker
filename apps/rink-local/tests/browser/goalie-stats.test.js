@@ -7,6 +7,7 @@ test('goalie substitutions attribute saves and goals to actual occupant, includi
  let a=new Authority({dbPath:file});t.after(()=>{a.close();fs.rmSync(dir,{recursive:true,force:true});});
  let i=0;const cmd=c=>a.command(c,{actor:'scorekeeper',key:'goalie-stats-'+(++i)});
  const swap=(team,player)=>cmd({type:'GOALIE_CHANGED',team,player,reason:'Substitution'});
+ assert.equal(a.spectator().goalieState.home,'UNASSIGNED');
  swap('home','29');
  cmd({type:'SHOT_RECORDED',team:'away'});
  cmd({type:'GOAL_RECORDED',team:'away',scorer:'7',assist1:'None',assist2:'None'});
@@ -18,6 +19,9 @@ test('goalie substitutions attribute saves and goals to actual occupant, includi
  assert.deepEqual(a.spectator().goalieStats.home['29'],{shotsAgainst:2,goalsAgainst:1,saves:1});
  assert.deepEqual(a.spectator().goalieStats.home['17'],{shotsAgainst:2,goalsAgainst:1,saves:1});
  assert.equal(a.spectator().goalies.home,null);
+ assert.equal(a.spectator().goalieState.home,'EMPTY_NET');
+ assert.equal(a.spectator().emptyNetGoals.home,1);
+ assert.equal(a.spectator().unattributedShots.home,1);
  assert.equal(a.spectator().shots.away,5);
  const rev=a.spectator().revision;a.close();
  a=new Authority({dbPath:file});assert.equal(a.spectator().revision,rev);
