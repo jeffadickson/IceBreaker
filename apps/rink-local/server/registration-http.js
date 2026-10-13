@@ -39,6 +39,7 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
    if(decision&&req.method==='POST'){reply(200,portal.decide(user,decision[1],await body()));return true;}
    const link=route.match(/^clubs\/([-\w]+)\/players$/);
    if(link&&req.method==='POST'){const b=await body();reply(201,portal.linkExisting(user,link[1],b.playerId));return true;}
+   if(link&&req.method==='DELETE'){const b=await body();reply(200,portal.unlinkExisting(user,link[1],b.playerId,b.reason));return true;}
    if(route==='training/requirements'&&req.method==='POST'){
     const b=await body();portal.requireLeague(user,b.leagueId);
     reply(201,portal.registry.requireTraining(b,user.id));return true;
