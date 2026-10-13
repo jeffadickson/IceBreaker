@@ -19,6 +19,7 @@ class LeagueStore {
    CREATE TABLE IF NOT EXISTS roster_memberships(season_id TEXT NOT NULL REFERENCES seasons(id),team_id TEXT NOT NULL REFERENCES teams(id),player_id TEXT NOT NULL REFERENCES players(id),jersey INTEGER NOT NULL,position TEXT NOT NULL,PRIMARY KEY(season_id,team_id,player_id));
    CREATE TABLE IF NOT EXISTS games(id TEXT PRIMARY KEY,division_id TEXT NOT NULL REFERENCES divisions(id),date TEXT NOT NULL,venue TEXT NOT NULL,sheet TEXT NOT NULL,home_team_id TEXT NOT NULL REFERENCES teams(id),away_team_id TEXT NOT NULL REFERENCES teams(id),status TEXT NOT NULL CHECK(status IN ('scheduled','live','final')),home_score INTEGER,away_score INTEGER,certified_at TEXT,certified_by TEXT,version INTEGER NOT NULL DEFAULT 0,CHECK(home_team_id<>away_team_id));
    CREATE TABLE IF NOT EXISTS goal_attributions(id TEXT PRIMARY KEY,game_id TEXT NOT NULL REFERENCES games(id),team_id TEXT NOT NULL REFERENCES teams(id),scorer_id TEXT REFERENCES players(id),assist1_id TEXT REFERENCES players(id),assist2_id TEXT REFERENCES players(id),CHECK(scorer_id IS NULL OR scorer_id<>assist1_id),CHECK(scorer_id IS NULL OR scorer_id<>assist2_id),CHECK(assist1_id IS NULL OR assist2_id IS NULL OR assist1_id<>assist2_id));
+   CREATE TABLE IF NOT EXISTS certified_goalie_stats(game_id TEXT NOT NULL REFERENCES games(id),team_id TEXT NOT NULL REFERENCES teams(id),player_id TEXT NOT NULL REFERENCES players(id),shots_against INTEGER NOT NULL CHECK(shots_against>=0),saves INTEGER NOT NULL CHECK(saves>=0),goals_against INTEGER NOT NULL CHECK(goals_against>=0),PRIMARY KEY(game_id,team_id,player_id),CHECK(shots_against=saves+goals_against));
    CREATE TABLE IF NOT EXISTS league_audit(id TEXT PRIMARY KEY,at TEXT NOT NULL,actor TEXT NOT NULL,action TEXT NOT NULL,entity_id TEXT NOT NULL,payload_json TEXT NOT NULL);
    CREATE INDEX IF NOT EXISTS ix_games_division_date ON games(division_id,date);
    CREATE INDEX IF NOT EXISTS ix_goals_game ON goal_attributions(game_id);
@@ -44,7 +45,7 @@ class LeagueStore {
   this.audit('DEMO_DATA_SEEDED','demo-2026',{fictional:true});
  });}
  createGame(g,{actor='league-admin'}={}){if(!g||!/^[-\w]{2,64}$/.test(g.id))throw Error('Invalid game id');const teams=this.db.prepare('SELECT id,division_id FROM teams WHERE id IN (?,?)').all(g.home,g.away);if(teams.length!==2||g.home===g.away||teams.some(t=>t.division_id!==g.divisionId))throw Error('Teams must be distinct and in division');if(!Number.isFinite(Date.parse(g.date)))throw Error('Invalid date');return this.tx(()=>{this.db.prepare('INSERT INTO games(id,division_id,date,venue,sheet,home_team_id,away_team_id,status,version) VALUES(?,?,?,?,?,?,?,\'scheduled\',0)').run(g.id,g.divisionId,g.date,String(g.venue||'TBD').slice(0,100),String(g.sheet||'TBD').slice(0,60),g.home,g.away);this.audit('GAME_SCHEDULED',g.id,g,actor);return {id:g.id,status:'scheduled'};});}
- certifyGame(id,{homeScore,awayScore,goals,expectedVersion,actor='league-admin'}={}){
+ certifyGame(id,{homeScore,awayScore,goals,expectedVersion,goalieStats=null,actor='league-admin'}={}){
   if(!Number.isInteger(homeScore)||homeScore<0||!Number.isInteger(awayScore)||awayScore<0||!Number.isInteger(expectedVersion)||!Array.isArray(goals))throw Error('Invalid certification payload');
   return this.tx(()=>{
    const g=this.db.prepare('SELECT * FROM games WHERE id=?').get(id);if(!g)throw Error('Unknown game');if(g.status==='final')throw Error('Final result immutable; correction workflow required');if(g.version!==expectedVersion)throw Error('Version conflict');
@@ -55,8 +56,22 @@ class LeagueStore {
     if(!goal.scorerId)throw Error('Certification requires resolved goal scorer');
    }
    if(h!==homeScore||a!==awayScore)throw Error('Certified goal events do not reconcile to score');
+   if(goalieStats!==null){
+    if(!Array.isArray(goalieStats))throw Error('Invalid certified goalie statistics');
+    const seen=new Set(),bySide={home:{shots:0,goals:0},away:{shots:0,goals:0}};
+    for(const row of goalieStats){
+     if(!row||!['home','away'].includes(row.side)||typeof row.playerId!=='string'||![row.shotsAgainst,row.saves,row.goalsAgainst].every(x=>Number.isSafeInteger(x)&&x>=0)||row.shotsAgainst!==row.saves+row.goalsAgainst)throw Error('Invalid certified goalie statistics');
+     const teamId=row.side==='home'?g.home_team_id:g.away_team_id,key=teamId+':'+row.playerId;
+     if(!membership.has(key)||seen.has(key))throw Error('Duplicate or ineligible certified goalie');
+     seen.add(key);bySide[row.side].shots+=row.shotsAgainst;bySide[row.side].goals+=row.goalsAgainst;
+    }
+    // Goals credited to a goalie can never exceed opposing goals; empty-net and
+    // unattributed shots may account for the difference.
+    if(bySide.home.goals>awayScore||bySide.away.goals>homeScore)throw Error('Goalie totals exceed opposing score');
+   }
    this.db.prepare('DELETE FROM goal_attributions WHERE game_id=?').run(id);
    const insert=this.db.prepare('INSERT INTO goal_attributions VALUES(?,?,?,?,?,?)');for(const goal of goals){insert.run(crypto.randomUUID(),id,goal.side==='home'?g.home_team_id:g.away_team_id,goal.scorerId,goal.assist1Id||null,goal.assist2Id||null);}
+   if(goalieStats!==null){const add=this.db.prepare('INSERT INTO certified_goalie_stats VALUES(?,?,?,?,?,?)');for(const row of goalieStats)add.run(id,row.side==='home'?g.home_team_id:g.away_team_id,row.playerId,row.shotsAgainst,row.saves,row.goalsAgainst);}
    const result=this.db.prepare("UPDATE games SET home_score=?,away_score=?,status='final',certified_at=?,certified_by=?,version=version+1 WHERE id=? AND version=?").run(homeScore,awayScore,new Date().toISOString(),actor,id,expectedVersion);
    if(result.changes!==1)throw Error('Version conflict');this.audit('RESULT_CERTIFIED',id,{homeScore,awayScore,goalCount:goals.length},actor);return {id,status:'final',version:expectedVersion+1};
   });
@@ -70,8 +85,11 @@ class LeagueStore {
    for(const p of roster)if(p.teamId===g.home||p.teamId===g.away)stats[p.id].gp++;
    for(const [scorer,assist1,assist2] of g.goals){if(stats[scorer])stats[scorer].g++;for(const id of [assist1,assist2])if(id&&stats[id])stats[id].a++;}
   }
+  const goalieRows=this.db.prepare('SELECT s.*,g.division_id,g.status FROM certified_goalie_stats s JOIN games g ON g.id=s.game_id WHERE g.status=\'final\'').all();
+  const goalieByPlayer=new Map();for(const r of goalieRows){const key=r.player_id;let v=goalieByPlayer.get(key);if(!v){v={playerId:key,teamId:r.team_id,gamesInGoal:0,shotsAgainst:0,saves:0,goalsAgainst:0};goalieByPlayer.set(key,v);}v.gamesInGoal++;v.shotsAgainst+=r.shots_against;v.saves+=r.saves;v.goalsAgainst+=r.goals_against;}
+  const goalieStats=[...goalieByPlayer.values()].map(v=>({...v,savePercentage:v.shotsAgainst?Number((v.saves/v.shotsAgainst).toFixed(4)):null}));
   const live=authority?.spectator();const schedule=fixtures.map(g=>g.status==='live'&&live?{...g,homeScore:live.scores.home,awayScore:live.scores.away,period:live.period,seconds:live.seconds,updatedRevision:live.revision}:g);
-  return {schemaVersion:2,source:'SQLITE_DEMONSTRATION_LEAGUE',message:'Fictional demonstration teams and players; not real league results.',season:{id:'demo-2026',name:'Demo 2026 Fall'},division:{id:'demo-10u',name:'10U demonstration'},standingsPolicy:{id:'DEMO-2-1-0-v1',win:2,tie:1,loss:0,tiebreakers:['points','wins','goal differential','team ID'],certifiedOnly:true},teams,players:Object.values(stats).map(p=>({...p,pts:p.g+p.a})).sort((a,b)=>b.pts-a.pts||b.g-a.g||a.id.localeCompare(b.id)),standings:Object.values(rows).map(x=>({...x,diff:x.gf-x.ga})).sort((a,b)=>b.points-a.points||b.wins-a.wins||b.gf-b.ga-(a.gf-a.ga)||a.teamId.localeCompare(b.teamId)),schedule,revision:live?.revision??0};
+  return {schemaVersion:2,source:'SQLITE_DEMONSTRATION_LEAGUE',message:'Fictional demonstration teams and players; not real league results.',season:{id:'demo-2026',name:'Demo 2026 Fall'},division:{id:'demo-10u',name:'10U demonstration'},standingsPolicy:{id:'DEMO-2-1-0-v1',win:2,tie:1,loss:0,tiebreakers:['points','wins','goal differential','team ID'],certifiedOnly:true},teams,goalieStats,players:Object.values(stats).map(p=>({...p,pts:p.g+p.a})).sort((a,b)=>b.pts-a.pts||b.g-a.g||a.id.localeCompare(b.id)),standings:Object.values(rows).map(x=>({...x,diff:x.gf-x.ga})).sort((a,b)=>b.points-a.points||b.wins-a.wins||b.gf-b.ga-(a.gf-a.ga)||a.teamId.localeCompare(b.teamId)),schedule,revision:live?.revision??0};
  }
  timingForDivision(divisionId){const row=this.db.prepare('SELECT d.rules_version AS version,r.rules_json AS rules FROM divisions d JOIN division_timing_rules r ON r.division_id=d.id AND r.version=d.rules_version WHERE d.id=?').get(divisionId);if(!row)throw Error('Division timing rules unavailable');const {validateTiming}=require('./game-timing-rules');return {divisionId,version:row.version,...validateTiming(JSON.parse(row.rules))};}
  configureDivisionTiming(divisionId,version,rules,{actor='league-admin'}={}){if(!/^[A-Za-z0-9_.-]{1,80}$/.test(version))throw Error('Invalid rules version');const {validateTiming}=require('./game-timing-rules');const checked=validateTiming(rules);return this.tx(()=>{const d=this.db.prepare('SELECT rules_version FROM divisions WHERE id=?').get(divisionId);if(!d)throw Error('Unknown division');const hasActive=this.db.prepare("SELECT 1 FROM games WHERE division_id=? AND status IN ('live','final') LIMIT 1").get(divisionId);if(hasActive)throw Error('Cannot change division timing policy after games have started; create a new division/ruleset revision through an authorized migration');this.db.prepare('INSERT INTO division_timing_rules VALUES(?,?,?)').run(divisionId,version,JSON.stringify(checked));this.db.prepare('UPDATE divisions SET rules_version=? WHERE id=?').run(version,divisionId);this.audit('DIVISION_TIMING_UPDATED',divisionId,{version,...checked},actor);return {divisionId,version,...checked};});}
