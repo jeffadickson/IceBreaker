@@ -4,6 +4,12 @@
 
 > **Status: development prototype.** The Node.js local server and C# components are not yet one unified production authority. No public-internet deployment or game certification is supported. Sample teams/results are fictional.
 
+## Native Windows timekeeper (development)
+
+Run `START_ICEBREAKER_DESKTOP_WINDOWS.cmd` on a Windows laptop with Node.js 22.13+ and .NET SDK 8+. This launches a **native Avalonia desktop window** and a **separate local authority process**; no browser is needed for timekeeping. Closing the window does not stop the independent authority. The app reconnects from authoritative snapshots, and displays a disconnected warning rather than guessing time when the backend is unavailable.
+
+See [native timekeeper guide](apps/rink-local/docs/native-timekeeper-desktop.md) and [desktop requirements](requirements/desktop-timekeeper.md). GitHub CI compiles the native app and publishes a Windows x64 artifact. The current shared development operator key, incomplete hardware drivers and unperformed physical-machine crash testing mean this is **not yet a production deployment**.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
