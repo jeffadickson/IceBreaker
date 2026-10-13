@@ -58,4 +58,36 @@ public sealed class DesktopAnnouncementTests
         await Assert.ThrowsAsync<ArgumentException>(() => speech.SynthesizeAsync("hi\nthere", true));
         await Assert.ThrowsAsync<ArgumentException>(() => speech.SynthesizeAsync("hello", true, "unsupported-voice"));
     }
+
+    private sealed class SpeechHandler : HttpMessageHandler
+    {
+        public string? Payload { get; private set; }
+        public string? Authorization { get; private set; }
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Assert.Equal("/v1/audio/speech", request.RequestUri?.AbsolutePath);
+            Authorization = request.Headers.Authorization?.ToString();
+            Payload = await request.Content!.ReadAsStringAsync(cancellationToken);
+            var wav = new byte[44];
+            "RIFF"u8.CopyTo(wav);
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(wav)
+            };
+        }
+    }
+
+    [Fact]
+    public async Task HostedAiVoiceUsesOptInScriptAndSelectedVoiceOnly()
+    {
+        var handler = new SpeechHandler();
+        using var http = new HttpClient(handler);
+        var speech = new AnnouncementSpeech(http, "fake-test-key");
+        var wav = await speech.SynthesizeAsync("Goal for the home team! Scored by number 29.", true, "onyx");
+        Assert.Equal(44, wav.Length);
+        Assert.Equal("Bearer fake-test-key", handler.Authorization);
+        Assert.Contains("gpt-4o-mini-tts", handler.Payload);
+        Assert.Contains("\\"voice\\":\\"onyx\\"", handler.Payload);
+        Assert.Contains("number 29", handler.Payload);
+    }
 }
