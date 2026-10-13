@@ -24,3 +24,17 @@ requirements/         StrictDoc and traceability
 ```
 
 **Do not move current backend files without rerunning existing tests**; current code imports paths relative to `apps/rink-local`.
+
+## TODO — Production email registration/certificate ingestion
+
+The fictional league-email parser, interactive name confirmation, pending training intake, and separate encrypted evidence archive are implemented as a development demo. The following are **not implemented** and should be completed in small, independently tested milestones:
+
+- [ ] **Mail connectors:** Implement read-only Gmail and Microsoft Outlook/Microsoft Graph adapters, followed by optional IMAP support. Use least-privilege OAuth where supported, narrowly scoped inbox searches, explicit operator consent, and idempotent provider message IDs.
+- [ ] **Robust extraction:** Parse real RFC 5322/MIME messages, multipart attachments and common PDF/image certificates in a sandbox. Apply strict attachment limits, content-type/signature validation, malware scanning and untrusted-content handling.
+- [ ] **Issuer and certificate verification:** Establish an allowlisted provider registry, validate sender authentication (including DKIM/DMARC where available), verify certificate/registration identifiers with issuers where possible, and never treat sender identity alone as proof.
+- [ ] **Identity confirmation UX:** Provide a secure registrar review screen displaying the parsed name and selected permanent person record side by side; require explicit confirmation, resolve duplicate/similar names manually, and prohibit automatic merges.
+- [ ] **Secure evidence and audit:** Use the separate encrypted evidence archive (not Git) with scoped access, malware quarantine, tamper-evident audit events, retention/deletion policies, encrypted backups, KMS integration and disaster-recovery tests.
+- [ ] **Approval workflow:** Keep email-derived records PENDING until authorized registrar verification. Add rejection/retry/reconciliation queues and verify that unapproved records never affect roster or training eligibility.
+- [ ] **End-to-end validation:** Test synthetic Gmail/Outlook/IMAP messages, duplicate delivery, malformed attachments, forged sender headers, name mismatch, wrong-person selection, interrupted imports, expired certificates and revocation. Keep production ingestion disabled until the security release gates are met.
+
+See [mock registration email demo](apps/rink-local/docs/mock-registration-email-demo.md), [backend CLI intake guide](apps/rink-local/docs/backend-cli-training-intake.md), and [private data security requirements](requirements/private-data-and-documents.md).
