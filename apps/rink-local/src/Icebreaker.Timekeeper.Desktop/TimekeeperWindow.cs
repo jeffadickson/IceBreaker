@@ -30,6 +30,10 @@ public sealed class TimekeeperWindow : Window
     private readonly TextBlock _penalties = Label("Penalties unavailable", 14);
     private readonly TextBlock _auxiliary = Label("Warmup / break —", 18);
     private readonly TextBlock _status = Label("Connecting to independent rink authority", 15);
+    private readonly TextBox _penaltyTeam = new() { Watermark = "home / away", Width = 130 };
+    private readonly TextBox _penaltyPlayer = new() { Watermark = "Jersey #", Width = 95 };
+    private readonly TextBox _penaltyInfraction = new() { Watermark = "Infraction", Width = 180 };
+    private readonly TextBox _penaltySeconds = new() { Watermark = "Seconds", Text = "120", Width = 100 };
     private readonly TextBox _setTime = new() { Watermark = "MM:SS", Width = 110 };
     private readonly TextBox _reason = new() { Watermark = "Reason for correction", Width = 250 };
     private readonly CheckBox _confirm = new() { Content = "Confirm clock correction" };
@@ -72,6 +76,23 @@ public sealed class TimekeeperWindow : Window
             ActionButton("END PERIOD", () => _client.CommandAsync(new { type = "PERIOD_ENDED" })),
             ActionButton("NEXT PERIOD", () => _client.CommandAsync(new { type = "PERIOD_ADVANCED" })),
             ActionButton("BEGIN OVERTIME", () => _client.CommandAsync(new { type = "OVERTIME_STARTED" }))));
+        body.Children.Add(Label("PENALTY ENTRY", 18));
+        body.Children.Add(Buttons(_penaltyTeam, _penaltyPlayer, _penaltyInfraction, _penaltySeconds,
+            ActionButton("ASSESS PENALTY", async () =>
+            {
+                if (!int.TryParse(_penaltySeconds.Text, out var seconds) || seconds < 1 || seconds > 3600)
+                    throw new InvalidOperationException("Penalty duration must be 1–3600 seconds");
+                await _client.CommandAsync(new
+                {
+                    type = "PENALTY_ASSESSED", team = (_penaltyTeam.Text ?? "").Trim().ToLowerInvariant(),
+                    player = (_penaltyPlayer.Text ?? "").Trim(),
+                    infraction = (_penaltyInfraction.Text ?? "").Trim(), duration = seconds,
+                    classification = "MINOR"
+                });
+            })));
+        body.Children.Add(Buttons(
+            ActionButton("HOME TIMEOUT", () => _client.CommandAsync(new { type = "TIMEOUT_TAKEN", team = "home" })),
+            ActionButton("AWAY TIMEOUT", () => _client.CommandAsync(new { type = "TIMEOUT_TAKEN", team = "away" }))));
         body.Children.Add(_auxiliary);
         body.Children.Add(Buttons(
             ActionButton("WARMUP", () => _client.AuxiliaryAsync("RESET", "WARMUP")),
@@ -167,7 +188,7 @@ public sealed class TimekeeperWindow : Window
             _connection.Text = snapshot.Running ? "● AUTHORITY CONNECTED · RUNNING" : "● AUTHORITY CONNECTED · STOPPED";
             _connection.Foreground = Brushes.LightGreen;
             _time.Text = snapshot.DisplayTime;
-            _period.Text = snapshot.Period.ToString();
+            _period.Text = $"PERIOD {snapshot.Period}";
             _score.Text = $"HOME {snapshot.Home}  —  {snapshot.Away} AWAY";
             _rules.Text = $"Clock mode {snapshot.ClockMode} · Rules {snapshot.TimingVersion} · Revision {snapshot.Revision}";
             _penalties.Text = "Penalty state: " + snapshot.PenaltiesJson;
