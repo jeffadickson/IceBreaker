@@ -275,3 +275,178 @@ CREATE TABLE IF NOT EXISTS training_completions_v2(id TEXT PRIMARY KEY,training_
 CREATE TABLE IF NOT EXISTS training_intake(id TEXT PRIMARY KEY,source_type TEXT NOT NULL CHECK(source_type IN ('EMAIL','API','MANUAL','BATCH')),source_digest TEXT NOT NULL UNIQUE,training_id TEXT NOT NULL REFERENCES training_catalog(id),subject_type TEXT NOT NULL CHECK(subject_type IN ('PLAYER','ADULT')),subject_id TEXT NOT NULL,completed_on TEXT NOT NULL,expires_on TEXT,evidence_ref TEXT,state TEXT NOT NULL CHECK(state IN ('PENDING','VERIFIED','REJECTED')),imported_by TEXT NOT NULL,imported_at TEXT NOT NULL,reviewed_by TEXT,reviewed_at TEXT,review_note TEXT,completion_id TEXT REFERENCES training_completions_v2(id));
 ```
 
+### apps/rink-local/server/authority-sqlite.js
+
+**`game_events`**
+
+```sql
+CREATE TABLE IF NOT EXISTS game_events (game_id TEXT NOT NULL,seq INTEGER NOT NULL,event_id TEXT NOT NULL UNIQUE,idempotency_key TEXT NOT NULL,event_type TEXT NOT NULL,occurred_at_utc TEXT NOT NULL,actor_id TEXT NOT NULL,period INTEGER NOT NULL,clock_seconds INTEGER NOT NULL,payload_json TEXT NOT NULL,PRIMARY KEY(game_id,seq),UNIQUE(game_id,idempotency_key));
+```
+
+**`sync_outbox`**
+
+```sql
+CREATE TABLE IF NOT EXISTS sync_outbox (event_id TEXT PRIMARY KEY NOT NULL REFERENCES game_events(event_id),game_id TEXT NOT NULL,seq INTEGER NOT NULL,delivered INTEGER NOT NULL DEFAULT 0);
+```
+
+**`game_timing_policy`**
+
+```sql
+CREATE TABLE IF NOT EXISTS game_timing_policy(game_id TEXT PRIMARY KEY,version TEXT NOT NULL,rules_json TEXT NOT NULL);
+```
+
+### apps/rink-local/server/scoresheet-certification.js
+
+**`scoresheet_referees`**
+
+```sql
+CREATE TABLE IF NOT EXISTS scoresheet_referees (
+  referee_id TEXT PRIMARY KEY, password_salt TEXT NOT NULL, password_hash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1);
+```
+
+**`scoresheet_referee_assignments`**
+
+```sql
+CREATE TABLE IF NOT EXISTS scoresheet_referee_assignments (
+  game_id TEXT NOT NULL,referee_id TEXT NOT NULL REFERENCES scoresheet_referees(referee_id),PRIMARY KEY(game_id,referee_id));
+```
+
+**`scoresheet_referee_sessions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS scoresheet_referee_sessions (
+  token_hash TEXT PRIMARY KEY, referee_id TEXT NOT NULL REFERENCES scoresheet_referees(referee_id), expires_at TEXT NOT NULL);
+```
+
+**`scoresheet_revisions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS scoresheet_revisions (
+  game_id TEXT NOT NULL,revision INTEGER NOT NULL,source_seq INTEGER NOT NULL,document_json TEXT NOT NULL,digest TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('SUBMITTED','CERTIFIED','SUPERSEDED')),submitted_at TEXT NOT NULL,submitted_by TEXT NOT NULL,PRIMARY KEY(game_id,revision));
+```
+
+**`scoresheet_signatures`**
+
+```sql
+CREATE TABLE IF NOT EXISTS scoresheet_signatures (
+  game_id TEXT NOT NULL,revision INTEGER NOT NULL,referee_id TEXT NOT NULL,document_digest TEXT NOT NULL,decision TEXT NOT NULL CHECK(decision IN ('APPROVE','REQUEST_CORRECTION')),reason TEXT NOT NULL,at TEXT NOT NULL,PRIMARY KEY(game_id,revision,referee_id),FOREIGN KEY(game_id,revision) REFERENCES scoresheet_revisions(game_id,revision));
+```
+
+### apps/rink-local/server/workflow-runtime.js
+
+**`workflow_instances`**
+
+```sql
+CREATE TABLE IF NOT EXISTS workflow_instances(game_id TEXT NOT NULL,workflow_id TEXT NOT NULL,version TEXT NOT NULL,definition_digest TEXT NOT NULL,state TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(game_id,workflow_id));
+```
+
+**`workflow_history`**
+
+```sql
+CREATE TABLE IF NOT EXISTS workflow_history(game_id TEXT NOT NULL,workflow_id TEXT NOT NULL,seq INTEGER NOT NULL,action TEXT NOT NULL,actor TEXT NOT NULL,from_state TEXT NOT NULL,to_state TEXT NOT NULL,scoresheet_revision INTEGER,document_digest TEXT,at TEXT NOT NULL,PRIMARY KEY(game_id,workflow_id,seq));
+```
+
+**`certification_delivery_outbox`**
+
+```sql
+CREATE TABLE IF NOT EXISTS certification_delivery_outbox(delivery_key TEXT PRIMARY KEY,game_id TEXT NOT NULL,scoresheet_revision INTEGER NOT NULL,document_digest TEXT NOT NULL,type TEXT NOT NULL CHECK(type IN ('LEAGUE_PUBLICATION','PARENT_REPORT')),status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','DELIVERED','BLOCKED')),created_at TEXT NOT NULL,delivered_at TEXT,details TEXT);
+```
+
+### apps/rink-local/server/certified-delivery.js
+
+**`certified_report_recipients`**
+
+```sql
+CREATE TABLE IF NOT EXISTS certified_report_recipients(delivery_key TEXT NOT NULL,user_id TEXT NOT NULL,PRIMARY KEY(delivery_key,user_id));
+```
+
+### apps/rink-local/server/parent-auth.js
+
+**`parent_users`**
+
+```sql
+CREATE TABLE IF NOT EXISTS parent_users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password_hash TEXT,email_verified INTEGER NOT NULL DEFAULT 0,display_name TEXT NOT NULL DEFAULT '',created_ms INTEGER NOT NULL);
+```
+
+**`parent_identities`**
+
+```sql
+CREATE TABLE IF NOT EXISTS parent_identities(provider TEXT NOT NULL,subject TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES parent_users(id),PRIMARY KEY(provider,subject));
+```
+
+**`parent_sessions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS parent_sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES parent_users(id),expires_ms INTEGER NOT NULL);
+```
+
+**`parent_tokens`**
+
+```sql
+CREATE TABLE IF NOT EXISTS parent_tokens(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES parent_users(id),purpose TEXT NOT NULL,expires_ms INTEGER NOT NULL,used_ms INTEGER);
+```
+
+**`parent_favorites`**
+
+```sql
+CREATE TABLE IF NOT EXISTS parent_favorites(user_id TEXT NOT NULL REFERENCES parent_users(id),kind TEXT NOT NULL,entity_id TEXT NOT NULL,PRIMARY KEY(user_id,kind,entity_id));
+```
+
+**`parent_preferences`**
+
+```sql
+CREATE TABLE IF NOT EXISTS parent_preferences(user_id TEXT PRIMARY KEY REFERENCES parent_users(id),email_mode TEXT NOT NULL DEFAULT 'certified',include_player_stats INTEGER NOT NULL DEFAULT 1);
+```
+
+**`parent_mail_outbox`**
+
+```sql
+CREATE TABLE IF NOT EXISTS parent_mail_outbox(id TEXT PRIMARY KEY,recipient TEXT NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,created_ms INTEGER NOT NULL,delivered_ms INTEGER);
+```
+
+**`parent_oauth_flows`**
+
+```sql
+CREATE TABLE IF NOT EXISTS parent_oauth_flows(state_hash TEXT PRIMARY KEY,code_verifier TEXT NOT NULL,nonce TEXT NOT NULL,expires_ms INTEGER NOT NULL);
+```
+
+**`parent_auth_attempts`**
+
+```sql
+CREATE TABLE IF NOT EXISTS parent_auth_attempts(key TEXT PRIMARY KEY,count INTEGER NOT NULL,reset_ms INTEGER NOT NULL);
+```
+
+### apps/rink-local/server/family-access.js
+
+**`family_accounts`**
+
+```sql
+CREATE TABLE IF NOT EXISTS family_accounts(id TEXT PRIMARY KEY,person_id TEXT NOT NULL UNIQUE REFERENCES player_related_people(id),email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,created_at TEXT NOT NULL);
+```
+
+**`family_sessions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS family_sessions(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES family_accounts(id),expires_ms INTEGER NOT NULL);
+```
+
+**`family_person_details`**
+
+```sql
+CREATE TABLE IF NOT EXISTS family_person_details(person_id TEXT PRIMARY KEY REFERENCES player_related_people(id),private_json TEXT NOT NULL,updated_at TEXT NOT NULL);
+```
+
+**`family_grants`**
+
+```sql
+CREATE TABLE IF NOT EXISTS family_grants(person_id TEXT NOT NULL REFERENCES player_related_people(id),player_id TEXT NOT NULL REFERENCES players(id),can_view_documents INTEGER NOT NULL DEFAULT 0,can_upload_documents INTEGER NOT NULL DEFAULT 0,verified_at TEXT NOT NULL,verified_by TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(person_id,player_id));
+```
+
+### apps/rink-local/server/encrypted-documents.js
+
+**`private_documents`**
+
+```sql
+CREATE TABLE IF NOT EXISTS private_documents(id TEXT PRIMARY KEY,player_id TEXT NOT NULL REFERENCES players(id),document_type TEXT NOT NULL,mime TEXT NOT NULL,bytes INTEGER NOT NULL,digest_sha256 TEXT NOT NULL,wrapped_key BLOB NOT NULL,key_nonce TEXT NOT NULL,key_tag TEXT NOT NULL,data_nonce TEXT NOT NULL,data_tag TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('QUARANTINED','PENDING','VERIFIED','REJECTED','REVOKED')),uploaded_by TEXT NOT NULL,uploaded_at TEXT NOT NULL,verified_by TEXT,verified_at TEXT,decision_note TEXT);
+```
+
