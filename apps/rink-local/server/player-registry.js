@@ -100,11 +100,11 @@ class PlayerRegistry{
   });
  }
  trainingStatus(playerId,teamId,date){return trainingStatus(this.db,playerId,teamId,date);}
- enroll(playerId,teamId,{jersey,position,reason='SEASON_ENROLLMENT'},actor){
+ enroll(playerId,teamId,{jersey,position,reason='SEASON_ENROLLMENT'},actor,{withinTransaction=false}={}){
   if(!good(actor,100)||!good(playerId,100)||!Number.isInteger(jersey)||jersey<0||jersey>99||!['F','D','G','C','LW','RW','LD','RD'].includes(position)||!good(reason,150))throw Error('Invalid enrollment');
   const team=this.db.prepare("SELECT d.season_id,ls.league_id FROM teams t JOIN divisions d ON d.id=t.division_id JOIN league_seasons ls ON ls.season_id=d.season_id WHERE t.id=?").get(teamId);
   if(!team||!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Unknown player or team');
-  return this.tx(()=>{
+  const apply=()=>{
    const previous=this.db.prepare("SELECT r.team_id FROM roster_memberships r JOIN teams t ON t.id=r.team_id JOIN divisions d ON d.id=t.division_id JOIN league_seasons ls ON ls.season_id=d.season_id WHERE r.player_id=? AND r.season_id=? AND ls.league_id=?").all(playerId,team.season_id,team.league_id);
    if(previous.some(r=>r.team_id===teamId))throw Error('Already on this team');
    const hasConfirmations=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='game_roster_confirmations'").get();
@@ -134,7 +134,8 @@ class PlayerRegistry{
    }
    this.audit('PLAYER_ENROLLED',playerId,{seasonId:team.season_id,teamId,previousTeams:previous.map(x=>x.team_id)},actor);
    return {playerId,teamId,seasonId:team.season_id,previousTeams:previous.map(x=>x.team_id)};
-  });
+  };
+  return withinTransaction?apply():this.tx(apply);
  }
  history(playerId){return this.db.prepare('SELECT season_id seasonId,team_id teamId,joined_at joinedAt,left_at leftAt,reason FROM player_membership_history WHERE player_id=? ORDER BY season_id,joined_at').all(playerId);}
  close(){this.db.close();}
