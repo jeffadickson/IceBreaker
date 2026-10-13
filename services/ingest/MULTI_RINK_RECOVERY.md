@@ -59,3 +59,19 @@ node --test tests/integration/verified-handoff.test.js
 The tests include success with goalie/penalty/clock restoration, explicit operator refusal, tampered manifest, divergent standby, changed journal after preparation, and refusal of legacy direct transfer for pinned games.
 
 **Limitations:** This is a development implementation, not a fully secured deployment. The HMAC verification currently shares the development admin secret with the recovery client; production must use a dedicated asymmetric central signing key, an authenticated administrative control plane, station-bound recovery authorization and TLS. The station-signed receipt attests to software completion but does not provide hardware attestation. The current `/admin/games/transfer` route remains for legacy unpinned games; all production games must require the verified handoff protocol. A failed commit after local restoration requires operator-led retry/reconciliation. Unsent events on the original laptop are **not** present in the central manifest and must be resolved before handoff.
+
+### Interactive development CLI
+
+Run this only with fictional test games, with the original timekeeper stopped and all available events synchronized. The central service must already have the two station public keys registered, the original station assigned, and the exact game timing policy pinned.
+
+```bash
+# Set ICEBREAKER_INGEST_ADMIN_KEY securely in the backend environment.
+node services/ingest/handoff-cli.js \
+  --remote http://127.0.0.1:8091 \
+  --db /path/to/standby.sqlite \
+  --game game-1042 \
+  --station rink-b \
+  --private-key /secure/path/rink-b.pem
+```
+
+The CLI displays the restored period, remaining seconds, goalie assignments, event count and epoch. It requires typing the exact game ID. The station private key is read from a protected local file, not passed as an argument. After successful handoff, **restart the standby Authority/timekeeper** to reload its restored state; use the returned epoch in its `RinkSyncClient`. The current demo API still requires an admin secret on the client side and is not appropriate for production use.
