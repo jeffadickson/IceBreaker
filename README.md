@@ -20,6 +20,12 @@ The league now has a permanent player registry independent of team/season member
 
 **Do not enter real minors' private information in the development database.** Production registrar authentication, encrypted storage, access auditing, secure backup/retention, and guardian-consent workflows remain to be completed. The private registry currently has internal APIs, not a production registrar portal.
 
+## Club and league registration web portals (development)
+
+Open `http://127.0.0.1:8090/registration.html` after starting the rink-local server. Scoped **club registrars** create private player profiles, add parent/guardian contacts, submit annual team registrations, preview CSV imports, and propose season rollovers. **League administrators** review/approve/reject submitted rosters and manage annual training requirements. A player keeps the same permanent ID when changing teams or divisions. Team managers can edit game-day lineups but cannot bypass league approval for club-managed season rosters.
+
+See [portal setup and development bootstrap](apps/rink-local/docs/club-league-registration.md) and [requirements](requirements/club-league-registration.md). **Do not use real minors' PII** until production encryption, guardian consent, MFA, secure backups and registrar access review are completed.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
