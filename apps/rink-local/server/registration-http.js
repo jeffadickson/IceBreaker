@@ -8,6 +8,13 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
   if(!pathname.startsWith('/api/registration/v1/'))return false;
   const route=pathname.slice('/api/registration/v1/'.length);
   const body=()=>readBody(req);
+  // Only this private endpoint accepts larger JSON payloads (1 MiB base64
+  // document). It is still authenticated and bounded before JSON parsing.
+  async function documentBody(){
+   let bytes=0;const chunks=[];
+   for await(const chunk of req){bytes+=chunk.length;if(bytes>1_450_000)throw Error('Document request too large');chunks.push(chunk);}
+   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  }
   const reply=(code,data)=>send(res,code,data);
   try{
    if(route==='login'&&req.method==='POST'){const b=await body();reply(200,portal.login(b.email,b.password));return true;}
@@ -21,7 +28,35 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
     return true;
    }
    if(route==='logout'&&req.method==='POST'){reply(200,portal.logout(String(req.headers.authorization||'').replace(/^Bearer /i,'')));return true;}
+   if(route==='family/login'&&req.method==='POST'){
+    const b=await body();reply(200,portal.family.login(b.email,b.password));return true;
+   }
+   if(route==='family/logout'&&req.method==='POST'){
+    reply(200,portal.family.logout(String(req.headers.authorization||'').replace(/^Bearer /i,'')));return true;
+   }
+   if(route.startsWith('family/')){
+    const family=portal.family.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));
+    if(route==='family/context'&&req.method==='GET'){reply(200,{children:portal.family.children(family)});return true;}
+    if(route==='family/contact'&&req.method==='GET'){reply(200,portal.family.ownContact(family));return true;}
+    if(route==='family/contact'&&req.method==='PUT'){reply(200,portal.family.updateContact(family,await body()));return true;}
+    const child=route.match(/^family\/players\/([-\w]+)\/documents$/);
+    if(child&&req.method==='GET'){reply(200,{documents:portal.listDocuments(family,child[1])});return true;}
+    if(child&&req.method==='POST'){const b=await documentBody();reply(201,portal.uploadDocument(family,{...b,playerId:child[1]}));return true;}
+    const doc=route.match(/^family\/documents\/([-\w]+)$/);
+    if(doc&&req.method==='GET'){const d=portal.readDocument(family,doc[1]);reply(200,{mime:d.mime,base64:d.data.toString('base64')});return true;}
+    reply(404,{error:'Unknown family endpoint'});return true;
+   }
    const user=portal.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));
+   if(route==='family/provision'&&req.method==='POST'){reply(201,portal.provisionFamily(user,await body()));return true;}
+   if(route==='family/grants'&&req.method==='POST'){reply(201,portal.grantGuardian(user,await body()));return true;}
+   if(route==='family/grants/revoke'&&req.method==='POST'){reply(200,portal.revokeGuardian(user,await body()));return true;}
+   const documents=route.match(/^players\/([-\w]+)\/documents$/);
+   if(documents&&req.method==='GET'){reply(200,{documents:portal.listDocuments(user,documents[1])});return true;}
+   if(documents&&req.method==='POST'){const b=await documentBody();reply(201,portal.uploadDocument(user,{...b,playerId:documents[1]}));return true;}
+   const document=route.match(/^documents\/([-\w]+)$/);
+   if(document&&req.method==='GET'){const d=portal.readDocument(user,document[1]);reply(200,{mime:d.mime,base64:d.data.toString('base64')});return true;}
+   const decision=route.match(/^documents\/([-\w]+)\/decision$/);
+   if(decision&&req.method==='POST'){const b=await body();reply(200,portal.documentDecision(user,decision[1],b.decision,b.note));return true;}
    if(route==='context'&&req.method==='GET'){reply(200,{role:user.role,scopeId:user.scopeId,teams:portal.teams(user)});return true;}
    if(route==='players'&&req.method==='GET'){reply(200,{players:portal.players(user)});return true;}
    if(route==='players'&&req.method==='POST'){reply(201,portal.createPlayer(user,await body()));return true;}
