@@ -15,6 +15,8 @@ class EvidenceArchive{
    "CREATE TABLE IF NOT EXISTS archived_evidence(id TEXT PRIMARY KEY,source_digest TEXT NOT NULL UNIQUE,subject_type TEXT NOT NULL,subject_id TEXT NOT NULL,training_id TEXT NOT NULL,mime TEXT NOT NULL,bytes INTEGER NOT NULL,sha256 TEXT NOT NULL,encrypted_data BLOB NOT NULL,data_nonce TEXT NOT NULL,data_tag TEXT NOT NULL,wrapped_key BLOB NOT NULL,key_nonce TEXT NOT NULL,key_tag TEXT NOT NULL,created_at TEXT NOT NULL)",
    "CREATE TABLE IF NOT EXISTS evidence_audit(id TEXT PRIMARY KEY,at TEXT NOT NULL,action TEXT NOT NULL,evidence_id TEXT NOT NULL,actor TEXT NOT NULL,details TEXT NOT NULL)"
   ].join(';')+';');
+  const cols=this.db.prepare('PRAGMA table_info(archived_evidence)').all().map(x=>x.name);
+  if(!cols.includes('scan_state'))this.db.exec("ALTER TABLE archived_evidence ADD COLUMN scan_state TEXT NOT NULL DEFAULT 'QUARANTINED' CHECK(scan_state IN ('QUARANTINED','CLEAN','REJECTED'))");
  }
  audit(action,id,actor,details={}){
   this.db.prepare('INSERT INTO evidence_audit VALUES(?,?,?,?,?,?)').run(uuid(),new Date().toISOString(),action,id,actor,JSON.stringify(details));
@@ -60,6 +62,29 @@ class EvidenceArchive{
    this.audit('EVIDENCE_REVIEW_READ',id,actor);
    return {mime:r.mime,bytes};
   }finally{dek.fill(0);}
+ }
+ async scanQuarantined(id,actor,scanner=require('./malware-scanner').scanWithClamav){
+  const row=this.db.prepare('SELECT scan_state FROM archived_evidence WHERE id=?').get(id);
+  if(!row||row.scan_state!=='QUARANTINED')throw Error('Evidence is not quarantined');
+  const document=this.decryptForReview(id,'scanner-worker');
+  let result;
+  try{result=await scanner(document.bytes);}
+  finally{document.bytes.fill(0);}
+  if(!result||result.engine!=='clamav'||typeof result.clean!=='boolean')throw Error('Untrusted scanner result');
+  const next=result.clean?'CLEAN':'REJECTED';
+  this.db.exec('BEGIN IMMEDIATE');
+  try{
+   const changed=this.db.prepare("UPDATE archived_evidence SET scan_state=? WHERE id=? AND scan_state='QUARANTINED'").run(next,id);
+   if(changed.changes!==1)throw Error('Scan state changed');
+   this.audit('EVIDENCE_SCAN_'+next,id,actor);
+   this.db.exec('COMMIT');
+  }catch(e){this.db.exec('ROLLBACK');throw e;}
+  return {evidenceId:id,scanState:next};
+ }
+ scanStatus(id){
+  const row=this.db.prepare('SELECT scan_state scanState FROM archived_evidence WHERE id=?').get(id);
+  if(!row)throw Error('Evidence not found');
+  return row.scanState;
  }
  // Compensating cleanup when the central intake transaction fails.
  discard(id,actor){
