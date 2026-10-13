@@ -55,6 +55,30 @@ class EncryptedDocuments{
   finally{dek.fill(0);}
   return {documentId:id,status:'QUARANTINED'};
  }
+ // Offline rewrap of all DEKs, without decrypting the document objects.
+ // Requires a verified encrypted backup and exclusive maintenance window.
+ rewrapKeys(oldKek,newKek,{backupVerified=false}={}){
+  if(!backupVerified)throw Error('Verified encrypted backup required for key rotation');
+  if(!Buffer.isBuffer(oldKek)||oldKek.length!==32||!Buffer.isBuffer(newKek)||newKek.length!==32||oldKek.equals(newKek))
+   throw Error('Distinct 256-bit old and new keys required');
+  let changed=0;
+  this.db.exec('BEGIN IMMEDIATE');
+  try{
+   const rows=this.db.prepare('SELECT id,wrapped_key,key_nonce,key_tag FROM private_documents ORDER BY id').all();
+   const update=this.db.prepare('UPDATE private_documents SET wrapped_key=?,key_nonce=?,key_tag=? WHERE id=?');
+   for(const row of rows){
+    const dek=open(row.wrapped_key,oldKek,row.key_nonce,row.key_tag,'icebreaker-dek-v1:'+row.id);
+    try{
+     const wrapped=seal(dek,newKek,'icebreaker-dek-v1:'+row.id);
+     update.run(wrapped.data,wrapped.nonce,wrapped.tag,row.id);
+     changed++;
+    }finally{dek.fill(0);}
+   }
+   this.audit('DOCUMENT_KEYS_REWRAPPED','vault','key-rotation-worker',{count:changed});
+   this.db.exec('COMMIT');
+  }catch(error){this.db.exec('ROLLBACK');throw error;}
+  return {rewrapped:changed};
+ }
  row(id){const r=this.db.prepare('SELECT * FROM private_documents WHERE id=?').get(id);if(!r)throw Error('Document not found');return r;}
  list(playerId){return this.db.prepare("SELECT id documentId,document_type documentType,mime,bytes,status,uploaded_at uploadedAt,verified_at verifiedAt FROM private_documents WHERE player_id=? ORDER BY uploaded_at DESC").all(playerId);}
  // Internal worker operation only; no HTTP route exposes it. The scanner
