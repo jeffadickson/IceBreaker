@@ -26,3 +26,5 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Test core
         run: dotnet test apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj -c Release
+      - name: Build native Avalonia desktop
+        run: dotnet build apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -c Release
