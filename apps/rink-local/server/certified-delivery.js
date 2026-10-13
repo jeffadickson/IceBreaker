@@ -32,6 +32,19 @@ class CertifiedDelivery {
     }
    }
   }
+  // Conservation of shots: each on-goal shot must be credited either to
+  // the active defending goalie or to the explicit unattributed/empty-net
+  // bucket. Never publish silently inconsistent goalie totals.
+  if(rev.document.unattributedShots&&rev.document.goalieStats){
+   for(const side of ['home','away']){
+    const credited=goalieStats.filter(x=>x.side===side).reduce((n,x)=>n+x.shotsAgainst,0);
+    const unassigned=rev.document.unattributedShots[side];
+    const opponent=side==='home'?'away':'home';
+    if(!Number.isSafeInteger(unassigned)||unassigned<0||credited+unassigned!==rev.document.shots[opponent])throw Error('Certified goalie shots do not reconcile to team shots');
+    const empty=rev.document.emptyNetGoals?.[side]??0;
+    if(!Number.isSafeInteger(empty)||empty<0||empty>unassigned)throw Error('Invalid certified empty-net goal count');
+   }
+  }
   const preexisting=this.leagueStore.db.prepare('SELECT * FROM games WHERE id=?').get(this.leagueGameId);
   if(preexisting.status==='final'){
     if(preexisting.certified_by===`scoresheet:${rev.revision}:${rev.digest}`)return {id:this.leagueGameId,status:'final',version:preexisting.version,recoveredAcknowledgment:true};
