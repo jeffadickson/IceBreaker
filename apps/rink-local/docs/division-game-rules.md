@@ -28,8 +28,12 @@ Arenas may use the ±1-second operator correction to align the display. `CLOCK_S
 
 The independent `AuxiliaryClock` handles warmup and intermission only. It cannot start while the official game clock is running; it uses the pinned duration for reset, pauses after process recovery, and never changes official game or penalty time. Its public visibility is intended to use `showAuxiliaryClock`.
 
+## Implemented operator workflows
+
+The operator has explicit **Begin overtime**, **Home timeout**, and **Away timeout** controls. The authoritative journal checks overtime is configured, the final regulation period has been explicitly ended, the game is tied, and the clock is stopped. Overtime uses the configured limit and becomes final when the first overtime goal is recorded. Timeout requests require a stopped clock and enforce the per-team allowance, recording an auditable event without consuming regulation or penalty seconds. The effective clock mode is exposed in game snapshots and recomputed from the configured mercy goal differential. Auxiliary clock visibility is configurable in the operator UI.
+
 ## Lifecycle and remaining integrations
 
-The planned operator lifecycle is warmup → regulation period → intermission → next period → final, with deliberate state transitions rather than automatic period advancement. Overtime/sudden-death, mercy-mode clock behavior, timeouts, per-period running/stop overrides, rink curfew and special operator overrides need additional implementation and dedicated tests; storing the configuration does not imply these workflows are enforced.
+The planned operator lifecycle is warmup → regulation period → intermission → next period → final, with deliberate state transitions rather than automatic period advancement. Overtime and sudden-death completion, charged timeout limits, and dynamic mercy clock-mode selection are implemented in the Node authority. The remaining gaps are enforcing running/stop/hybrid stoppage exceptions against referee actions, automatic game stoppage scheduling, a visible timeout countdown linked to timeout events, a public auxiliary display, rink curfew, and special operator overrides. Clock mode currently describes the effective policy but does not automatically decide when the operator must stop or restart a clock.
 
 Tests: `node --test apps/rink-local/tests/browser/division-timing-bounds.test.js`, or `npm test`. Test cases cover invalid numbers, negative time, period maximum, unequal periods, advancement, and division policy immutability.
