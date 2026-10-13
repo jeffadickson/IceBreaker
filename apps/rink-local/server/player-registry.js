@@ -11,6 +11,7 @@ function init(db){
  db.exec("PRAGMA foreign_keys=ON;");
  db.exec("CREATE TABLE IF NOT EXISTS player_private_profiles(player_id TEXT PRIMARY KEY REFERENCES players(id),legal_name TEXT NOT NULL,birth_date TEXT NOT NULL,address_json TEXT NOT NULL,updated_at TEXT NOT NULL,updated_by TEXT NOT NULL)");
  db.exec("CREATE TABLE IF NOT EXISTS player_related_people(id TEXT PRIMARY KEY,full_name TEXT NOT NULL,email TEXT,phone TEXT)");
+ db.exec("CREATE TABLE IF NOT EXISTS player_registration_identifiers(player_id TEXT NOT NULL REFERENCES players(id),issuer TEXT NOT NULL,identifier TEXT NOT NULL,season_id TEXT REFERENCES seasons(id),PRIMARY KEY(issuer,identifier),UNIQUE(player_id,issuer,season_id))");
  db.exec("CREATE TABLE IF NOT EXISTS player_person_links(player_id TEXT NOT NULL REFERENCES players(id),person_id TEXT NOT NULL REFERENCES player_related_people(id),relationship TEXT NOT NULL CHECK(relationship IN ('PARENT','GUARDIAN','EMERGENCY_CONTACT','OTHER')),PRIMARY KEY(player_id,person_id,relationship))");
  db.exec("CREATE TABLE IF NOT EXISTS season_training_requirements(id TEXT PRIMARY KEY,league_id TEXT NOT NULL REFERENCES leagues(id),season_id TEXT NOT NULL REFERENCES seasons(id),code TEXT NOT NULL,title TEXT NOT NULL,required_by TEXT,blocks_lineup INTEGER NOT NULL CHECK(blocks_lineup IN (0,1)),UNIQUE(league_id,season_id,code))");
  db.exec("CREATE TABLE IF NOT EXISTS player_training_completions(id TEXT PRIMARY KEY,player_id TEXT NOT NULL REFERENCES players(id),requirement_id TEXT NOT NULL REFERENCES season_training_requirements(id),completed_on TEXT NOT NULL,expires_on TEXT,evidence_ref TEXT,verified_by TEXT NOT NULL,verified_at TEXT NOT NULL,revoked_at TEXT,UNIQUE(player_id,requirement_id,completed_on))");
@@ -61,6 +62,14 @@ class PlayerRegistry{
    if(result.changes!==1)throw Error('Private player profile not found');
    this.audit('PRIVATE_PROFILE_UPDATED',playerId,{privateFieldsChanged:true},actor);
    return {playerId,updated:true};
+  });
+ }
+ linkRegistration(playerId,{issuer,identifier,seasonId=null},actor){
+  if(!good(actor,100)||!good(issuer,80)||!good(identifier,120)||!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId)||seasonId!==null&&!this.db.prepare('SELECT 1 FROM seasons WHERE id=?').get(seasonId))throw Error('Invalid registration identifier');
+  return this.tx(()=>{
+   this.db.prepare('INSERT INTO player_registration_identifiers VALUES(?,?,?,?)').run(playerId,issuer.trim(),identifier.trim(),seasonId);
+   this.audit('REGISTRATION_LINKED',playerId,{issuer:issuer.trim(),seasonId},actor);
+   return {playerId,issuer:issuer.trim(),seasonId};
   });
  }
  linkPerson(playerId,{personId=null,fullName,email=null,phone=null,relationship},actor){
