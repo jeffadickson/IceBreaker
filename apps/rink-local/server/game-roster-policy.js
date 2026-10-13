@@ -3,7 +3,8 @@
 // team confirmation snapshot, not the mutable season roster, to validate play.
 const ATTR_FIELDS = {
   GOAL_RECORDED: ['scorer','assist1','assist2'],
-  PENALTY_ASSESSED: ['player']
+  PENALTY_ASSESSED: ['player'],
+  GOALIE_CHANGED: ['player']
 };
 function snapshotForGame(db,gameId){
   const game=db.prepare('SELECT id,home_team_id,away_team_id FROM games WHERE id=?').get(gameId);
@@ -32,7 +33,7 @@ function assertGameRosterEligible(snapshot,command,lookupGoalTeam){
   for(const player of permitted){const jersey=String(player.jersey);jerseyCounts.set(jersey,(jerseyCounts.get(jersey)||0)+1);}
   for(const field of fields||['scorer','assist1','assist2']){
     const value=String(command[field]);
-    if(value==='TBD'||value==='None')continue;
+    if(value==='TBD'||value==='None'||(command.type==='GOALIE_CHANGED'&&command.player===null))continue;
     const count=jerseyCounts.get(String(Number(value)))||0;
     if(count===0)throw Error(`Jersey #${value} is not on the confirmed ${team} game roster`);
     if(count>1)throw Error(`Jersey #${value} is ambiguous on the confirmed ${team} game roster`);
