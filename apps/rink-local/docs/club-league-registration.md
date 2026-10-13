@@ -59,7 +59,7 @@ The team-manager portal cannot bypass approval for a team assigned to the new cl
 
 ## Access and security boundaries
 
-- Club registrar: private records only for players linked to that club, and roster proposals only for teams explicitly assigned to that club.
+- Club registrar: private records only for players linked to that club, and roster proposals only for teams explicitly assigned to that club. Every successful private profile read is recorded in the league audit without copying PII into the audit payload.
 - League administrator: pending registrations and authorized player records within that league; can approve/reject but cannot use club-only creation actions.
 - Team manager: roster aliases, game-day participation and eligibility flags, not private addresses, DOBs or guardian contact details.
 - Public scoreboards and rink event sync: **no private registry fields**.
@@ -67,7 +67,7 @@ The team-manager portal cannot bypass approval for a team assigned to the new cl
 
 ## Remaining release blockers
 
-Verified parent/guardian self-service and correction requests, MFA, account invitation/recovery, audit of sensitive profile reads, encrypted storage/backups, retention and consent policies, duplicate-identity review/merge, production consent checks on transfers, secure evidence uploads, and an actual production deployment security assessment. A successful test run is not permission to use this with real minors' records.
+Verified parent/guardian self-service and correction requests, MFA, account invitation/recovery, production-grade immutable access-log retention, encrypted storage/backups, retention and consent policies, duplicate-identity review/merge, production consent checks on transfers, secure evidence uploads, and an actual production deployment security assessment. A successful test run is not permission to use this with real minors' records.
 
 ## Tests
 
