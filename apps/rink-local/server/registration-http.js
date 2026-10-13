@@ -26,6 +26,9 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
    if(route==='players'&&req.method==='POST'){reply(201,portal.createPlayer(user,await body()));return true;}
    const player=route.match(/^players\/([-\w]+)$/);
    if(player&&req.method==='GET'){reply(200,portal.profile(user,player[1]));return true;}
+   if(player&&req.method==='PUT'){reply(200,portal.updateProfile(user,player[1],await body()));return true;}
+   const related=route.match(/^players\/([-\w]+)\/related-people$/);
+   if(related&&req.method==='POST'){reply(201,portal.addRelatedPerson(user,related[1],await body()));return true;}
    if(route==='requests'&&req.method==='GET'){reply(200,{requests:portal.requests(user)});return true;}
    if(route==='requests'&&req.method==='POST'){reply(201,portal.submit(user,await body()));return true;}
    if(route==='imports/preview'&&req.method==='POST'){const b=await body();reply(200,{rows:portal.preview(user,b.rows)});return true;}
