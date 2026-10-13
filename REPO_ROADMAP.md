@@ -1,5 +1,17 @@
 # Proposed next architectural refactor (not yet completed)
 
+## Integration milestone 1 — completed synthetic baseline
+
+- [x] Document SQLite schema definitions across league/rink, central ingest, encrypted evidence and C# desktop; provide read-only introspection tooling for exact columns, indexes and foreign keys.
+- [x] Simulate an eight-team, 120-player, 56-game double round-robin season and reconcile certified standings, skater statistics and split goalie totals.
+- [x] Test suspension, training, confirmed lineups, late disciplinary changes and recovery.
+- [x] Test one complete game from manager lineup through timekeeper events, goalie changes, referee signature and certified league publication.
+- [ ] Extend the large simulation to concurrent rink stations, network partition/reconnection, distributed replay and certification amendment conflicts.
+- [ ] Run physical desktop/hardware acceptance and production security reviews.
+
+See [schema reference](apps/rink-local/docs/database-schemas.md) and [integration simulation](apps/rink-local/docs/full-league-integration-simulation.md).
+
+
 The current prototype is intentionally kept intact under `apps/rink-local/` so that its relative source/test paths work. Refactor **in tested PRs** toward:
 
 ```text
