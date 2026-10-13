@@ -21,7 +21,7 @@ Version 0.1 · Development implementation and production gap analysis
 ## Upload lifecycle
 1. Authenticated club registrar or verified guardian submits a bounded base64-encoded PDF, PNG or JPEG (development cap: 1 MiB). The server validates declared MIME and magic bytes, rejects path/filename handling and oversized payloads.
 2. Generate random 256-bit DEK and 96-bit GCM nonce; encrypt the bytes with player/document-bound AAD. Encrypt the DEK with the KEK and distinct AAD. Write ciphertext to an exclusive private file (mode 0600), then commit metadata/audit to SQLite; remove file if the database commit fails.
-3. Mark `QUARANTINED`. The development build deliberately has **no public scanner bypass**. An isolated trusted malware-scanning service must attest a clean result before `PENDING`; until then, viewing and verification are blocked.
+3. Mark `QUARANTINED`. The development build has a backend-only ClamAV scanner worker and **no public scanner bypass**. The worker must attest a clean result before PENDING; scanner failures leave documents quarantined. Viewing and verification are blocked until scanning succeeds.
 4. A league compliance reviewer verifies or rejects a scanned document. A verified result can be reused next season without downloading the scan, subject to league validity rules.
 5. On every download, recheck club membership or the verified guardian grant, check document status, unwrap the DEK, authenticate/decrypt bytes and audit the read. Do not expose a direct object URL.
 
@@ -34,11 +34,11 @@ An adult is a distinct `person_id` and `family_account`. One adult can have gran
 | Stolen encrypted object | Per-file AEAD + wrapped DEK | KMS required |
 | Tampering or object swapping | GCM tag + ID/player/type AAD + digest | Key rotation required |
 | Cross-club/family access | Live scoped authorization | Independent pen test required |
-| Malicious PDF | Quarantine and type/size checks | Scanner/CDR not integrated |
+| Malicious PDF | Quarantine, type/size checks, ClamAV INSTREAM worker | Scanner deployment, signatures and CDR remain |
 | Compromised database host | Field encryption on opt-in new writes | SQLCipher/migration, encrypted backups |
 | Compromised key env/host | Distinct keys; no keys in DB | KMS/HSM, isolation, key lifecycle |
 | Stale parent custody rights | Per-player revocable grants | Verified legal process required |
-| Credential theft | Scrypt passwords, hashed expiring tokens | MFA, rate limits, invitations, recovery |
+| Credential theft | Scrypt passwords, hashed expiring tokens, optional encrypted staff TOTP | Mandatory MFA, rate limits, invitations, recovery |
 | Sensitive data in logs | PII-free audit payloads | Full logging/privacy review |
 | Lost/corrupted documents | Authenticated encryption | Encrypted backups and restore drills |
 
