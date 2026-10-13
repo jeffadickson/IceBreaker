@@ -26,6 +26,12 @@ Open `http://127.0.0.1:8090/registration.html` after starting the rink-local ser
 
 See [portal setup and development bootstrap](apps/rink-local/docs/club-league-registration.md) and [requirements](requirements/club-league-registration.md). **Do not use real minors' PII** until production encryption, guardian consent, MFA, secure backups and registrar access review are completed.
 
+## Family accounts and encrypted documents (development only)
+
+IceBreaker now includes a separate [family registration page](apps/rink-local/web/family-registration.html), verified per-child guardian grants, contact details and preferences, and a development encrypted document vault for PDF/PNG/JPEG test files. Each file uses a unique AES-256-GCM key wrapped by a separate local KEK; uploads are quarantined until an independent malware scanner is integrated. Private player and related-person fields can be encrypted on new writes when `ICEBREAKER_PRIVATE_FIELD_KEY_BASE64` is configured.
+
+**Do not upload real birth certificates or children's personal information.** Production mode intentionally refuses to start private registration until KMS, malware scanning, MFA, verified consent, encrypted legacy-data migration, and secure backups are implemented. See [security design](apps/rink-local/docs/private-data-security-design.md) and [requirements](requirements/private-data-and-documents.md).
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
