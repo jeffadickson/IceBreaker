@@ -11,7 +11,7 @@ test('inclusive league-local dates block lineup selection, but allow dates outsi
  const x=setup();t.after(()=>x.close());const {game,accounts,league}=x;
  const date=gameDate(league.db,game.id),team=game.home_team_id,player=accounts.roster(team)[0];
  assert.match(date,/^\d{4}-\d{2}-\d{2}$/);
- const s=league.addSuspension({playerId:player.id,startDate:date,endDate:date,reason:'League discipline',actor:'league-admin'});
+ const s=league.addSuspension({leagueId:'demo-league',playerId:player.id,startDate:date,endDate:date,reason:'League discipline',actor:'league-admin'});
  assert.equal(league.suspensions({playerId:player.id}).length,1);
  assert.throws(()=>accounts.confirmLineup(team,game.id,'manager',{playerIds:[player.id],expectedRosterRevision:0}),/Suspended player/);
  const lineup=accounts.getLineup(team,game.id);const row=lineup.players.find(p=>p.id===player.id);
@@ -31,15 +31,15 @@ test('a new suspension invalidates previously confirmed lineup and pregame readi
  accounts.confirmLineup(game.away_team_id,game.id,'manager',{playerIds:[away.id],expectedRosterRevision:0});
  assert.equal(snapshotForGame(accounts.db,game.id).confirmed,true);
  const date=gameDate(league.db,game.id);
- league.addSuspension({playerId:home.id,startDate:date,endDate:date,reason:'Suspension'});
+ league.addSuspension({leagueId:'demo-league',playerId:home.id,startDate:date,endDate:date,reason:'Suspension'});
  assert.equal(snapshotForGame(accounts.db,game.id).confirmed,false);
  assert.equal(pregameSnapshot(accounts.db,game.id).ready,false);
  assert.equal(accounts.getLineup(game.home_team_id,game.id).confirmed.playerIds.includes(home.id),true);
 });
 test('invalid dates and unknown players never mutate suspension ledger',t=>{
  const x=setup();t.after(()=>x.close());const p=x.accounts.roster(x.game.home_team_id)[0];
- for(const [startDate,endDate] of [['2026-02-30','2026-03-01'],['2026-11-02','2026-11-01'],['2026/11/01','2026-11-02']])assert.throws(()=>x.league.addSuspension({playerId:p.id,startDate,endDate,reason:'Test'}),/Invalid/);
- assert.throws(()=>x.league.addSuspension({playerId:'nonexistent',startDate:'2026-11-01',endDate:'2026-11-02',reason:'Test'}),/Unknown player/);
+ for(const [startDate,endDate] of [['2026-02-30','2026-03-01'],['2026-11-02','2026-11-01'],['2026/11/01','2026-11-02']])assert.throws(()=>x.league.addSuspension({leagueId:'demo-league',playerId:p.id,startDate,endDate,reason:'Test'}),/Invalid/);
+ assert.throws(()=>x.league.addSuspension({leagueId:'demo-league',playerId:'nonexistent',startDate:'2026-11-01',endDate:'2026-11-02',reason:'Test'}),/Unknown player/);
  assert.equal(x.league.suspensions().length,0);
 });
 test('team schedule only includes own league games and is chronologically ordered',t=>{
