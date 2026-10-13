@@ -39,6 +39,9 @@ test('protected HTTP auxiliary timer endpoints do not alter game/penalty clock',
   let r=await post({action:'RESET',phase:'INTERMISSION'});assert.equal(r.status,200);
   assert.equal((await get()).seconds,120);
   r=await post({action:'START'});assert.equal(r.status,200);
+  const gameStart=await fetch(base+'/api/operator/command',{method:'POST',headers:{...h,'Idempotency-Key':'aux-regulation-block-001','Content-Type':'application/json'},body:JSON.stringify({type:'CLOCK_UPDATED',action:'START',seconds:900})});
+  assert.equal(gameStart.status,400);
+  assert.match((await gameStart.json()).error,/Pause warm-up/);
   r=await post({action:'PAUSE'});assert.equal(r.status,200);
   const after=await (await fetch(base+'/api/games/demo/snapshot')).json();
   assert.equal(after.seconds,before.seconds);
