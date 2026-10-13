@@ -45,14 +45,14 @@ function validate(c,state,timing=validateTiming()){if(!c||typeof c!=='object')th
  }else if(['PERIOD_ENDED','PERIOD_ADVANCED','GAME_ENDED'].includes(c.type)){
   if(c.type==='PERIOD_ADVANCED'){if(state.period>=timing.periodCount)throw Error('No additional regulation period');nextPeriod(state.period,timing);if(c.seconds!==undefined)checkOfficial(c.seconds,timing,state.period+1);}
  }else if(c.type==='OVERTIME_STARTED'){
-  if(!timing.overtimeSeconds||state.period!==timing.periodCount||state.running||state.scores.home!==state.scores.away)throw Error('Overtime requires a tied, stopped end of regulation');
+  if(!timing.overtimeSeconds||state.period!==timing.periodCount||state.running||state.scores.home!==state.scores.away||!state.periodEnded)throw Error('Overtime requires a tied, stopped end of regulation');
  }else if(c.type==='TIMEOUT_TAKEN'){
   if(!validSide(c.team)||!timing.timeoutSeconds||!timing.timeoutsPerTeam||state.running||state.timeouts[c.team]>=timing.timeoutsPerTeam)throw Error('Timeout unavailable, clock running, or allowance exhausted');
  }else if(c.type==='MERCY_MODE_CHANGED'){
   if(typeof c.active!=='boolean'||typeof c.hasTriggered!=='boolean'||!clean(c.reason))throw Error('Invalid mercy change');
  }else throw Error('Unsupported command');
 }
-function project(events,timing=validateTiming()){const state={revision:0,period:1,seconds:periodLength(timing,1),running:false,scores:{home:0,away:0},shots:{home:0,away:0},goals:new Map(),events:[],mercy:{enabled:true,threshold:5,cap:5,triggered:false},timeouts:{home:0,away:0},ended:false};
+function project(events,timing=validateTiming()){const state={revision:0,period:1,seconds:periodLength(timing,1),running:false,scores:{home:0,away:0},shots:{home:0,away:0},goals:new Map(),events:[],mercy:{enabled:true,threshold:5,cap:5,triggered:false},timeouts:{home:0,away:0},periodEnded:false,ended:false};
  for(const e of events){if(e.seq!==state.revision+1)throw Error('Journal sequence gap');const d=JSON.parse(e.payload_json);const item={id:e.event_id,type:e.event_type,team:d.teamId||null,period:e.period,seconds:e.clock_seconds,at:e.occurred_at_utc,details:{}};
   state.period=e.period;state.seconds=e.clock_seconds;
   if(e.event_type==='GOAL_RECORDED'){state.scores[d.teamId]++;state.shots[d.teamId]++;state.goals.set(e.event_id,{goalId:d.goalId,voided:false});item.details={scorer:unattr(d.scorer),assist1:unattr(d.assist1),assist2:unattr(d.assist2)};if(Math.abs(state.scores.home-state.scores.away)>=state.mercy.threshold)state.mercy.triggered=true;}
@@ -64,12 +64,13 @@ function project(events,timing=validateTiming()){const state={revision:0,period:
   if(e.event_type==='CLOCK_SYNCED')item.details={action:'SYNC_TO_ARENA',previousSeconds:d.previousSeconds,secondsRemaining:d.secondsRemaining,scope:d.scope||'GAME_ONLY',reason:d.reason};
   if(e.event_type==='CLOCK_UPDATED')state.running=d.action==='START'?true:d.action==='STOP'?false:state.running;
   if(e.event_type==='PERIOD_ENDED'||e.event_type==='GAME_ENDED')state.running=false;
-  if(e.event_type==='PERIOD_ADVANCED'){state.period=e.period;state.seconds=e.clock_seconds;state.running=false;}
+  if(e.event_type==='PERIOD_ENDED')state.periodEnded=true;
+  if(e.event_type==='PERIOD_ADVANCED'){state.period=e.period;state.seconds=e.clock_seconds;state.running=false;state.periodEnded=false;}
   if(e.event_type==='GAME_ENDED')state.ended=true;
   if(e.event_type==='GOAL_RECORDED'&&d.suddenDeath){state.ended=true;state.running=false;}
   if(e.event_type==='MERCY_MODE_CHANGED')state.mercy.triggered=d.hasTriggered;
   if(e.event_type==='TIMEOUT_TAKEN'){state.timeouts[d.teamId]++;item.details={durationSeconds:d.durationSeconds};}
-  if(e.event_type==='OVERTIME_STARTED')state.running=false;
+  if(e.event_type==='OVERTIME_STARTED'){state.running=false;state.periodEnded=false;}
   state.events.push(item);state.revision=e.seq;
  }
  return state;
