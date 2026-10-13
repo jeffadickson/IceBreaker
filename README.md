@@ -42,6 +42,10 @@ New backend-only [ClamAV quarantine scanner](apps/rink-local/server/scan-quarant
 
 League administrators can now define training courses once and assign versioned requirements by role, league or tournament, and season. Renewal can be once, per hockey season, per calendar year, or after a configurable number of days. Verified completion and revocation history is retained across seasons, and the game-day roster gate checks current requirements. See [training catalog and renewal requirements](requirements/training-catalog-and-renewals.md). The league administrator editor is available in `/registration.html`.
 
+## Backend training certificate CLI
+
+An offline [IceBreaker admin CLI](apps/rink-local/server/icebreaker-admin.js) now supports staged certificate ingestion, duplicate-safe email-source references, a pending review queue, explicit approval/rejection and training-status queries. A future mail parser can supply JSON metadata without writing directly to the database. **Unverified imports never satisfy training eligibility.** See the [CLI integration guide](apps/rink-local/docs/backend-cli-training-intake.md).
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
