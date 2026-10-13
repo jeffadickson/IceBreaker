@@ -2,6 +2,8 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {createRinkServer}=require('../../server/rink-server');
+const {code}=require('../../server/mfa-totp');
+const crypto=require('node:crypto');
 test('registration web API enforces distinct club/league roles, private profile and approval workflow',async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-registration-http-'));
  const app=createRinkServer({dbPath:path.join(dir,'game.db'),port:0,operatorKey:'development-bootstrap-only'});
@@ -39,4 +41,30 @@ test('registration web API enforces distinct club/league roles, private profile 
  assert.equal(JSON.stringify(await call('context','GET',null,club)).includes('Fiction City'),false);
  assert.equal((await call('logout','POST',null,club)).status,200);
  assert.equal((await call('context','GET',null,club)).status,403);
+});
+
+
+test('HTTP administrator MFA enrollment requires encrypted seed and fresh one-time login code',async t=>{
+ const previous=process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;
+ process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64=crypto.randomBytes(32).toString('base64');
+ t.after(()=>{if(previous===undefined)delete process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;else process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64=previous;});
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-mfa-http-'));
+ const app=createRinkServer({dbPath:path.join(dir,'game.db'),port:0,operatorKey:'dev-mfa-bootstrap'});
+ const port=(await app.start()).port,base='http://127.0.0.1:'+port+'/api/registration/v1/';
+ t.after(async()=>{await app.stop();fs.rmSync(dir,{recursive:true,force:true});});
+ async function call(route,body,token,bootstrap=false){
+  const r=await fetch(base+route,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(bootstrap?{'X-Operator-Key':'dev-mfa-bootstrap'}:{})},body:JSON.stringify(body||{})});
+  return {status:r.status,data:await r.json()};
+ }
+ assert.equal((await call('bootstrap/user',{email:'mfa@example.invalid',password:'fake-very-long-password',role:'LEAGUE_ADMIN',scopeId:'demo-league'},null,true)).status,201);
+ const first=await call('login',{email:'mfa@example.invalid',password:'fake-very-long-password'});
+ assert.equal(first.status,200);
+ const setup=await call('mfa/setup',{},first.data.token);
+ assert.equal(setup.status,200);
+ assert.equal(setup.data.secret.length,32);
+ const step=Math.floor(Date.now()/30000);
+ assert.equal((await call('mfa/confirm',{code:code(setup.data.secret,step)},first.data.token)).status,200);
+ assert.equal((await call('mfa/setup',{},first.data.token)).status,403);
+ assert.notEqual((await call('login',{email:'mfa@example.invalid',password:'fake-very-long-password'})).status,200);
+ assert.equal((await call('login',{email:'mfa@example.invalid',password:'fake-very-long-password',mfaCode:code(setup.data.secret,step+1)})).status,200);
 });
