@@ -93,4 +93,15 @@ function trainingForRole(db,{subjectType,subjectId,role,scopeType,scopeId,season
    return {code:r.code,title:r.title,required:!!r.required,complete,eligible:!r.required||complete};
   });
 }
-module.exports={init,linkExternalId,lookupExternalId,externalIds,setCompetition,competitionForGame,legacyTrainingRequired,assignRole,requireCourse,recordCourse,trainingForRole};
+function gamePlayerTraining(db,playerId,teamId,gameId,date){
+ const policy=competitionForGame(db,gameId);
+ const legacy=policy.requireLegacyPlayerTraining?
+  require('./player-registry').trainingStatus(db,playerId,teamId,date):[];
+ const team=db.prepare('SELECT d.season_id seasonId,ls.league_id leagueId FROM teams t JOIN divisions d ON d.id=t.division_id JOIN league_seasons ls ON ls.season_id=d.season_id WHERE t.id=?').get(teamId);
+ if(!team)throw Error('Unknown team');
+ const scopeType=policy.type,scopeId=scopeType==='TOURNAMENT'?gameId:team.leagueId;
+ const extra=trainingForRole(db,{subjectType:'PLAYER',subjectId:playerId,role:'PLAYER',
+  scopeType,scopeId,seasonId:scopeType==='LEAGUE'?team.seasonId:'',date});
+ return [...legacy,...extra.map(x=>({code:x.code,title:x.title,complete:x.complete,blocksLineup:x.required,requiredBy:null}))];
+}
+module.exports={init,linkExternalId,lookupExternalId,externalIds,setCompetition,competitionForGame,legacyTrainingRequired,assignRole,requireCourse,recordCourse,trainingForRole,gamePlayerTraining};
