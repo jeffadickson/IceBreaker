@@ -117,3 +117,11 @@ test('HANDOFF-006: running clock and mismatched timing policy cannot be restored
  assert.throws(()=>restoreIdleStandby({dbPath:x.files.b,pkg:fresh,adminKey:ADMIN,gameId:x.gameId,stationId:'rink-b'}),/timing policy differs/);
  assert.equal(x.b.rows().length,0);
 });
+
+test('HANDOFF-007: operator CLI rejects missing and duplicate configuration',()=>{
+ const {parse}=require('../../services/ingest/handoff-cli');
+ assert.throws(()=>parse(['--remote','http://127.0.0.1:8091']),/five/);
+ assert.throws(()=>parse(['--db','one','--db','two']),/Usage/);
+ const result=parse(['--remote','http://127.0.0.1:8091','--db','standby.sqlite','--game','g1','--station','rink-b','--private-key','rink-b.pem']);
+ assert.equal(result['--game'],'g1');
+});
