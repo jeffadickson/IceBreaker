@@ -11,6 +11,7 @@ Status: implementation target; **development only** until production release gat
 ## Encryption and documents
 - DOC-001 P0: Encrypt document bytes before persistent storage with AES-256-GCM and random 96-bit nonce, authenticated metadata/AAD, and a unique random 256-bit DEK per document.
 - DOC-002 P0: Wrap each DEK using a separate key-encryption key (KEK); store only wrapped DEK, nonce, tags, opaque object ID and metadata. Production KEK comes from a KMS/HSM, not code or the database.
+- DOC-003A P0: A dedicated backend worker SHALL scan quarantined documents through a local ClamAV Unix socket, fail closed on timeouts/errors, and reject positive detections. No public or administrator endpoint may attest a scan as clean.
 - DOC-003 P0: Document uploads are limited by size and allowlisted MIME types and signatures. Quarantine and malware-scan prior to verification; do not serve active content inline. Never trust client-supplied filenames or paths.
 - DOC-004 P0: Download requires fresh server-side authorization, is no-store, and is streamed/decrypted only for an authorized viewer. A guardian sees only their verified children's permitted documents.
 - DOC-005 P0: Document verification stores verifier, timestamp, type, and status independently of the scan; season eligibility can reuse verification without downloading original document.
@@ -19,6 +20,8 @@ Status: implementation target; **development only** until production release gat
 - DOC-008 P0: Key absence, authentication-tag failure, or wrong AAD must fail closed. No silent plaintext fallback for encrypted records.
 - DOC-009 P0: Never store keys in Git, HTML, local rink SQLite, client bundles, or event feeds. Separate server key privileges from league admin/club accounts.
 - DOC-010 P0: Encrypted backups, key rotation, disaster recovery and restore tests are release blockers.
+- DOC-011 P0: Offline document KEK rotation SHALL rewrap every per-file DEK transactionally after an independently verified encrypted backup; plaintext document objects SHALL never be written during rotation.
+- DOC-012 P0: An offline migration SHALL encrypt existing plaintext legal names, birth dates, addresses and related-person contacts; provide dry-run counts and refuse apply without a verified encrypted backup. Strict mode SHALL reject plaintext private reads/writes after migration.
 
 ## Access and workflows
 - ACL-001 P0: Club registrar may upload and review only documents of players currently authorized to their club.
@@ -26,6 +29,7 @@ Status: implementation target; **development only** until production release gat
 - ACL-003 P0: Parent may upload/view own child's permitted records only after explicit guardian verification; no auto-access from email or surname.
 - ACL-004 P0: Timekeepers, coaches, team managers, spectators and central game-event consumers have no document endpoints.
 - ACL-005 P0: Former-club access is revoked when affiliation ends; every access rechecks live authorization, never a cached grant.
+- ACL-006A P0: Staff shall enroll encrypted TOTP MFA seeds through authenticated sessions, confirm before activation, invalidate existing sessions on activation and reject replayed OTPs. Production must enforce MFA at account provisioning, including secure recovery.
 - ACL-006 P0: Production requires MFA for administrators, invitation/identity verification, consent, rate limiting, TLS, malware scanning, key management, audit retention and privacy/legal review.
 
 ## Acceptance
@@ -37,4 +41,4 @@ Status: implementation target; **development only** until production release gat
 - Tests use entirely fictional data and keys.
 
 ## Release boundary
-A development AES-GCM encrypted document vault and family relationship model are implemented incrementally. A local environment KEK is **not equivalent to KMS**, and existing legacy SQLite private fields are plaintext until a separate verified migration. Do not ingest real minors' documents into the current demo deployment.
+A development AES-GCM encrypted document vault, local ClamAV scan worker, offline field migration/DEK rewrap tools, opt-in staff TOTP MFA and family relationship model are implemented incrementally. A local environment KEK is **not equivalent to KMS**, and existing legacy SQLite private fields are plaintext until a separate verified migration. Do not ingest real minors' documents into the current demo deployment.
