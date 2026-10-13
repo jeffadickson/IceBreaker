@@ -59,6 +59,7 @@ function execute(db,command,opts,{readJson=inputJson}={}){
  }
 }
 function main(argv=process.argv.slice(2)){
+ if(process.env.ICEBREAKER_PRODUCTION_MODE==='1')throw Error('Development CLI cannot be used for production verification without authenticated registrar authorization');
  const {command,opts}=argsOf(argv);
  if(!opts.db)throw Error('--db existing SQLite file required');
  const file=path.resolve(opts.db);
