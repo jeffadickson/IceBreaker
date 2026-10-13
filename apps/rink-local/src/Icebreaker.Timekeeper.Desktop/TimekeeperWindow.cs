@@ -46,6 +46,7 @@ public sealed class TimekeeperWindow : Window
     private readonly ComboBox _voiceMode = new() { ItemsSource = new[] { "Offline Windows voice", "AI arena announcer (cloud)" }, SelectedIndex = 0, Width = 245 };
     private readonly ComboBox _aiVoice = new() { ItemsSource = new[] { "onyx", "marin", "cedar", "echo", "alloy", "nova" }, SelectedIndex = 0, Width = 115 };
     private readonly TextBlock _paStatus = Label("PA is manual-approval only; AI speech is synthetic.", 14);
+    private readonly HashSet<string> _seenPaEvents = new(StringComparer.Ordinal);
     private bool _paBusy;
     private bool _busy;
     private bool _connected;
@@ -262,7 +263,8 @@ public sealed class TimekeeperWindow : Window
         {
             var snapshot = await _client.SnapshotAsync();
             _latest = snapshot;
-            foreach (var ev in snapshot.Events ?? []) _paQueue.Stage(ev);
+            foreach (var ev in snapshot.Events ?? [])
+                if (_seenPaEvents.Add(ev.Id)) _paQueue.Stage(ev);
             if (!_paBusy) UpdatePaList();
             _connected = true;
             _connection.Text = snapshot.Running ? "● AUTHORITY CONNECTED · RUNNING" : "● AUTHORITY CONNECTED · STOPPED";
