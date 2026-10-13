@@ -108,6 +108,12 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
     }
     if(typeof b.digest!=='string'||!/^[a-f0-9]{64}$/.test(b.digest)||!Number.isSafeInteger(b.expectedEpoch))
      throw Object.assign(new Error('Invalid handoff acknowledgment'),{status:400});
+    const receipt=JSON.stringify({gameId:b.gameId,stationId:b.stationId,digest:b.digest,expectedEpoch:b.expectedEpoch});
+    let verifiedReceipt=false;
+    try{
+     verifiedReceipt=crypto.verify(null,Buffer.from(receipt),crypto.createPublicKey(db.prepare('SELECT public_key FROM stations WHERE id=?').get(b.stationId).public_key),Buffer.from(String(b.stationSignature||''),'base64'));
+    }catch{}
+    if(!verifiedReceipt)throw Object.assign(new Error('Signed standby restoration receipt required'),{status:401});
     db.exec('BEGIN IMMEDIATE');
     try{
      const prepared=db.prepare('SELECT * FROM handoff_preparations WHERE game_id=?').get(b.gameId);
