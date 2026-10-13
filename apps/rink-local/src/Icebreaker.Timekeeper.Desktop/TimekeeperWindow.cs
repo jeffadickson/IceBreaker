@@ -29,6 +29,15 @@ public sealed class TimekeeperWindow : Window
     private readonly TextBlock _rules = Label("Rules unavailable", 14);
     private readonly TextBlock _penalties = Label("Penalties unavailable", 14);
     private readonly TextBlock _auxiliary = Label("Warmup / break —", 18);
+    private readonly ListBox _eventHistory = new() { MinHeight = 230 };
+    private readonly ComboBox _goalTeam = new() { ItemsSource = new[] { "home", "away" }, SelectedIndex = 0, Width = 120 };
+    private readonly TextBox _goalScorer = new() { Watermark = "Scorer jersey #", Width = 145 };
+    private readonly TextBox _goalAssist1 = new() { Watermark = "Assist 1 or NONE", Text = "NONE", Width = 160 };
+    private readonly TextBox _goalAssist2 = new() { Watermark = "Assist 2 or NONE", Text = "NONE", Width = 160 };
+    private readonly CheckBox _goalConfirm = new() { Content = "I verified the scoring team and players" };
+    private readonly ComboBox _goalieTeam = new() { ItemsSource = new[] { "home", "away" }, SelectedIndex = 0, Width = 120 };
+    private readonly TextBox _goalieNumber = new() { Watermark = "Goalie jersey or EMPTY", Width = 190 };
+    private readonly TextBox _goalieReason = new() { Watermark = "Reason for goalie change", Width = 240 };
     private readonly TextBlock _status = Label("Connecting to independent rink authority", 15);
     private readonly TextBox _penaltyTeam = new() { Watermark = "home / away", Width = 130 };
     private readonly TextBox _penaltyPlayer = new() { Watermark = "Jersey #", Width = 95 };
@@ -64,32 +73,69 @@ public sealed class TimekeeperWindow : Window
         var key = Environment.GetEnvironmentVariable("ICEBREAKER_OPERATOR_KEY") ?? "local-development-key";
         _client = new RinkClockClient(_http, key, Environment.GetEnvironmentVariable("ICEBREAKER_OPERATOR_ID") ?? "desktop-timekeeper");
 
-        var body = new StackPanel { Spacing = 14, Margin = new Thickness(24) };
-        body.Children.Add(Label("ICEBREAKER · RINK TIMEKEEPER", 27));
-        body.Children.Add(_connection);
-        body.Children.Add(_period);
-        body.Children.Add(_time);
-        body.Children.Add(_score);
-        body.Children.Add(_rules);
-        body.Children.Add(_penalties);
-        body.Children.Add(Buttons(
-            ActionButton("START / STOP   [SPACE]", () => _client.ToggleAsync(), 220),
+        // The official score and clock remain fixed while the operator changes
+        // tabs. No UI timer owns or advances the authoritative game clock.
+        Background = new SolidColorBrush(Color.Parse("#071321"));
+        var clockBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
+        clockBody.Children.Add(Label("CLOCK OPERATIONS", 19));
+        clockBody.Children.Add(_rules);
+        clockBody.Children.Add(_penalties);
+        clockBody.Children.Add(Buttons(
+            ActionButton("START / STOP   [SPACE]", () => _client.ToggleAsync(), 230),
             ActionButton("−1 SECOND", () => _client.NudgeAsync(-1)),
             ActionButton("+1 SECOND", () => _client.NudgeAsync(1))));
-        body.Children.Add(new TextBlock { Text = "Clock synchronization (stopped clock only; reason and confirmation required)" });
-        body.Children.Add(Buttons(_setTime, _reason, _confirm,
-            ActionButton("SET CLOCK", async () =>
+        clockBody.Children.Add(new TextBlock { Text = "Clock correction — stopped clock only; a reason and confirmation are required" });
+        clockBody.Children.Add(Buttons(_setTime, _reason, _confirm,
+            ActionButton("SET ARENA TIME", async () =>
             {
                 if (_confirm.IsChecked != true) throw new InvalidOperationException("Confirm the correction first");
                 try { await _client.SetClockAsync(_setTime.Text ?? "", _reason.Text ?? ""); }
                 finally { _confirm.IsChecked = false; }
             })));
-        body.Children.Add(Buttons(
+        clockBody.Children.Add(Buttons(
             ActionButton("END PERIOD", () => _client.CommandAsync(new { type = "PERIOD_ENDED" })),
             ActionButton("NEXT PERIOD", () => _client.CommandAsync(new { type = "PERIOD_ADVANCED" })),
-            ActionButton("BEGIN OVERTIME", () => _client.CommandAsync(new { type = "OVERTIME_STARTED" }))));
-        body.Children.Add(Label("PENALTY ENTRY", 18));
-        body.Children.Add(Buttons(_penaltyTeam, _penaltyPlayer, _penaltyInfraction, _penaltySeconds,
+            ActionButton("OVERTIME", () => _client.CommandAsync(new { type = "OVERTIME_STARTED" }))));
+        clockBody.Children.Add(Label("WARMUP · INTERMISSION · TIMEOUT", 18));
+        clockBody.Children.Add(_auxiliary);
+        clockBody.Children.Add(Buttons(
+            ActionButton("WARMUP", () => _client.AuxiliaryAsync("RESET", "WARMUP")),
+            ActionButton("INTERMISSION", () => _client.AuxiliaryAsync("RESET", "INTERMISSION")),
+            ActionButton("AUX START", () => _client.AuxiliaryAsync("START")),
+            ActionButton("AUX PAUSE", () => _client.AuxiliaryAsync("PAUSE"))));
+        clockBody.Children.Add(Buttons(
+            ActionButton("HOME TIMEOUT", () => _client.CommandAsync(new { type = "TIMEOUT_TAKEN", team = "home" })),
+            ActionButton("AWAY TIMEOUT", () => _client.CommandAsync(new { type = "TIMEOUT_TAKEN", team = "away" }))));
+
+        var scoringBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
+        scoringBody.Children.Add(Label("GOAL · OFFICIAL JOURNAL ENTRY", 19));
+        scoringBody.Children.Add(new TextBlock
+        {
+            Text = "Use jersey numbers from the approved game lineup. NONE means no assist. The server validates the event before committing it.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        scoringBody.Children.Add(Buttons(_goalTeam, _goalScorer, _goalAssist1, _goalAssist2));
+        scoringBody.Children.Add(_goalConfirm);
+        scoringBody.Children.Add(ActionButton("RECORD GOAL", async () =>
+        {
+            if (_goalConfirm.IsChecked != true) throw new InvalidOperationException("Verify goal details before committing");
+            var scorer = RequiredJersey(_goalScorer.Text);
+            var assist1 = OptionalJersey(_goalAssist1.Text);
+            var assist2 = OptionalJersey(_goalAssist2.Text);
+            if (scorer == assist1 || scorer == assist2 || (assist1 != "NONE" && assist1 == assist2))
+                throw new InvalidOperationException("Scorer and assists must be different players");
+            await _client.CommandAsync(new
+            {
+                type = "GOAL_RECORDED", team = _goalTeam.SelectedItem?.ToString() ?? "home",
+                scorer, assist1, assist2
+            });
+            _goalConfirm.IsChecked = false;
+            _goalScorer.Text = "";
+            _goalAssist1.Text = "NONE";
+            _goalAssist2.Text = "NONE";
+        }));
+        scoringBody.Children.Add(Label("PENALTY ENTRY", 18));
+        scoringBody.Children.Add(Buttons(_penaltyTeam, _penaltyPlayer, _penaltyInfraction, _penaltySeconds,
             ActionButton("ASSESS PENALTY", async () =>
             {
                 if (!int.TryParse(_penaltySeconds.Text, out var seconds) || seconds < 1 || seconds > 3600)
@@ -102,37 +148,91 @@ public sealed class TimekeeperWindow : Window
                     classification = "MINOR"
                 });
             })));
-        body.Children.Add(Buttons(
-            ActionButton("HOME TIMEOUT", () => _client.CommandAsync(new { type = "TIMEOUT_TAKEN", team = "home" })),
-            ActionButton("AWAY TIMEOUT", () => _client.CommandAsync(new { type = "TIMEOUT_TAKEN", team = "away" }))));
-        body.Children.Add(_auxiliary);
-        body.Children.Add(Buttons(
-            ActionButton("WARMUP", () => _client.AuxiliaryAsync("RESET", "WARMUP")),
-            ActionButton("INTERMISSION", () => _client.AuxiliaryAsync("RESET", "INTERMISSION")),
-            ActionButton("AUX START", () => _client.AuxiliaryAsync("START")),
-            ActionButton("AUX PAUSE", () => _client.AuxiliaryAsync("PAUSE"))));
-        body.Children.Add(Label("PUBLIC ADDRESS · MANUAL APPROVAL", 18));
-        body.Children.Add(new TextBlock
+        scoringBody.Children.Add(Label("GOALIE CHANGE", 18));
+        scoringBody.Children.Add(new TextBlock
         {
-            Text = "AI speech is synthetic. Voice selection is optional and requires internet. " +
-                   "Only committed event scripts using jersey numbers are sent to the provider.",
+            Text = "Record a goalie substitution or enter EMPTY for a pulled goalie. This does not modify the approved roster.",
             TextWrapping = TextWrapping.Wrap
         });
-        body.Children.Add(Buttons(_voiceMode, _aiVoice, _paStyle));
-        body.Children.Add(_announcements);
-        body.Children.Add(Buttons(
+        scoringBody.Children.Add(Buttons(_goalieTeam, _goalieNumber, _goalieReason,
+            ActionButton("RECORD GOALIE CHANGE", async () =>
+            {
+                var jersey = (_goalieNumber.Text ?? "").Trim().ToUpperInvariant();
+                if (jersey != "EMPTY") jersey = RequiredJersey(jersey);
+                if (string.IsNullOrWhiteSpace(_goalieReason.Text))
+                    throw new InvalidOperationException("Goalie change reason required");
+                await _client.CommandAsync(new
+                {
+                    type = "GOALIE_CHANGED", team = _goalieTeam.SelectedItem?.ToString() ?? "home",
+                    player = jersey == "EMPTY" ? null : jersey, reason = _goalieReason.Text.Trim()
+                });
+                _goalieNumber.Text = "";
+                _goalieReason.Text = "";
+            })));
+
+        var eventsBody = new StackPanel { Spacing = 12, Margin = new Thickness(18) };
+        eventsBody.Children.Add(Label("COMMITTED EVENT HISTORY", 19));
+        eventsBody.Children.Add(new TextBlock { Text = "Read-only events from the rink authority; drafts do not appear here." });
+        eventsBody.Children.Add(_eventHistory);
+
+        var paBody = new StackPanel { Spacing = 13, Margin = new Thickness(18) };
+        paBody.Children.Add(Label("PUBLIC ADDRESS · MANUAL APPROVAL", 18));
+        paBody.Children.Add(new TextBlock
+        {
+            Text = "AI speech is synthetic and optional. Only committed event scripts using jersey numbers are sent to the provider.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        paBody.Children.Add(Buttons(_voiceMode, _aiVoice, _paStyle));
+        paBody.Children.Add(_announcements);
+        paBody.Children.Add(Buttons(
             PaButton("PREVIEW / PLAY SELECTED", PlaySelectedAsync),
             PaButton("SKIP SELECTED", SkipSelectedAsync)));
-        body.Children.Add(_paStatus);
-        body.Children.Add(_status);
-        body.Children.Add(new TextBlock
+        paBody.Children.Add(_paStatus);
+
+        var tabs = new TabControl
         {
-            Text = "Local authority is a separate process. Closing this window does not stop the game clock. " +
-                   "If authority itself restarts, it recovers paused for operator review.",
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = Brushes.LightGray
-        });
-        Content = new ScrollViewer { Content = body };
+            Items =
+            {
+                new TabItem { Header = "CLOCK & PERIODS", Content = new ScrollViewer { Content = clockBody } },
+                new TabItem { Header = "GOALS · PENALTIES · GOALIES", Content = new ScrollViewer { Content = scoringBody } },
+                new TabItem { Header = "EVENT HISTORY", Content = new ScrollViewer { Content = eventsBody } },
+                new TabItem { Header = "ARENA ANNOUNCER", Content = new ScrollViewer { Content = paBody } }
+            }
+        };
+        var scoreboard = new StackPanel
+        {
+            Spacing = 4,
+            Margin = new Thickness(20, 15),
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        scoreboard.Children.Add(Label("ICEBREAKER · RINK CONTROL", 17));
+        scoreboard.Children.Add(_connection);
+        scoreboard.Children.Add(_period);
+        scoreboard.Children.Add(_time);
+        scoreboard.Children.Add(_score);
+        _time.HorizontalAlignment = HorizontalAlignment.Center;
+        _time.Foreground = Brushes.White;
+        _score.HorizontalAlignment = HorizontalAlignment.Center;
+        var header = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#12324C")),
+            CornerRadius = new CornerRadius(15),
+            Margin = new Thickness(14, 12, 14, 6),
+            Child = scoreboard
+        };
+        var footer = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#112A40")),
+            Padding = new Thickness(16, 9),
+            Child = _status
+        };
+        var shell = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(header, Dock.Top);
+        DockPanel.SetDock(footer, Dock.Bottom);
+        shell.Children.Add(header);
+        shell.Children.Add(footer);
+        shell.Children.Add(tabs);
+        Content = shell;
         KeyDown += OnKeyDown;
         _poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         _poll.Tick += async (_, _) => await RefreshAsync();
@@ -140,6 +240,20 @@ public sealed class TimekeeperWindow : Window
         Opened += async (_, _) => await RefreshAsync();
         Closed += (_, _) => { _poll.Stop(); _http.Dispose(); _paQueue.Dispose(); };
         SetEnabled(false);
+    }
+
+    private static string RequiredJersey(string? value)
+    {
+        var raw = (value ?? "").Trim();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(raw, @"^\d{1,3}$"))
+            throw new InvalidOperationException("Enter a valid jersey number");
+        return int.Parse(raw).ToString();
+    }
+
+    private static string OptionalJersey(string? value)
+    {
+        var raw = (value ?? "").Trim().ToUpperInvariant();
+        return raw is "" or "NONE" ? "NONE" : RequiredJersey(raw);
     }
 
     private static TextBlock Label(string text, double size) => new()
@@ -283,6 +397,10 @@ public sealed class TimekeeperWindow : Window
             _score.Text = $"HOME {snapshot.Home}  —  {snapshot.Away} AWAY";
             _rules.Text = $"Clock mode {snapshot.ClockMode} · Rules {snapshot.TimingVersion} · Revision {snapshot.Revision}";
             _penalties.Text = "Penalty state: " + snapshot.PenaltiesJson;
+            _eventHistory.ItemsSource = (snapshot.Events ?? [])
+                .Reverse().Take(80).Select(ev =>
+                    ev.Type.Replace('_', ' ') + (ev.Team is null ? "" : " · " + ev.Team.ToUpperInvariant()) +
+                    " · " + ev.DetailsJson).ToArray();
             try
             {
                 var aux = await _client.AuxiliarySnapshotAsync();
