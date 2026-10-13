@@ -34,8 +34,8 @@ test('game rules persist across restart and cannot silently change',t=>{
 });
 test('division rules are versioned and locked after a completed game',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-division-timing-')),file=path.join(dir,'league.db');const league=new LeagueStore(file,{seedDemo:true});t.after(()=>{league.close();fs.rmSync(dir,{recursive:true,force:true});});
- const d='demo-10u';assert.equal(league.timingForDivision(d).periodSeconds,900);
+ const d='new-division';league.db.prepare('INSERT INTO divisions VALUES(?,?,?,?)').run(d,'demo-2026','10U B','10U-B-default');league.db.prepare('INSERT INTO division_timing_rules VALUES(?,?,?)').run(d,'10U-B-default',JSON.stringify({periodCount:3,periodSeconds:900,warmupSeconds:300,intermissionSeconds:120,overtimeSeconds:0}));assert.equal(league.timingForDivision(d).periodSeconds,900);
  const r=league.configureDivisionTiming(d,'10U-12M-v1',{periodCount:3,periodSeconds:720,warmupSeconds:180,intermissionSeconds:60,overtimeSeconds:0});
  assert.equal(r.periodSeconds,720);assert.equal(league.timingForDivision(d).version,'10U-12M-v1');
- assert.throws(()=>league.configureDivisionTiming(d,'10U-new',{periodSeconds:800}),/Cannot change division timing policy/);
+ league.db.prepare("INSERT INTO teams VALUES(?,?,?,?,?,?)").run('b-one',d,'B One','ONE','Demo','blue');league.db.prepare("INSERT INTO teams VALUES(?,?,?,?,?,?)").run('b-two',d,'B Two','TWO','Demo','red');league.db.prepare("INSERT INTO games(id,division_id,date,venue,sheet,home_team_id,away_team_id,status) VALUES(?,?,?,?,?,?,?,?)").run('b-game',d,'2026-10-12T18:00:00Z','Demo','Ice 1','b-one','b-two','final');assert.throws(()=>league.configureDivisionTiming(d,'10U-new',{periodSeconds:800}),/Cannot change division timing policy/);
 });
