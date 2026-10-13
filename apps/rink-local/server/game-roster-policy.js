@@ -19,7 +19,7 @@ function snapshotForGame(db,gameId){
     const members=db.prepare('SELECT r.player_id id,r.jersey jersey,p.display_name name,r.position position FROM roster_memberships r JOIN teams t ON t.id=r.team_id JOIN divisions d ON d.id=t.division_id AND d.season_id=r.season_id JOIN players p ON p.id=r.player_id WHERE r.team_id=? ORDER BY r.jersey').all(teamId);
     const eligible=members.filter(p=>ids.has(p.id));
     const suspensions=activeForGame(db,gameId,eligible.map(p=>p.id));
-    result.teams[side]={teamId,confirmed:!!row,eligible:suspensions.length===0,suspensions,revision:row?.roster_revision??null,confirmedAt:row?.confirmed_at??null,players:eligible};
+    result.teams[side]={teamId,confirmed:!!row,eligible:suspensions.length===0,suspensions:suspensions.map(({playerId,startDate,endDate})=>({playerId,startDate,endDate})),revision:row?.roster_revision??null,confirmedAt:row?.confirmed_at??null,players:eligible};
   }
   result.confirmed=result.teams.home.confirmed&&result.teams.away.confirmed&&result.teams.home.eligible&&result.teams.away.eligible;
   return result;
