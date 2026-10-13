@@ -6,6 +6,7 @@ const {PlayerRegistry}=require('../../server/player-registry');
 const {TeamAccounts}=require('../../server/team-accounts');
 const {pregameSnapshot}=require('../../server/pregame-gate');
 const C=require('../../server/participant-compliance');
+const {gameDate}=require('../../server/player-suspensions');
 function setup(t){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-participant-')),file=path.join(dir,'league.db');
  const league=new LeagueStore(file,{seedDemo:true}),registry=new PlayerRegistry(file),team=new TeamAccounts(file);
@@ -47,20 +48,20 @@ test('tournament policy explicitly waives league training but never suspension',
  const x=setup(t);
  const game=x.db.prepare("SELECT id,home_team_id home,away_team_id away,date FROM games WHERE status='scheduled' LIMIT 1").get();
  assert.ok(game);
- const player=x.team.roster(game.home)[0],other=x.team.roster(game.away)[0];
+ const player=x.team.roster(game.home)[0],other=x.team.roster(game.away)[0],day=gameDate(x.db,game.id);
  const req=x.registry.requireTraining({leagueId:'demo-league',seasonId:'demo-2026',code:'LEAGUE_TRAINING',title:'League training'},'admin');
  assert.ok(req.requirementId);
- assert.equal(C.gamePlayerTraining(x.db,player.id,game.home,game.id,game.date).some(r=>r.blocksLineup&&!r.complete),true);
+ assert.equal(C.gamePlayerTraining(x.db,player.id,game.home,game.id,day).some(r=>r.blocksLineup&&!r.complete),true);
  assert.throws(()=>x.team.confirmLineup(game.home,game.id,'manager',{playerIds:[player.id],expectedRosterRevision:0}),/training incomplete/);
  C.setCompetition(x.db,{gameId:game.id,type:'TOURNAMENT',note:'Independent tournament policy'},'league-admin');
- assert.equal(C.gamePlayerTraining(x.db,player.id,game.home,game.id,game.date).length,0);
+ assert.equal(C.gamePlayerTraining(x.db,player.id,game.home,game.id,day).length,0);
  x.team.confirmLineup(game.home,game.id,'manager',{playerIds:[player.id],expectedRosterRevision:0});
  x.team.confirmLineup(game.away,game.id,'manager',{playerIds:[other.id],expectedRosterRevision:0});
  assert.equal(pregameSnapshot(x.team.db,game.id).ready,true);
  C.requireCourse(x.db,{scopeType:'TOURNAMENT',scopeId:game.id,role:'PLAYER',code:'TOURNEY_BRIEFING',title:'Tournament briefing'},'admin');
  assert.equal(pregameSnapshot(x.team.db,game.id).ready,false);
- C.recordCourse(x.db,{subjectType:'PLAYER',subjectId:player.id,code:'TOURNEY_BRIEFING',completedOn:game.date},'admin');
- C.recordCourse(x.db,{subjectType:'PLAYER',subjectId:other.id,code:'TOURNEY_BRIEFING',completedOn:game.date},'admin');
+ C.recordCourse(x.db,{subjectType:'PLAYER',subjectId:player.id,code:'TOURNEY_BRIEFING',completedOn:day},'admin');
+ C.recordCourse(x.db,{subjectType:'PLAYER',subjectId:other.id,code:'TOURNEY_BRIEFING',completedOn:day},'admin');
  assert.equal(pregameSnapshot(x.team.db,game.id).ready,true);
  // League suspension rules remain independently enforced by the pregame gate.
 });
