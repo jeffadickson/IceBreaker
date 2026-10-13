@@ -66,7 +66,7 @@ Run `node --test tests/integration/*.test.js`; the integration suite now runs au
 
 ## Verified backup-laptop takeover (development)
 
-A [two-phase signed handoff](services/ingest/verified-handoff.js) now restores a complete central journal to an idle backup laptop, verifies the pinned timing rules and event sequence, requires explicit operator approval, and commits ownership only after a station-signed restore receipt. Stale or divergent histories fail closed. See [recovery protocol and limitations](services/ingest/MULTI_RINK_RECOVERY.md) and [integration tests](tests/integration/verified-handoff.test.js). Production security, operator UI and old-laptop outbox reconciliation remain open.
+A [two-phase signed handoff](services/ingest/verified-handoff.js), with an [interactive development CLI](services/ingest/handoff-cli.js), now restores a complete central journal to an idle backup laptop, verifies the pinned timing rules and event sequence, requires explicit operator approval, and commits ownership only after a station-signed restore receipt. Stale or divergent histories fail closed. See [recovery protocol and limitations](services/ingest/MULTI_RINK_RECOVERY.md) and [integration tests](tests/integration/verified-handoff.test.js). Production security, operator UI and old-laptop outbox reconciliation remain open.
 
 ## Launch
 
