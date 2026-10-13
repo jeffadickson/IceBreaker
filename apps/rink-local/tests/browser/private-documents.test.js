@@ -90,7 +90,6 @@ test('private player and related-person fields encrypt with opt-in field key',t=
  assert.match(raw.email,/^enc:v1:/);
  assert.equal(x.portal.registry.relatedPeople(playerId)[0].email,'private@example.invalid');
  delete process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;
- const parentId=x.portal.registry.relatedPeople(playerId)[0].personId;
  assert.throws(()=>x.portal.registry.relatedPeople(playerId),/requires configured key/);
  assert.throws(()=>x.portal.registry.privateProfile(playerId),/requires configured key/);
 });
