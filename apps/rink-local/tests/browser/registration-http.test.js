@@ -14,6 +14,8 @@ test('registration web API enforces distinct club/league roles, private profile 
  assert.equal((await call('bootstrap/club','POST',{id:'club-x',name:'Club X',leagueId:'demo-league'})).status,403);
  assert.equal((await call('bootstrap/club','POST',{id:'club-x',name:'Club X',leagueId:'demo-league'},null,true)).status,201);
  assert.equal((await call('bootstrap/team','POST',{clubId:'club-x',teamId:'maple'},null,true)).status,201);
+ const managerRoster=await fetch('http://127.0.0.1:'+port+'/api/team/v1/teams/maple/roster');
+ assert.equal(managerRoster.status,403);
  assert.equal((await call('bootstrap/user','POST',{email:'registrar@example.invalid',password:'registrar-long-secret',role:'CLUB_REGISTRAR',scopeId:'club-x'},null,true)).status,201);
  assert.equal((await call('bootstrap/user','POST',{email:'league@example.invalid',password:'league-long-secret',role:'LEAGUE_ADMIN',scopeId:'demo-league'},null,true)).status,201);
  const club=(await call('login','POST',{email:'registrar@example.invalid',password:'registrar-long-secret'})).data.token;
