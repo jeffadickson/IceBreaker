@@ -34,6 +34,7 @@ class LeagueStore {
   require('./player-registry').initPlayerRegistry(this.db);
   require('./participant-compliance').init(this.db);
   require('./training-catalog').init(this.db);
+  require('./training-intake').init(this.db);
   // Existing divisions acquire a default versioned regulation timing policy.
   const {DEFAULT_TIMING}=require('./game-timing-rules');
   const addTiming=this.db.prepare('INSERT OR IGNORE INTO division_timing_rules(division_id,version,rules_json) VALUES(?,?,?)');
