@@ -31,6 +31,7 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
    if(related&&req.method==='POST'){reply(201,portal.addRelatedPerson(user,related[1],await body()));return true;}
    if(route==='requests'&&req.method==='GET'){reply(200,{requests:portal.requests(user)});return true;}
    if(route==='requests'&&req.method==='POST'){reply(201,portal.submit(user,await body()));return true;}
+   if(route==='rollover/preview'&&req.method==='POST'){reply(200,{rows:portal.rolloverPreview(user,await body())});return true;}
    if(route==='imports/preview'&&req.method==='POST'){const b=await body();reply(200,{rows:portal.preview(user,b.rows)});return true;}
    if(route==='imports/submit'&&req.method==='POST'){const b=await body();reply(201,{submitted:portal.submitBatch(user,b.rows)});return true;}
    const decision=route.match(/^requests\/([-\w]+)\/decision$/);
