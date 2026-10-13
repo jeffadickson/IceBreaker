@@ -64,6 +64,10 @@ The [distributed recovery test suite](tests/integration/multi-rink-offline.test.
 
 Run `node --test tests/integration/*.test.js`; the integration suite now runs automatically in [GitHub CI](.github/workflows/ci.yml). See [recovery design and remaining handoff requirements](services/ingest/MULTI_RINK_RECOVERY.md). This is a development integration milestone; automatic backup-laptop state restoration is still pending.
 
+## Verified backup-laptop takeover (development)
+
+A [two-phase signed handoff](services/ingest/verified-handoff.js) now restores a complete central journal to an idle backup laptop, verifies the pinned timing rules and event sequence, requires explicit operator approval, and commits ownership only after a station-signed restore receipt. Stale or divergent histories fail closed. See [recovery protocol and limitations](services/ingest/MULTI_RINK_RECOVERY.md) and [integration tests](tests/integration/verified-handoff.test.js). Production security, operator UI and old-laptop outbox reconciliation remain open.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
