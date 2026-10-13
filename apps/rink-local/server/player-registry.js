@@ -6,6 +6,7 @@ const {DatabaseSync}=require('node:sqlite');
 const {validDate}=require('./player-suspensions');
 const uuid=()=>crypto.randomUUID();
 const good=(x,n=160)=>typeof x==='string'&&x.trim().length>0&&x.length<=n;
+const validAddress=a=>a&&typeof a==='object'&&!Array.isArray(a)&&Object.keys(a).every(k=>['street','city','region','postalCode','country'].includes(k))&&Object.values(a).every(v=>typeof v==='string'&&v.length<=200);
 function init(db){
  db.exec("PRAGMA foreign_keys=ON;");
  db.exec("CREATE TABLE IF NOT EXISTS player_private_profiles(player_id TEXT PRIMARY KEY REFERENCES players(id),legal_name TEXT NOT NULL,birth_date TEXT NOT NULL,address_json TEXT NOT NULL,updated_at TEXT NOT NULL,updated_by TEXT NOT NULL)");
@@ -39,7 +40,7 @@ class PlayerRegistry{
  tx(fn){this.db.exec('BEGIN IMMEDIATE');try{const x=fn();this.db.exec('COMMIT');return x;}catch(e){this.db.exec('ROLLBACK');throw e;}}
  audit(action,entity,payload,actor){this.db.prepare("INSERT INTO league_audit VALUES(?,?,?,?,?,?)").run(uuid(),new Date().toISOString(),actor,action,entity,JSON.stringify(payload));}
  createPlayer({displayName,legalName,birthDate,address={}},actor){
-  if(!good(actor,100)||!good(displayName,120)||!good(legalName)||!validDate(birthDate)||!address||typeof address!=='object'||Array.isArray(address)||JSON.stringify(address).length>2000)throw Error('Invalid private player profile');
+  if(!good(actor,100)||!good(displayName,120)||!good(legalName)||!validDate(birthDate)||!validAddress(address))throw Error('Invalid private player profile');
   return this.tx(()=>{const playerId=uuid();this.db.prepare("INSERT INTO players(id,display_name,privacy_status) VALUES(?,?,'PRIVATE')").run(playerId,displayName.trim());this.db.prepare("INSERT INTO player_private_profiles VALUES(?,?,?,?,?,?)").run(playerId,legalName.trim(),birthDate,JSON.stringify(address),new Date().toISOString(),actor);this.audit('PLAYER_CREATED',playerId,{privateProfile:true},actor);return {playerId};});
  }
  privateProfile(playerId){
