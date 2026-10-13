@@ -279,6 +279,37 @@ class RegistrationPortal{
    throw Error('Participant outside league scope');
   return participant.recordCourse(this.db,input,user.id);
  }
+ listTrainingCatalog(user){
+  this.requireLeague(user,user.scopeId);
+  return require('./training-catalog').catalog(this.db);
+ }
+ createTrainingDefinition(user,input){
+  this.requireLeague(user,user.scopeId);
+  return require('./training-catalog').createTraining(this.db,input,user.id);
+ }
+ createTrainingPolicy(user,input){
+  this.requireLeague(user,input.scopeType==='TOURNAMENT'?this.gameLeague(input.scopeId):input.scopeId);
+  return require('./training-catalog').addPolicy(this.db,input,user.id);
+ }
+ verifyTrainingCompletion(user,input){
+  this.requireLeague(user,user.scopeId);
+  if(input.subjectType==='PLAYER'?!this.canRead(user,input.subjectId):!this.personInLeague(input.subjectId,user.scopeId))
+   throw Error('Participant outside league scope');
+  return require('./training-catalog').recordCompletion(this.db,input,user.id);
+ }
+ revokeTrainingCompletion(user,{completionId,reason}){
+  this.requireLeague(user,user.scopeId);
+  const r=this.db.prepare('SELECT subject_type type,subject_id id FROM training_completions_v2 WHERE id=?').get(completionId);
+  if(!r||!(r.type==='PLAYER'?this.canRead(user,r.id):this.personInLeague(r.id,user.scopeId)))
+   throw Error('Training record outside league scope');
+  return require('./training-catalog').revokeCompletion(this.db,completionId,reason,user.id);
+ }
+ trainingStatusForRole(user,input){
+  this.requireLeague(user,input.scopeType==='TOURNAMENT'?this.gameLeague(input.scopeId):input.scopeId);
+  if(input.subjectType==='PLAYER'?!this.canRead(user,input.subjectId):!this.personInLeague(input.subjectId,user.scopeId))
+   throw Error('Participant outside league scope');
+  return require('./participant-compliance').trainingForRole(this.db,input);
+ }
  close(){this.db.close();}
 }
 module.exports={RegistrationPortal};
