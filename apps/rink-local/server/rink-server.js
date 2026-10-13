@@ -18,7 +18,7 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
   if(pathname.startsWith('/api/parent/'))return parentAuth.handle(req,res,pathname,new URL(req.url,'http://localhost'));
   if(pathname==='/api/team/v1/login'&&req.method==='POST'){try{const b=await readBody(req);return send(res,200,teamAccounts.login(b.email,b.password));}catch(e){return send(res,401,{error:e.message});}}
   if(pathname==='/api/team/v1/admin/accounts'&&req.method==='POST'){if(!auth(req))return send(res,403,{error:'League administrator credential required'});try{const b=await readBody(req);return send(res,201,teamAccounts.createUser(b.email,b.password,b.teamId,b.role));}catch(e){return send(res,400,{error:e.message});}}
-  const teamScheduleRoute=pathname.match(/^\/api\/team\/v1\/teams\/([-\\w]+)\/schedule$/);
+  const teamScheduleRoute=pathname.match(/^\/api\/team\/v1\/teams\/([-\w]+)\/schedule$/);
   if(teamScheduleRoute&&req.method==='GET'){try{const teamId=teamScheduleRoute[1];teamAccounts.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''),teamId,false);return send(res,200,{teamId,games:teamAccounts.schedule(teamId)});}catch(e){return send(res,403,{error:e.message});}}
   const teamRoute=pathname.match(/^\/api\/team\/v1\/teams\/([-\w]+)(?:\/games\/([-\w]+)\/lineup|\/roster)?$/);
   const gameSummary=pathname.match(new RegExp('^/api/team/v1/teams/([-\\w]+)/games/([-\\w]+)/summary$'));
