@@ -47,9 +47,9 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
     reply(404,{error:'Unknown family endpoint'});return true;
    }
    const user=portal.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));
-   if(route==='family/provision'&&req.method==='POST'){reply(201,portal.provisionFamily(user,await body()));return true;}
-   if(route==='family/grants'&&req.method==='POST'){reply(201,portal.grantGuardian(user,await body()));return true;}
-   if(route==='family/grants/revoke'&&req.method==='POST'){reply(200,portal.revokeGuardian(user,await body()));return true;}
+   if(route==='guardian-admin/provision'&&req.method==='POST'){reply(201,portal.provisionFamily(user,await body()));return true;}
+   if(route==='guardian-admin/grants'&&req.method==='POST'){reply(201,portal.grantGuardian(user,await body()));return true;}
+   if(route==='guardian-admin/grants/revoke'&&req.method==='POST'){reply(200,portal.revokeGuardian(user,await body()));return true;}
    const documents=route.match(/^players\/([-\w]+)\/documents$/);
    if(documents&&req.method==='GET'){reply(200,{documents:portal.listDocuments(user,documents[1])});return true;}
    if(documents&&req.method==='POST'){const b=await documentBody();reply(201,portal.uploadDocument(user,{...b,playerId:documents[1]}));return true;}
