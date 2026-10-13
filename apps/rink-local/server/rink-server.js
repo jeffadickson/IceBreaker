@@ -12,9 +12,11 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
  const broadcast=()=>{const msg=`id: ${authority.state.revision}\nevent: snapshot\ndata: ${JSON.stringify(authority.spectator())}\n\n`;for(const r of clients){try{r.write(msg);}catch{clients.delete(r);}}};
  const auth=req=>{const k=req.headers['x-operator-key'];return typeof k==='string'&&k.length===operatorKey.length&&crypto.timingSafeEqual(Buffer.from(k),Buffer.from(operatorKey));};
  async function readBody(req){let body='';for await(const chunk of req){body+=chunk;if(body.length>16_384)throw Error('Request too large');}return JSON.parse(body);}
+ const registrationHttp=require('./registration-http').createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth:auth});
  const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png'};
  const ticker=setInterval(()=>{if(authority.state.running)broadcast();},1000);ticker.unref();
  const server=http.createServer(async(req,res)=>{let pathname;try{pathname=new URL(req.url,'http://localhost').pathname;}catch{return send(res,400,{error:'Bad URL'});}
+  if(pathname.startsWith('/api/registration/v1/'))return registrationHttp.handle(req,res,pathname);
   if(pathname.startsWith('/api/parent/'))return parentAuth.handle(req,res,pathname,new URL(req.url,'http://localhost'));
   if(pathname==='/api/team/v1/login'&&req.method==='POST'){try{const b=await readBody(req);return send(res,200,teamAccounts.login(b.email,b.password));}catch(e){return send(res,401,{error:e.message});}}
   if(pathname==='/api/team/v1/admin/accounts'&&req.method==='POST'){if(!auth(req))return send(res,403,{error:'League administrator credential required'});try{const b=await readBody(req);return send(res,201,teamAccounts.createUser(b.email,b.password,b.teamId,b.role));}catch(e){return send(res,400,{error:e.message});}}
@@ -111,7 +113,7 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
   const file=path.resolve(root,'.'+(pathname==='/'?'/operator.html':pathname));if(!file.startsWith(root+path.sep))return send(res,403,{error:'Forbidden'});
   try{const data=fs.readFileSync(file);res.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','X-Content-Type-Options':'nosniff'});res.end(data);}catch{return send(res,404,{error:'Not found'});}
  });
- return {server,authority,start:()=>new Promise(resolve=>server.listen(port,host,()=>resolve(server.address()))),stop:()=>new Promise(resolve=>{clearInterval(ticker);for(const c of clients)c.end();server.close(()=>{authority.close();leagueStore.close();teamAccounts.close();parentAuth.close();resolve();});})};
+ return {server,authority,start:()=>new Promise(resolve=>server.listen(port,host,()=>resolve(server.address()))),stop:()=>new Promise(resolve=>{clearInterval(ticker);for(const c of clients)c.end();server.close(()=>{authority.close();leagueStore.close();teamAccounts.close();registrationHttp.close();parentAuth.close();resolve();});})};
 }
 if(require.main===module){const app=createRinkServer({dbPath:process.env.ICEBREAKER_DB||path.join(__dirname,'../data/demo.db'),host:process.env.HOST||'127.0.0.1',port:Number(process.env.PORT||8090)});app.start().then(a=>console.log(`Icebreaker backend: http://127.0.0.1:${a.port}/operator.html\nParent view: http://127.0.0.1:${a.port}/live.html`));}
 module.exports={createRinkServer};
