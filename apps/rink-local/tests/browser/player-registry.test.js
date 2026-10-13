@@ -65,7 +65,7 @@ test('annual training blocks only required seasons and preserves prior-year evid
  assert.equal(pregameSnapshot(x.teams.db,game.id).ready,true);
  const completion=x.players.db.prepare('SELECT id FROM player_training_completions WHERE player_id=?').get(player.id);
  // A revocation after lineup confirmation must invalidate pregame readiness.
- x.players.db.prepare('UPDATE player_training_completions SET revoked_at=? WHERE id=?').run(new Date().toISOString(),completion.id);
+ x.players.revokeTraining(completion.id,'Verification rescinded','league-admin');
  assert.equal(pregameSnapshot(x.teams.db,game.id).ready,false);
  assert.equal(x.teams.getLineup('maple',game.id).players.find(p=>p.id===player.id).eligible,false);
 });
