@@ -69,6 +69,14 @@ test('annual training blocks only required seasons and preserves prior-year evid
  assert.equal(pregameSnapshot(x.teams.db,game.id).ready,false);
  assert.equal(x.teams.getLineup('maple',game.id).players.find(p=>p.id===player.id).eligible,false);
 });
+test('registrar can enroll before team account tables exist',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'icebreaker-registrar-')),file=path.join(dir,'league.db');
+ const league=new LeagueStore(file,{seedDemo:true}),players=new PlayerRegistry(file);
+ t.after(()=>{players.close();league.close();fs.rmSync(dir,{recursive:true,force:true});});
+ const {playerId}=players.createPlayer({displayName:'New',legalName:'New Private',birthDate:'2016-05-02'},'registrar');
+ assert.equal(players.enroll(playerId,'maple',{jersey:63,position:'F'},'registrar').playerId,playerId);
+ assert.equal(players.history(playerId).length,1);
+});
 test('invalid private profiles and unverified training cannot be silently accepted',t=>{
  const x=setup();t.after(()=>x.close());
  assert.throws(()=>x.players.createPlayer({displayName:'A',legalName:'B',birthDate:'2026-02-30'},'registrar'),/Invalid/);
