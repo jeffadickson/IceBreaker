@@ -19,7 +19,8 @@ class RegistrationPortal{
    "CREATE TABLE IF NOT EXISTS registration_users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('CLUB_REGISTRAR','LEAGUE_ADMIN')),scope_id TEXT NOT NULL,created_at TEXT NOT NULL)",
    'CREATE TABLE IF NOT EXISTS registration_sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES registration_users(id),expires_ms INTEGER NOT NULL)',
    "CREATE TABLE IF NOT EXISTS registration_requests(id TEXT PRIMARY KEY,club_id TEXT NOT NULL REFERENCES registration_clubs(id),league_id TEXT NOT NULL REFERENCES leagues(id),player_id TEXT NOT NULL REFERENCES players(id),team_id TEXT NOT NULL REFERENCES teams(id),jersey INTEGER NOT NULL,position TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('SUBMITTED','APPROVED','REJECTED')),created_by TEXT NOT NULL,created_at TEXT NOT NULL,decided_by TEXT,decided_at TEXT,decision_reason TEXT)",
-   "CREATE UNIQUE INDEX IF NOT EXISTS registration_open_request ON registration_requests(club_id,player_id,team_id) WHERE status='SUBMITTED'"
+   "CREATE UNIQUE INDEX IF NOT EXISTS registration_open_request ON registration_requests(club_id,player_id,team_id) WHERE status='SUBMITTED'",
+   'CREATE TABLE IF NOT EXISTS registration_division_age_rules(division_id TEXT PRIMARY KEY REFERENCES divisions(id),cutoff_date TEXT NOT NULL,min_age INTEGER NOT NULL,max_age INTEGER NOT NULL,CHECK(min_age>=0 AND max_age>=min_age AND max_age<=99))'
   ].join(';')+';');
  }
  tx(fn){this.db.exec('BEGIN IMMEDIATE');try{const x=fn();this.db.exec('COMMIT');return x;}catch(e){this.db.exec('ROLLBACK');throw e;}}
@@ -94,11 +95,28 @@ class RegistrationPortal{
   };return withinTransaction?apply():this.tx(apply);
  }
  requests(u){const field=u.role==='CLUB_REGISTRAR'?'club_id':'league_id';return this.db.prepare('SELECT r.id requestId,r.club_id clubId,r.player_id playerId,p.display_name displayName,r.team_id teamId,r.jersey,r.position,r.status,r.created_at createdAt,r.decision_reason decisionReason FROM registration_requests r JOIN players p ON p.id=r.player_id WHERE r.'+field+'=? ORDER BY r.created_at DESC,r.id DESC LIMIT 500').all(u.scopeId);}
+ setAgeRule(u,{divisionId,cutoffDate,minAge,maxAge}){
+  const {validDate}=require('./player-suspensions');
+  const row=this.db.prepare('SELECT ls.league_id leagueId FROM divisions d JOIN league_seasons ls ON ls.season_id=d.season_id WHERE d.id=?').get(divisionId);
+  if(!row)throw Error('Unknown division');this.requireLeague(u,row.leagueId);
+  if(!validDate(cutoffDate)||!Number.isInteger(minAge)||!Number.isInteger(maxAge)||minAge<0||maxAge>99||maxAge<minAge)throw Error('Invalid age rule');
+  return this.tx(()=>{
+   this.db.prepare('INSERT INTO registration_division_age_rules VALUES(?,?,?,?) ON CONFLICT(division_id) DO UPDATE SET cutoff_date=excluded.cutoff_date,min_age=excluded.min_age,max_age=excluded.max_age').run(divisionId,cutoffDate,minAge,maxAge);
+   this.audit('DIVISION_AGE_RULE_SET',divisionId,u.id,{cutoffDate,minAge,maxAge});
+   return {divisionId,cutoffDate,minAge,maxAge};
+  });
+ }
  decide(u,requestId,{decision,reason}){
   if(!['APPROVED','REJECTED'].includes(decision)||!good(reason,300))throw Error('Decision and reason required');
   return this.tx(()=>{const r=this.db.prepare('SELECT * FROM registration_requests WHERE id=?').get(requestId);if(!r)throw Error('Unknown request');this.requireLeague(u,r.league_id);if(r.status!=='SUBMITTED')throw Error('Request already decided');
    if(decision==='APPROVED'){
     if(!this.db.prepare('SELECT 1 FROM registration_club_teams WHERE club_id=? AND team_id=?').get(r.club_id,r.team_id)||!this.owns(r.club_id,r.player_id))throw Error('Club scope changed');
+    const division=this.db.prepare('SELECT division_id FROM teams WHERE id=?').get(r.team_id);
+    const rule=this.db.prepare('SELECT * FROM registration_division_age_rules WHERE division_id=?').get(division.division_id);
+    if(rule){
+     const age=this.registry.ageAt(r.player_id,rule.cutoff_date);
+     if(age<rule.min_age||age>rule.max_age)throw Error('Player outside configured division age eligibility');
+    }
     this.registry.enroll(r.player_id,r.team_id,{jersey:r.jersey,position:r.position,reason:'LEAGUE_APPROVED'},u.id,{withinTransaction:true});
    }
    this.db.prepare('UPDATE registration_requests SET status=?,decided_by=?,decided_at=?,decision_reason=? WHERE id=?').run(decision,u.id,new Date().toISOString(),reason.trim(),requestId);
