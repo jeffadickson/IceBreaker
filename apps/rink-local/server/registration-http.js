@@ -18,7 +18,7 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
   }
   const reply=(code,data)=>send(res,code,data);
   try{
-   if(route==='login'&&req.method==='POST'){const b=await body();reply(200,portal.login(b.email,b.password));return true;}
+   if(route==='login'&&req.method==='POST'){const b=await body();reply(200,portal.login(b.email,b.password,b.mfaCode||null));return true;}
    if(route.startsWith('bootstrap/')&&req.method==='POST'){
     if(!bootstrapAuth(req)){reply(403,{error:'Development bootstrap credential required'});return true;}
     const b=await body();
@@ -59,6 +59,8 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
    if(document&&req.method==='GET'){const d=portal.readDocument(user,document[1]);reply(200,{mime:d.mime,base64:d.data.toString('base64')});return true;}
    const documentDecisionRoute=route.match(/^documents\/([-\w]+)\/decision$/);
    if(documentDecisionRoute&&req.method==='POST'){const b=await body();reply(200,portal.documentDecision(user,documentDecisionRoute[1],b.decision,b.note));return true;}
+   if(route==='mfa/setup'&&req.method==='POST'){reply(200,portal.beginMfa(user));return true;}
+   if(route==='mfa/confirm'&&req.method==='POST'){const b=await body();reply(200,portal.confirmMfa(user,b.code));return true;}
    if(route==='context'&&req.method==='GET'){reply(200,{role:user.role,scopeId:user.scopeId,teams:portal.teams(user)});return true;}
    if(route==='players'&&req.method==='GET'){reply(200,{players:portal.players(user)});return true;}
    if(route==='players'&&req.method==='POST'){reply(201,portal.createPlayer(user,await body()));return true;}
