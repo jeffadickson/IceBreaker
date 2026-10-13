@@ -101,6 +101,18 @@ test('club-managed team manager cannot bypass league approval with roster edit',
  assert.throws(()=>x.teamAccounts.editRoster('maple','manager',{playerId:'rogue-player',displayName:'Rogue',jersey:77,position:'F',expectedRevision:0}),/League-approved club roster/);
  assert.equal(x.teamAccounts.roster('maple').some(p=>p.id==='rogue-player'),false);
 });
+test('league-configured division age cutoff rejects out-of-range approval atomically',t=>{
+ const x=setup();t.after(()=>x.close());
+ const {playerId}=x.portal.createPlayer(x.a,{displayName:'Young Player',legalName:'Private Young',birthDate:'2020-03-03'});
+ assert.throws(()=>x.portal.setAgeRule(x.a,{divisionId:'demo-10u',cutoffDate:'2026-12-31',minAge:8,maxAge:10}),/access denied/);
+ x.portal.setAgeRule(x.admin,{divisionId:'demo-10u',cutoffDate:'2026-12-31',minAge:8,maxAge:10});
+ const request=x.portal.submit(x.a,{playerId,teamId:'maple',jersey:55,position:'F'});
+ assert.throws(()=>x.portal.decide(x.admin,request.requestId,{decision:'APPROVED',reason:'Check age'}),/age eligibility/);
+ assert.equal(x.portal.requests(x.admin).find(r=>r.requestId===request.requestId).status,'SUBMITTED');
+ assert.equal(x.portal.db.prepare('SELECT COUNT(*) n FROM roster_memberships WHERE player_id=?').get(playerId).n,0);
+ x.portal.setAgeRule(x.admin,{divisionId:'demo-10u',cutoffDate:'2026-12-31',minAge:6,maxAge:10});
+ assert.equal(x.portal.decide(x.admin,request.requestId,{decision:'APPROVED',reason:'Age eligible'}).status,'APPROVED');
+});
 test('annual rollover proposes same permanent ID into next-season club team',t=>{
  const x=setup();t.after(()=>x.close());
  const {playerId}=x.portal.createPlayer(x.a,{displayName:'Rollover Alias',legalName:'Private Rollover',birthDate:'2016-03-03'});
