@@ -108,7 +108,7 @@ class PlayerRegistry{
    if(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_roster_revisions'").get()){
     for(const changed of [teamId,...previous.map(x=>x.team_id)]){
      const rev=this.db.prepare('SELECT COALESCE(MAX(revision),0)+1 n FROM team_roster_revisions WHERE team_id=?').get(changed).n;
-     this.db.prepare('INSERT INTO team_roster_revisions VALUES(?,?,?,?,?)'.replace('?,?,?,?,?','?,?,?,?'))
+     this.db.prepare('INSERT INTO team_roster_revisions VALUES(?,?,?,?)')
       .run(changed,rev,now,actor);
     }
    }
