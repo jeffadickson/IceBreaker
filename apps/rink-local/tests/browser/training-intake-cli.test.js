@@ -1,0 +1,66 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const crypto=require('node:crypto'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {LeagueStore}=require('../../server/league-store');
+const {PlayerRegistry}=require('../../server/player-registry');
+const training=require('../../server/training-catalog');
+const intake=require('../../server/training-intake');
+const cli=require('../../server/icebreaker-admin');
+function setup(t){
+ const old=process.env.ICEBREAKER_INGEST_HMAC_KEY_BASE64;
+ process.env.ICEBREAKER_INGEST_HMAC_KEY_BASE64=crypto.randomBytes(32).toString('base64');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-intake-')),file=path.join(dir,'league.db');
+ const league=new LeagueStore(file,{seedDemo:true}),registry=new PlayerRegistry(file);
+ intake.init(league.db);
+ t.after(()=>{registry.close();league.close();fs.rmSync(dir,{recursive:true,force:true});if(old===undefined)delete process.env.ICEBREAKER_INGEST_HMAC_KEY_BASE64;else process.env.ICEBREAKER_INGEST_HMAC_KEY_BASE64=old;});
+ const playerId=registry.createPlayer({displayName:'Test Alias',legalName:'Fictional Test',birthDate:'2016-01-01'},'registrar').playerId;
+ const course=training.createTraining(league.db,{code:'ANTI_BULLYING',title:'Anti-bullying'},'admin');
+ training.addPolicy(league.db,{trainingId:course.trainingId,scopeType:'LEAGUE',scopeId:'demo-league',seasonId:'demo-2026',role:'PLAYER',renewalMode:'ANNUAL_SEASON',effectiveFrom:'2026-09-01'},'admin');
+ return {db:league.db,file,playerId,course};
+}
+const policy=(x,date='2026-10-13')=>training.status(x.db,{subjectType:'PLAYER',subjectId:x.playerId,role:'PLAYER',scopeType:'LEAGUE',scopeId:'demo-league',seasonId:'demo-2026',date});
+test('email-derived metadata is pending only and does not satisfy lineup training',t=>{
+ const x=setup(t);
+ const data={sourceType:'EMAIL',sourceId:'fictional-mail-id-001',trainingId:x.course.trainingId,subjectType:'PLAYER',subjectId:x.playerId,completedOn:'2026-10-01',verification:'REVIEW_REQUIRED'};
+ const opts={actor:'email-parser',json:'-'};const readJson=()=>data;
+ const first=cli.execute(x.db,'ingest',opts,{readJson});
+ assert.equal(first.state,'PENDING');
+ assert.equal(policy(x)[0].eligible,false);
+ const again=cli.execute(x.db,'ingest',opts,{readJson});
+ assert.equal(again.duplicate,true);assert.equal(again.intakeId,first.intakeId);
+ assert.equal(x.db.prepare('SELECT COUNT(*) n FROM training_intake').get().n,1);
+ assert.equal(x.db.prepare('SELECT COUNT(*) n FROM training_completions_v2').get().n,0);
+ const raw=JSON.stringify(x.db.prepare('SELECT * FROM training_intake WHERE id=?').get(first.intakeId));
+ assert.equal(raw.includes('fictional-mail-id-001'),false);
+ assert.throws(()=>cli.execute(x.db,'verify',{intake:first.intakeId,actor:'registrar',note:'Checked'}),/attest-reviewed/);
+ const result=cli.execute(x.db,'verify',{intake:first.intakeId,actor:'registrar',note:'Verified against original certificate',attestReviewed:true});
+ assert.equal(result.state,'VERIFIED');assert.ok(result.completionId);
+ assert.equal(policy(x)[0].eligible,true);
+ assert.throws(()=>cli.execute(x.db,'verify',{intake:first.intakeId,actor:'registrar',note:'again',attestReviewed:true}),/already reviewed/);
+ assert.equal(x.db.prepare('SELECT COUNT(*) n FROM training_completions_v2').get().n,1);
+});
+test('duplicate source IDs with conflicting data fail closed and rejection never creates evidence',t=>{
+ const x=setup(t),data={sourceType:'EMAIL',sourceId:'mail-002',trainingId:x.course.trainingId,subjectType:'PLAYER',subjectId:x.playerId,completedOn:'2026-10-02'};
+ const result=intake.stage(x.db,data,'parser');
+ assert.throws(()=>intake.stage(x.db,{...data,completedOn:'2026-10-03'},'parser'),/different certificate/);
+ assert.throws(()=>intake.stage(x.db,{...data,subjectId:'unknown'},'parser'),/Unknown participant/);
+ assert.throws(()=>cli.execute(x.db,'ingest',{actor:'parser',json:'-'},{readJson:()=>({...data,verification:'VERIFIED'})}),/cannot mark/);
+ assert.equal(intake.list(x.db,{state:'PENDING'}).length,1);
+ assert.equal(intake.decide(x.db,result.intakeId,{decision:'REJECTED',reviewer:'registrar',note:'Invalid certificate'}).state,'REJECTED');
+ assert.equal(intake.list(x.db,{state:'PENDING'}).length,0);
+ assert.equal(policy(x)[0].eligible,false);
+ assert.equal(x.db.prepare('SELECT COUNT(*) n FROM training_completions_v2').get().n,0);
+});
+test('CLI rejects raw email fields and oversized metadata; JSON code lookup works',t=>{
+ const x=setup(t);
+ const file=path.join(path.dirname(x.file),'sample.json');
+ fs.writeFileSync(file,JSON.stringify({sourceType:'EMAIL',sourceId:'mail-003',trainingCode:'ANTI_BULLYING',subjectType:'PLAYER',subjectId:x.playerId,completedOn:'2026-10-02'}));
+ const result=cli.execute(x.db,'ingest',{actor:'parser',json:file});
+ assert.equal(result.state,'PENDING');
+ assert.equal(cli.execute(x.db,'pending',{}).items.length,1);
+ fs.writeFileSync(file,JSON.stringify({sourceType:'EMAIL',sourceId:'mail-004',trainingCode:'ANTI_BULLYING',subjectType:'PLAYER',subjectId:x.playerId,completedOn:'2026-10-02',rawEmail:'do not store'}));
+ assert.throws(()=>cli.execute(x.db,'ingest',{actor:'parser',json:file}),/Unknown metadata field/);
+ fs.writeFileSync(file,' '.repeat(32769));
+ assert.throws(()=>cli.inputJson(file),/32 KiB/);
+ assert.throws(()=>cli.argsOf(['ingest','--db',x.file,'--bad-option','x']),/Unknown option/);
+});
