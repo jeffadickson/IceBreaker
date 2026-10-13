@@ -1,4 +1,5 @@
 'use strict';
+const {activeForGame}=require('./player-suspensions');
 // Game-bound roster gate for the local rink authority. Uses the persistent
 // team confirmation snapshot, not the mutable season roster, to validate play.
 const ATTR_FIELDS = {
@@ -17,13 +18,14 @@ function snapshotForGame(db,gameId){
     const ids=new Set(selection);
     const members=db.prepare('SELECT r.player_id id,r.jersey jersey,p.display_name name,r.position position FROM roster_memberships r JOIN teams t ON t.id=r.team_id JOIN divisions d ON d.id=t.division_id AND d.season_id=r.season_id JOIN players p ON p.id=r.player_id WHERE r.team_id=? ORDER BY r.jersey').all(teamId);
     const eligible=members.filter(p=>ids.has(p.id));
-    result.teams[side]={teamId,confirmed:!!row,revision:row?.roster_revision??null,confirmedAt:row?.confirmed_at??null,players:eligible};
+    const suspensions=activeForGame(db,gameId,eligible.map(p=>p.id));
+    result.teams[side]={teamId,confirmed:!!row,eligible:suspensions.length===0,suspensions,revision:row?.roster_revision??null,confirmedAt:row?.confirmed_at??null,players:eligible};
   }
-  result.confirmed=result.teams.home.confirmed&&result.teams.away.confirmed;
+  result.confirmed=result.teams.home.confirmed&&result.teams.away.confirmed&&result.teams.home.eligible&&result.teams.away.eligible;
   return result;
 }
 function assertGameRosterEligible(snapshot,command,lookupGoalTeam){
-  if(!snapshot?.confirmed)throw Error('Both teams must confirm the game-day rosters before player events');
+  if(!snapshot?.confirmed)throw Error('Both teams must confirm eligible, non-suspended game-day rosters before player events');
   const fields=ATTR_FIELDS[command?.type];
   if(!fields&&command?.type!=='GOAL_ATTRIBUTION_CORRECTED')return;
   const team=command.type==='GOAL_ATTRIBUTION_CORRECTED'?lookupGoalTeam?.(command.originalEventId):command.team;
