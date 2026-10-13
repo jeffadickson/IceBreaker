@@ -13,6 +13,7 @@ class LeagueStore {
    CREATE TABLE IF NOT EXISTS leagues(id TEXT PRIMARY KEY,name TEXT NOT NULL,public_scoreboard_enabled INTEGER NOT NULL DEFAULT 1 CHECK(public_scoreboard_enabled IN (0,1)),timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles');
    CREATE TABLE IF NOT EXISTS league_seasons(league_id TEXT NOT NULL REFERENCES leagues(id),season_id TEXT NOT NULL REFERENCES seasons(id),PRIMARY KEY(league_id,season_id),UNIQUE(season_id));
    CREATE TABLE IF NOT EXISTS divisions(id TEXT PRIMARY KEY,season_id TEXT NOT NULL REFERENCES seasons(id),name TEXT NOT NULL,rules_version TEXT NOT NULL);
+   CREATE TABLE IF NOT EXISTS division_timing_rules(division_id TEXT NOT NULL REFERENCES divisions(id),version TEXT NOT NULL,rules_json TEXT NOT NULL,PRIMARY KEY(division_id,version));
    CREATE TABLE IF NOT EXISTS teams(id TEXT PRIMARY KEY,division_id TEXT NOT NULL REFERENCES divisions(id),name TEXT NOT NULL,short TEXT NOT NULL,city TEXT NOT NULL,tone TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY,display_name TEXT NOT NULL,privacy_status TEXT NOT NULL DEFAULT 'PUBLIC_ALIAS');
    CREATE TABLE IF NOT EXISTS roster_memberships(season_id TEXT NOT NULL REFERENCES seasons(id),team_id TEXT NOT NULL REFERENCES teams(id),player_id TEXT NOT NULL REFERENCES players(id),jersey INTEGER NOT NULL,position TEXT NOT NULL,PRIMARY KEY(season_id,team_id,player_id));
@@ -26,6 +27,10 @@ class LeagueStore {
   // Backward-compatible mapping for existing single-league prototype databases.
   this.db.prepare("INSERT OR IGNORE INTO leagues(id,name,public_scoreboard_enabled,timezone) VALUES('demo-league','Demonstration League',1,'America/Los_Angeles')").run();
   this.db.prepare("INSERT OR IGNORE INTO league_seasons(league_id,season_id) SELECT 'demo-league',id FROM seasons WHERE id NOT IN (SELECT season_id FROM league_seasons)").run();
+  // Existing divisions acquire a default versioned regulation timing policy.
+  const {DEFAULT_TIMING}=require('./game-timing-rules');
+  const addTiming=this.db.prepare('INSERT OR IGNORE INTO division_timing_rules(division_id,version,rules_json) VALUES(?,?,?)');
+  for(const d of this.db.prepare('SELECT id,rules_version FROM divisions').all())addTiming.run(d.id,d.rules_version,JSON.stringify(DEFAULT_TIMING));
  }
  tx(action){this.db.exec('BEGIN IMMEDIATE');try{const value=action();this.db.exec('COMMIT');return value;}catch(e){this.db.exec('ROLLBACK');throw e;}}
  audit(action,id,payload,actor='system'){this.db.prepare('INSERT INTO league_audit VALUES(?,?,?,?,?,?)').run(crypto.randomUUID(),new Date().toISOString(),actor,action,id,JSON.stringify(payload));}
@@ -68,6 +73,8 @@ class LeagueStore {
   const live=authority?.spectator();const schedule=fixtures.map(g=>g.status==='live'&&live?{...g,homeScore:live.scores.home,awayScore:live.scores.away,period:live.period,seconds:live.seconds,updatedRevision:live.revision}:g);
   return {schemaVersion:2,source:'SQLITE_DEMONSTRATION_LEAGUE',message:'Fictional demonstration teams and players; not real league results.',season:{id:'demo-2026',name:'Demo 2026 Fall'},division:{id:'demo-10u',name:'10U demonstration'},standingsPolicy:{id:'DEMO-2-1-0-v1',win:2,tie:1,loss:0,tiebreakers:['points','wins','goal differential','team ID'],certifiedOnly:true},teams,players:Object.values(stats).map(p=>({...p,pts:p.g+p.a})).sort((a,b)=>b.pts-a.pts||b.g-a.g||a.id.localeCompare(b.id)),standings:Object.values(rows).map(x=>({...x,diff:x.gf-x.ga})).sort((a,b)=>b.points-a.points||b.wins-a.wins||b.gf-b.ga-(a.gf-a.ga)||a.teamId.localeCompare(b.teamId)),schedule,revision:live?.revision??0};
  }
+ timingForDivision(divisionId){const row=this.db.prepare('SELECT d.rules_version AS version,r.rules_json AS rules FROM divisions d JOIN division_timing_rules r ON r.division_id=d.id AND r.version=d.rules_version WHERE d.id=?').get(divisionId);if(!row)throw Error('Division timing rules unavailable');const {validateTiming}=require('./game-timing-rules');return {divisionId,version:row.version,...validateTiming(JSON.parse(row.rules))};}
+ configureDivisionTiming(divisionId,version,rules,{actor='league-admin'}={}){if(!/^[-\\w.]{1,80}$/.test(version))throw Error('Invalid rules version');const {validateTiming}=require('./game-timing-rules');const checked=validateTiming(rules);return this.tx(()=>{const d=this.db.prepare('SELECT rules_version FROM divisions WHERE id=?').get(divisionId);if(!d)throw Error('Unknown division');const hasActive=this.db.prepare("SELECT 1 FROM games WHERE division_id=? AND status IN ('live','final') LIMIT 1").get(divisionId);if(hasActive)throw Error('Cannot change division timing policy after games have started; create a new division/ruleset revision through an authorized migration');this.db.prepare('INSERT INTO division_timing_rules VALUES(?,?,?)').run(divisionId,version,JSON.stringify(checked));this.db.prepare('UPDATE divisions SET rules_version=? WHERE id=?').run(version,divisionId);this.audit('DIVISION_TIMING_UPDATED',divisionId,{version,...checked},actor);return {divisionId,version,...checked};});}
  close(){this.db.close();}
 }
 module.exports={LeagueStore};
