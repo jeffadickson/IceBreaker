@@ -15,6 +15,7 @@
 <section><h2>Players in my scope</h2><label>Select player<select id="player"></select></label><button id="showProfile">View private profile (authorized staff only)</button><pre id="profile">Private profile not loaded</pre></section>
 <section id="familyPanel"><h2>Club registrar · Linked parent or guardian</h2><p class="muted">Linking a contact does not automatically grant portal access or prove legal guardianship.</p><div class="grid"><label>Full name<input id="contactName"></label><label>Email<input id="contactEmail" type="email"></label><label>Phone<input id="contactPhone"></label><label>Relationship<select id="relationship"><option>PARENT</option><option>GUARDIAN</option><option>EMERGENCY_CONTACT</option><option>OTHER</option></select></label></div><button id="addContact">Add related person to selected player</button></section>
 <section id="submissionPanel"><h2>Club registrar · Submit season roster</h2><div class="grid"><label>Team / season<select id="team"></select></label><label>Jersey<input id="jersey" type="number" min="0" max="99"></label><label>Position<select id="position"><option>F</option><option>D</option><option>G</option><option>C</option><option>LW</option><option>RW</option><option>LD</option><option>RD</option></select></label></div><button id="submit">Submit for league approval</button></section>
+<section id="rolloverPanel"><h2>Club registrar · Annual rollover</h2><p class="muted">Preview existing players from a prior-season team into a new-season team. Nothing is changed until you submit the resulting pending approvals.</p><div class="grid"><label>Prior-season team<select id="fromTeam"></select></label><label>Next-season team<select id="toTeam"></select></label></div><button id="rolloverPreview">Preview rollover</button><button id="rolloverSubmit" disabled>Submit rollover for league approval</button><pre id="rolloverResults"></pre></section>
 <section id="csvPanel"><h2>Club registrar · CSV import</h2><p class="muted">CSV columns: playerId,teamId,jersey,position. Existing permanent player IDs only. Preview does not change any records; submitting creates pending approvals atomically.</p><input id="csv" type="file" accept=".csv,text/csv"><button id="preview">Preview CSV</button><button id="submitCsv" disabled>Submit validated rows</button><pre id="csvResults"></pre></section>
 <section><h2>Roster approval queue</h2><div id="requests"></div></section>
 <section id="leaguePanel"><h2>League administrator · Annual training</h2>
@@ -26,7 +27,7 @@
 <script>
 'use strict';
 (()=>{
-const $=id=>document.getElementById(id);let token='',context=null,players=[],previewRows=[];
+const $=id=>document.getElementById(id);let token='',context=null,players=[],previewRows=[],rolloverRows=[];
 const status=(s,error=false)=>{$('status').textContent=s;$('status').style.color=error?'#ffb2a7':'#9ae6bd';};
 async function api(path,method='GET',body){const r=await fetch('/api/registration/v1/'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});const x=await r.json();if(!r.ok)throw Error(x.error||'Request failed');return x;}
 const safe=fn=>async()=>{try{await fn();}catch(e){status(e.message,true);}};
@@ -34,8 +35,8 @@ function options(id,rows,label){const el=$(id);el.replaceChildren();for(const r 
 async function refresh(){
  context=await api('context');const p=await api('players'),r=await api('requests');
  players=p.players;options('player',players,x=>x.displayName+' · '+x.id);
- options('team',context.teams,x=>x.name+' · '+x.seasonId);
- $('clubPanel').hidden=context.role!=='CLUB_REGISTRAR';$('familyPanel').hidden=context.role!=='CLUB_REGISTRAR';$('submissionPanel').hidden=context.role!=='CLUB_REGISTRAR';$('csvPanel').hidden=context.role!=='CLUB_REGISTRAR';$('leaguePanel').hidden=context.role!=='LEAGUE_ADMIN';
+ options('team',context.teams,x=>x.name+' · '+x.seasonId);options('fromTeam',context.teams,x=>x.name+' · '+x.seasonId);options('toTeam',context.teams,x=>x.name+' · '+x.seasonId);
+ $('clubPanel').hidden=context.role!=='CLUB_REGISTRAR';$('familyPanel').hidden=context.role!=='CLUB_REGISTRAR';$('submissionPanel').hidden=context.role!=='CLUB_REGISTRAR';$('csvPanel').hidden=context.role!=='CLUB_REGISTRAR';$('rolloverPanel').hidden=context.role!=='CLUB_REGISTRAR';$('leaguePanel').hidden=context.role!=='LEAGUE_ADMIN';
  $('roleHeading').textContent=context.role==='LEAGUE_ADMIN'?'League Administration':'Club Registration';
  $('scope').textContent='Authorized scope: '+context.scopeId;
  if(context.role==='LEAGUE_ADMIN')$('leagueId').value=context.scopeId;
@@ -75,6 +76,8 @@ function parseCsv(text){
  if(!rows.length||rows[0].map(x=>x.trim()).join(',')!=='playerId,teamId,jersey,position')throw Error('Expected CSV header: playerId,teamId,jersey,position');
  return rows.slice(1).map(x=>{if(x.length!==4)throw Error('Each CSV row needs four columns');return {playerId:x[0].trim(),teamId:x[1].trim(),jersey:Number(x[2]),position:x[3].trim()};});
 }
+$('rolloverPreview').onclick=safe(async()=>{const x=await api('rollover/preview','POST',{fromTeamId:$('fromTeam').value,toTeamId:$('toTeam').value});$('rolloverResults').textContent=JSON.stringify(x.rows,null,2);rolloverRows=x.rows.map(r=>({playerId:r.playerId,teamId:r.teamId,jersey:r.jersey,position:r.position}));$('rolloverSubmit').disabled=!x.rows.length||x.rows.some(r=>!r.valid);status('Rollover preview ready; no roster changed.');});
+$('rolloverSubmit').onclick=safe(async()=>{if(!rolloverRows.length||!confirm('Submit these rollover requests for league approval?'))return;const x=await api('imports/submit','POST',{rows:rolloverRows});rolloverRows=[];$('rolloverSubmit').disabled=true;await refresh();status('Submitted '+x.submitted.length+' rollover requests.');});
 $('preview').onclick=safe(async()=>{const file=$('csv').files[0];if(!file)throw Error('Select CSV file');if(file.size>25000)throw Error('CSV must be under 25 KB');previewRows=parseCsv(await file.text());const x=await api('imports/preview','POST',{rows:previewRows});$('csvResults').textContent=JSON.stringify(x.rows,null,2);$('submitCsv').disabled=!x.rows.length||x.rows.some(r=>!r.valid);status('CSV preview complete.');});
 $('submitCsv').onclick=safe(async()=>{if(!previewRows.length||!confirm('Submit every validated CSV row for league approval?'))return;const x=await api('imports/submit','POST',{rows:previewRows});previewRows=[];$('submitCsv').disabled=true;await refresh();status('Submitted '+x.submitted.length+' roster requests.');});
 $('createRequirement').onclick=safe(async()=>{const x=await api('training/requirements','POST',{leagueId:$('leagueId').value,seasonId:$('seasonId').value,code:$('code').value,title:$('title').value,requiredBy:$('requiredBy').value||null,blocksLineup:true});$('requirementId').value=x.requirementId;status('Requirement created: '+x.requirementId);});
