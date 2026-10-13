@@ -28,3 +28,17 @@ jobs:
         run: dotnet test apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj -c Release
       - name: Build native Avalonia desktop
         run: dotnet build apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -c Release
+
+  windows-desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish native Windows x64 timekeeper
+        run: dotnet publish apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -c Release -r win-x64 --self-contained false -o out/desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IceBreaker-Timekeeper-win-x64
+          path: out/desktop/
