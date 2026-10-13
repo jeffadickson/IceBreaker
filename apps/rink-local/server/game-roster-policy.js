@@ -1,5 +1,6 @@
 'use strict';
-const {activeForGame}=require('./player-suspensions');
+const {activeForGame,gameDate}=require('./player-suspensions');
+const {trainingStatus}=require('./player-registry');
 // Game-bound roster gate for the local rink authority. Uses the persistent
 // team confirmation snapshot, not the mutable season roster, to validate play.
 const ATTR_FIELDS = {
@@ -19,7 +20,8 @@ function snapshotForGame(db,gameId){
     const members=db.prepare('SELECT r.player_id id,r.jersey jersey,p.display_name name,r.position position FROM roster_memberships r JOIN teams t ON t.id=r.team_id JOIN divisions d ON d.id=t.division_id AND d.season_id=r.season_id JOIN players p ON p.id=r.player_id WHERE r.team_id=? ORDER BY r.jersey').all(teamId);
     const eligible=members.filter(p=>ids.has(p.id));
     const suspensions=activeForGame(db,gameId,eligible.map(p=>p.id));
-    result.teams[side]={teamId,confirmed:!!row,eligible:suspensions.length===0,suspensions:suspensions.map(({playerId,startDate,endDate})=>({playerId,startDate,endDate})),revision:row?.roster_revision??null,confirmedAt:row?.confirmed_at??null,players:eligible};
+    const hasTraining=db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='season_training_requirements'").get();const day=hasTraining?gameDate(db,gameId):null;const trainingMissing=day?eligible.flatMap(p=>trainingStatus(db,p.id,teamId,day).filter(x=>x.blocksLineup&&!x.complete).map(x=>({playerId:p.id,code:x.code}))):[];
+    result.teams[side]={teamId,confirmed:!!row,eligible:suspensions.length===0&&trainingMissing.length===0,trainingMissing,suspensions:suspensions.map(({playerId,startDate,endDate})=>({playerId,startDate,endDate})),revision:row?.roster_revision??null,confirmedAt:row?.confirmed_at??null,players:eligible};
   }
   result.confirmed=result.teams.home.confirmed&&result.teams.away.confirmed&&result.teams.home.eligible&&result.teams.away.eligible;
   return result;
