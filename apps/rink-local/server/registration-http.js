@@ -3,6 +3,7 @@
 // ONLY for development provisioning, never to read private player records.
 const {RegistrationPortal}=require('./registration-portal');
 function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
+ if(process.env.ICEBREAKER_PRODUCTION_MODE==='1')throw Error('Private registration cannot start in production mode until KMS, malware scanning, MFA, consent and encrypted migration are implemented');
  const portal=new RegistrationPortal(dbPath);
  async function handle(req,res,pathname){
   if(!pathname.startsWith('/api/registration/v1/'))return false;
