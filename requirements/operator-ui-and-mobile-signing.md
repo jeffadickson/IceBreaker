@@ -27,6 +27,21 @@ Status: **development increment 1**. This document is a living UI specification;
 - SIGN-008 P1: Produce a certified PDF with verifiable digital signature, timestamps, audit trail and correction/resubmission history where required.
 - SIGN-009 P0: The mobile UI SHALL work without horizontal scrolling on a typical phone and support keyboard, touch and assistive technology.
 
+## Increment 2: single-screen, minimum-interaction entry and corrections
+
+- UI-011 P0: The **main game screen** SHALL always show both teams, score, period, authoritative time, running/paused status, and primary event actions. No tab navigation is required for routine goal, penalty, goalie or shot entry.
+- UI-012 P0: Team-specific action buttons SHALL preselect the team and open a compact modal entry overlay **over the scoreboard**, preserving visible context. Closing a draft SHALL never create a game event.
+- UI-013 P0: Draft fields SHALL remain freely editable before commit, with one explicit commit action. A cancelled draft SHALL not affect official state. The operator SHALL receive clear confirmation or an actionable validation error.
+- UI-014 P0: After commit, a correction SHALL reference the original event ID, operator identity, reason and an idempotency key, and be appended to the immutable audit/event history. Original events SHALL remain inspectable; no direct row overwrites.
+- UI-015 P0: The interface SHALL distinguish **draft edit**, **committed correction**, **void/reversal**, and **postgame certified-scoresheet amendment**. Unsupported correction types SHALL be disabled rather than faked as successful.
+- UI-016 P0: Corrections after scoresheet submission SHALL respect referee review and resubmission rules; signatures to older revisions SHALL not carry over silently.
+- UI-017 P0: Target routine unassisted goals in 2–3 selections, assisted goals in 3–5, and common minor penalties in 3–4, measured from the scoreboard using an already-selected approved roster. Do not sacrifice accurate attribution for a click-count target.
+- UI-018 P0: Popup opening, draft editing, and closing SHALL not pause, restart or advance the official clock. The clock remains controlled exclusively by the rink authority.
+- UI-019 P1: Support quick event correction from a recent-events list, prepopulating the last committed values, and require reason/confirmation only for post-commit amendments.
+- UI-020 P1: Measure median and 95th-percentile interaction time and error rate during full-game simulation; refine based on timekeeper feedback.
+
+**Correction support at this stage:** the authority supports audited `GOAL_ATTRIBUTION_CORRECTED` with an original event reference and reason. Postgame attribution correction requires the existing referee-requested correction/resubmission workflow. Arbitrary penalty editing, goal voiding and score reversals are **not yet general-purpose supported commands** and must not be exposed as operational UI actions until implemented and tested.
+
 ## Increment 1 implementation
 
 - Native Avalonia window: persistent score/clock header; four tabbed workflows; basic goal/assist and goalie event forms; existing penalty, phase, timeout and PA controls; committed event list.
