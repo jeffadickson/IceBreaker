@@ -80,3 +80,25 @@ test('HANDOFF-003: tampered manifest, divergent standby, changed central journal
  assert.equal(changed.status,401); // no station-signed restoration receipt
  assert.equal(x.central.db.prepare('SELECT station_id FROM game_owners WHERE game_id=?').get(x.gameId).station_id,'rink-a');
 });
+
+test('HANDOFF-004: new owner events after prepare invalidate an otherwise signed restore receipt',async t=>{
+ const x=await fixture(t);
+ x.command(x.a,{type:'SHOT_RECORDED',team:'home'});
+ await x.client('a',1).flush();
+ const pkg=(await x.post('/admin/games/prepare-handoff',{gameId:x.gameId,stationId:'rink-b'})).data;
+ restoreIdleStandby({dbPath:x.files.b,pkg,adminKey:ADMIN,gameId:x.gameId,stationId:'rink-b'});
+ x.command(x.a,{type:'SHOT_RECORDED',team:'away'});
+ await x.client('a',1).flush();
+ const receipt=JSON.stringify({gameId:x.gameId,stationId:'rink-b',digest:pkg.digest,expectedEpoch:1});
+ const stationSignature=crypto.sign(null,Buffer.from(receipt),x.keys.b.privateKey).toString('base64');
+ const result=await x.post('/admin/games/commit-handoff',{gameId:x.gameId,stationId:'rink-b',digest:pkg.digest,expectedEpoch:1,stationSignature});
+ assert.equal(result.status,409);
+ assert.equal(x.central.db.prepare('SELECT station_id FROM game_owners WHERE game_id=?').get(x.gameId).station_id,'rink-a');
+ assert.equal(x.central.snapshot(x.gameId).lastSequence,2);
+});
+test('HANDOFF-005: pinned game refuses unsafe legacy transfer path',async t=>{
+ const x=await fixture(t);
+ const result=await x.post('/admin/games/transfer',{gameId:x.gameId,stationId:'rink-b'});
+ assert.equal(result.status,409);
+ assert.match(result.data.error,/verified/);
+});
