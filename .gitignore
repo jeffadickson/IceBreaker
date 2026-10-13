@@ -21,3 +21,8 @@ __pycache__/
 
 # encrypted document objects and locally provisioned secrets
 **/private-document-vault/
+
+# Separate encrypted mock-email evidence archive and demo workspace
+**/encrypted-email-evidence.db*
+**/fictional-email.json
+**/demo-identity.json
