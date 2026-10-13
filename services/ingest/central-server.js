@@ -141,6 +141,7 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
     }
     if(!validId(b.stationId)||!validId(b.gameId))throw Object.assign(new Error('Invalid assignment'),{status:400});
     if(pathname==='/admin/games/transfer'){
+     if(db.prepare('SELECT 1 FROM handoff_policies WHERE game_id=?').get(b.gameId))throw Object.assign(new Error('Pinned game requires verified prepare/commit handoff'),{status:409});
      const dest=db.prepare('SELECT enabled FROM stations WHERE id=?').get(b.stationId);
      if(!dest||!dest.enabled)throw Object.assign(new Error('Target station unavailable'),{status:409});
      const owner=db.prepare('SELECT * FROM game_owners WHERE game_id=?').get(b.gameId);
