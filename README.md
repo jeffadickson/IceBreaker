@@ -50,6 +50,14 @@ An offline [IceBreaker admin CLI](apps/rink-local/server/icebreaker-admin.js) no
 
 A [mock league email demo](apps/rink-local/docs/mock-registration-email-demo.md) parses a fictional registration certificate, previews its claimed name against a selected permanent player record, and **requires an exact-name confirmation before writing anything**. On confirmation, it stages a pending intake and encrypts the PNG attachment into a **separate SQLite evidence archive**, with audit records and ClamAV quarantine handling. No actual mailbox or real minors' data are used. Run the local [demo script](apps/rink-local/server/demo-registration-email.js) to try it.
 
+## Database schemas and end-to-end league integration
+
+- [Database schema reference](apps/rink-local/docs/database-schemas.md): source-level DDL inventory for league, registration, family, training, encrypted evidence, central ingest and C# desktop databases, with privacy boundaries and key relationships.
+- [Exact SQLite schema generator](apps/rink-local/tools/generate-schema-reference.js): creates three fictional databases and documents every installed table, column, index and foreign key, including migrated fields.
+- [Full league simulation](apps/rink-local/docs/full-league-integration-simulation.md): 8 teams, 120 players, 56 games, certified standings, skater/goalie statistics, eligibility/suspension checks, plus a separate end-to-end timekeeper → referee → publication HTTP test.
+
+The simulation is a development integration baseline, not production deployment or a real-season data set.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
