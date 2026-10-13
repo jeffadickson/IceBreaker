@@ -1,11 +1,11 @@
 'use strict';
 // Versioned division timing policy. All clock values are integer seconds.
 // Default values preserve existing league configurations and event journals.
-const DEFAULT_TIMING=Object.freeze({periodCount:3,periodSeconds:900,warmupSeconds:300,intermissionSeconds:120,overtimeSeconds:0,clockMode:'STOP',showAuxiliaryClock:true,periodLengths:null,timeoutSeconds:0,timeoutsPerTeam:0,mercyRunningDifferential:0});
+const DEFAULT_TIMING=Object.freeze({periodCount:3,periodSeconds:900,warmupSeconds:300,intermissionSeconds:120,overtimeSeconds:0,clockMode:'STOP',showAuxiliaryClock:true,periodLengths:null,timeoutSeconds:0,timeoutsPerTeam:0,mercyRunningDifferential:0,hybridStopSeconds:120});
 function validateTiming(input={}){
  if(input===null||Array.isArray(input)||typeof input!=='object')throw Error('Invalid timing rules');
  const v={...DEFAULT_TIMING,...input};
- for(const [k,lo,hi] of [['periodCount',1,9],['periodSeconds',60,3600],['warmupSeconds',0,3600],['intermissionSeconds',0,3600],['overtimeSeconds',0,3600],['timeoutSeconds',0,600],['timeoutsPerTeam',0,9],['mercyRunningDifferential',0,99]]){
+ for(const [k,lo,hi] of [['periodCount',1,9],['periodSeconds',60,3600],['warmupSeconds',0,3600],['intermissionSeconds',0,3600],['overtimeSeconds',0,3600],['timeoutSeconds',0,600],['timeoutsPerTeam',0,9],['mercyRunningDifferential',0,99],['hybridStopSeconds',0,3600]]){
   if(!Number.isInteger(v[k])||v[k]<lo||v[k]>hi)throw Error('Invalid timing rule '+k);
  }
  if(!['STOP','RUNNING','HYBRID'].includes(v.clockMode))throw Error('Invalid timing rule clockMode');
