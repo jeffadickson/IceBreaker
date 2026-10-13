@@ -91,4 +91,4 @@ class PlayerRegistry{
  history(playerId){return this.db.prepare('SELECT season_id seasonId,team_id teamId,joined_at joinedAt,left_at leftAt,reason FROM player_membership_history WHERE player_id=? ORDER BY season_id,joined_at').all(playerId);}
  close(){this.db.close();}
 }
-module.exports={PlayerRegistry,initPlayerRegistry,trainingStatus};
+module.exports={PlayerRegistry,initPlayerRegistry:init,trainingStatus};
