@@ -9,7 +9,7 @@ namespace Icebreaker.Timekeeper.Desktop;
 /// Explicitly invoked PA speech. Neither synthesis nor playback touches the
 /// game clock or journal. Hosted speech is opt-in; offline speech is default.
 /// </summary>
-public sealed class AnnouncementSpeech(HttpClient http)
+public sealed class AnnouncementSpeech(HttpClient http, string? apiKeyOverride = null)
 {
     public const string DefaultInstructions =
         "You are a professional ice hockey arena public-address announcer. " +
@@ -41,7 +41,7 @@ public sealed class AnnouncementSpeech(HttpClient http)
             throw new ArgumentException("Voice instructions must be printable and at most 300 characters", nameof(instructions));
 
         // The key stays on the laptop and is never sent to the rink backend.
-        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        var apiKey = apiKeyOverride ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException("Set OPENAI_API_KEY to enable the optional AI voice.");
 
