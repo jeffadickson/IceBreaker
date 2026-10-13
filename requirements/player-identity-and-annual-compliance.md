@@ -6,7 +6,8 @@ Status: foundational schema and internal APIs implemented; administrator UI, pro
 
 - **PLAYER-001 P0:** Each player SHALL have a stable, generated, immutable UUID independent of team, division, season, jersey, or listed playing position.
 - **PLAYER-002 P0:** Store legal name, date of birth, and residential address in a **private** profile. Derive age at the league's published season eligibility cutoff; do not store a mutable age field.
-- **PLAYER-003 P0:** Link a player to one or more related people (parent, legal guardian, emergency contact, or other) by permanent person ID. A person may be related to multiple players. Relationship does not itself grant app access or legal guardianship authority.
+- **PLAYER-003 P0:** Link optional federation registration numbers or season-specific registration/ticket identifiers to the permanent player ID, with uniqueness checks and private storage.
+- **PLAYER-003A P0:** Link a player to one or more related people (parent, legal guardian, emergency contact, or other) by permanent person ID. A person may be related to multiple players. Relationship does not itself grant app access or legal guardianship authority.
 - **PLAYER-004 P0:** Keep season/team/jersey/position as a separate membership record. Retain historical team and division affiliation through season membership history.
 - **PLAYER-005 P0:** A new-season enrollment or approved transfer SHALL reuse the same player ID, preserving historical statistics, guardian links and verified training records.
 - **PLAYER-006 P0:** A same-season league transfer SHALL close the old membership and open the new one atomically. Confirmed live/scheduled game lineups require authorized amendment rather than silent reassignment.
@@ -25,7 +26,7 @@ Status: foundational schema and internal APIs implemented; administrator UI, pro
 
 ## Privacy and migration
 
-The new `player_private_profiles`, `player_related_people`, `player_person_links`, `season_training_requirements`, `player_training_completions` and `player_membership_history` tables live in the league SQLite database. The current registry is an internal module, with **no public API endpoints** for sensitive profiles. Legacy memberships are marked `LEGACY_IMPORT` because their true join dates are unknown.
+The new `player_private_profiles`, `player_registration_identifiers`, `player_related_people`, `player_person_links`, `season_training_requirements`, `player_training_completions` and `player_membership_history` tables live in the league SQLite database. The current registry is an internal module, with **no public API endpoints** for sensitive profiles. Legacy memberships are marked `LEGACY_IMPORT` because their true join dates are unknown.
 
 **Before production with real minors' data:** isolate sensitive records in a separately encrypted datastore or enable database encryption, enforce registrar-only access and parent/guardian consent/authorization, audit all reads and changes, implement retention/deletion policies and secure backups, verify legal requirements, and complete the identity-duplicate/merge review workflow. The existing development manager roster editor can still create a name-only placeholder; it must be replaced by registrar-controlled enrollment before production. Never import actual DOBs or addresses into the current development deployment.
 
