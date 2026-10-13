@@ -58,6 +58,12 @@ A [mock league email demo](apps/rink-local/docs/mock-registration-email-demo.md)
 
 The simulation is a development integration baseline, not production deployment or a real-season data set.
 
+## Multi-rink offline and ownership-fencing tests
+
+The [distributed recovery test suite](tests/integration/multi-rink-offline.test.js) simulates two independent rink laptop SQLite journals, an offline timekeeper, reconnection, lost acknowledgments, ownership transfer, and conflicting event histories. Signed **ownership epochs** now prevent an old laptop from publishing after a transfer, including after ownership is transferred back. The central ingestion allowlist includes goalie substitutions and extended penalty/clock events.
+
+Run `node --test tests/integration/*.test.js`; the integration suite now runs automatically in [GitHub CI](.github/workflows/ci.yml). See [recovery design and remaining handoff requirements](services/ingest/MULTI_RINK_RECOVERY.md). This is a development integration milestone; automatic backup-laptop state restoration is still pending.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
