@@ -4,6 +4,9 @@
 const crypto=require('node:crypto');
 const {DatabaseSync}=require('node:sqlite');
 const {PlayerRegistry}=require('./player-registry');
+const {FamilyAccess}=require('./family-access');
+const {EncryptedDocuments,MAX_BYTES}=require('./encrypted-documents');
+const path=require('node:path');
 const uid=()=>crypto.randomUUID(),hash=s=>crypto.createHash('sha256').update(s).digest('hex');
 const good=(x,n=160)=>typeof x==='string'&&x.trim().length>0&&x.length<=n;
 function secret(p){if(!good(p,256)||p.length<12)throw Error('Password must be at least 12 characters');const salt=crypto.randomBytes(16);return salt.toString('hex')+':'+crypto.scryptSync(p,salt,64).toString('hex');}
@@ -12,6 +15,8 @@ class RegistrationPortal{
  constructor(file){
   this.db=new DatabaseSync(file);this.db.exec('PRAGMA foreign_keys=ON');
   this.registry=Object.create(PlayerRegistry.prototype);this.registry.db=this.db;
+  this.family=new FamilyAccess(this.db);
+  this.documents=new EncryptedDocuments(this.db,path.join(path.dirname(file),'private-document-vault'));
   this.db.exec([
    'CREATE TABLE IF NOT EXISTS registration_clubs(id TEXT PRIMARY KEY,name TEXT NOT NULL,league_id TEXT NOT NULL REFERENCES leagues(id))',
    'CREATE TABLE IF NOT EXISTS registration_club_teams(club_id TEXT NOT NULL REFERENCES registration_clubs(id),team_id TEXT NOT NULL REFERENCES teams(id),PRIMARY KEY(club_id,team_id),UNIQUE(team_id))',
@@ -147,6 +152,53 @@ class RegistrationPortal{
   const preview=this.preview(u,rows);
   if(!preview.length||preview.some(r=>!r.valid))throw Error('Import contains invalid or empty rows; preview and correct before submitting');
   return this.tx(()=>preview.map(r=>this.submit(u,r,{withinTransaction:true})));
+ }
+ personInLeague(personId,leagueId){
+  return !!this.db.prepare("SELECT 1 FROM player_person_links l JOIN registration_player_clubs pc ON pc.player_id=l.player_id JOIN registration_clubs c ON c.id=pc.club_id WHERE l.person_id=? AND c.league_id=? LIMIT 1").get(personId,leagueId);
+ }
+ provisionFamily(user,{personId,email,password}){
+  this.requireLeague(user,user.scopeId);
+  if(!this.personInLeague(personId,user.scopeId))throw Error('Person outside league scope');
+  return this.family.provision(personId,email,password,user.id);
+ }
+ grantGuardian(user,{personId,playerId,canViewDocuments=false,canUploadDocuments=false}){
+  this.requireLeague(user,user.scopeId);
+  if(!this.personInLeague(personId,user.scopeId)||!this.canRead(user,playerId))throw Error('Relationship outside league scope');
+  return this.family.verifyRelationship(personId,playerId,{canViewDocuments,canUploadDocuments},user.id);
+ }
+ revokeGuardian(user,{personId,playerId}){
+  this.requireLeague(user,user.scopeId);
+  if(!this.canRead(user,playerId))throw Error('Player outside league scope');
+  return this.family.revoke(personId,playerId,user.id);
+ }
+ documentAccess(user,playerId,mode){
+  if(user?.personId){
+   if(!this.family.can(user,playerId,mode))throw Error('Family document access denied');
+  }else if(user?.role==='CLUB_REGISTRAR'){
+   if(!this.owns(user.scopeId,playerId))throw Error('Player outside club scope');
+  }else if(user?.role==='LEAGUE_ADMIN'){
+   if(!this.canRead(user,playerId))throw Error('Player outside league scope');
+  }else throw Error('Document access denied');
+ }
+ uploadDocument(user,{playerId,documentType,mime,base64}){
+  this.documentAccess(user,playerId,'upload');
+  if(typeof base64!=='string'||base64.length>Math.ceil(MAX_BYTES/3)*4+8||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64))throw Error('Invalid document encoding');
+  const data=Buffer.from(base64,'base64');
+  return this.documents.store({playerId,documentType,mime,data},user.id||user.accountId);
+ }
+ listDocuments(user,playerId){
+  this.documentAccess(user,playerId,'view');
+  return this.documents.list(playerId);
+ }
+ readDocument(user,id){
+  const row=this.documents.row(id);
+  this.documentAccess(user,row.player_id,'view');
+  return this.documents.read(id,user.id||user.accountId);
+ }
+ documentDecision(user,id,decision,note){
+  const row=this.documents.row(id);
+  if(user.role!=='LEAGUE_ADMIN'||!this.canRead(user,row.player_id))throw Error('League document verification denied');
+  return this.documents.decide(id,user.id,decision,note);
  }
  close(){this.db.close();}
 }
