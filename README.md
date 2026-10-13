@@ -46,6 +46,10 @@ League administrators can now define training courses once and assign versioned 
 
 An offline [IceBreaker admin CLI](apps/rink-local/server/icebreaker-admin.js) now supports staged certificate ingestion, duplicate-safe email-source references, a pending review queue, explicit approval/rejection and training-status queries. A future mail parser can supply JSON metadata without writing directly to the database. **Unverified imports never satisfy training eligibility.** See the [CLI integration guide](apps/rink-local/docs/backend-cli-training-intake.md).
 
+## Fictional registration email demonstration
+
+A [mock league email demo](apps/rink-local/docs/mock-registration-email-demo.md) parses a fictional registration certificate, previews its claimed name against a selected permanent player record, and **requires an exact-name confirmation before writing anything**. On confirmation, it stages a pending intake and encrypts the PNG attachment into a **separate SQLite evidence archive**, with audit records and ClamAV quarantine handling. No actual mailbox or real minors' data are used. Run the local [demo script](apps/rink-local/server/demo-registration-email.js) to try it.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
