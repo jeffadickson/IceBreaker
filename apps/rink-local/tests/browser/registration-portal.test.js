@@ -147,6 +147,21 @@ test('tournament guest needs no external registration or annual training but req
  assert.equal(x.teamAccounts.roster(game.home).some(p=>p.id===guest.playerId),true);
  assert.throws(()=>x.portal.addTournamentGuest(x.admin,{gameId:game.id,teamId:game.home,displayName:'Another',jersey:90,position:'F'}),/Jersey in use/);
 });
+test('league administrator owns training catalog policies and verification, not club registrars',t=>{
+ const x=setup();t.after(()=>x.close());
+ assert.throws(()=>x.portal.createTrainingDefinition(x.a,{code:'SAFESPORT',title:'SafeSport'}),/access denied/);
+ const course=x.portal.createTrainingDefinition(x.admin,{code:'SAFESPORT',title:'SafeSport'});
+ assert.equal(x.portal.listTrainingCatalog(x.admin)[0].trainingId,course.trainingId);
+ assert.throws(()=>x.portal.createTrainingPolicy(x.a,{trainingId:course.trainingId,scopeType:'LEAGUE',scopeId:'demo-league',seasonId:'demo-2026',role:'PLAYER',renewalMode:'ANNUAL_SEASON',effectiveFrom:'2026-09-01'}),/access denied/);
+ x.portal.createTrainingPolicy(x.admin,{trainingId:course.trainingId,scopeType:'LEAGUE',scopeId:'demo-league',seasonId:'demo-2026',role:'PLAYER',renewalMode:'ANNUAL_SEASON',effectiveFrom:'2026-09-01'});
+ const {playerId}=x.portal.createPlayer(x.a,{displayName:'Alias',legalName:'Fictional',birthDate:'2016-02-02'});
+ const args={subjectType:'PLAYER',subjectId:playerId,role:'PLAYER',scopeType:'LEAGUE',scopeId:'demo-league',seasonId:'demo-2026',date:'2026-10-13'};
+ assert.equal(x.portal.trainingStatusForRole(x.admin,args)[0].eligible,false);
+ const evidence=x.portal.verifyTrainingCompletion(x.admin,{trainingId:course.trainingId,subjectType:'PLAYER',subjectId:playerId,completedOn:'2026-09-10'});
+ assert.equal(x.portal.trainingStatusForRole(x.admin,args)[0].eligible,true);
+ x.portal.revokeTrainingCompletion(x.admin,{completionId:evidence.completionId,reason:'Invalid certificate'});
+ assert.equal(x.portal.trainingStatusForRole(x.admin,args)[0].eligible,false);
+});
 test('hashed expiring sessions and role-bound scope prevent credential crossover',t=>{
  const x=setup();t.after(()=>x.close());
  assert.throws(()=>x.portal.login('a@example.invalid','wrong'),/Invalid credentials/);
