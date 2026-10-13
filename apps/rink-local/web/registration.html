@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IceBreaker · Registration Administration</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#eaf4ff;background:#0a192a}*{box-sizing:border-box}body{margin:0}header{background:#14324b;padding:18px 5%;border-bottom:2px solid #54b8e6}main{max-width:1080px;margin:auto;padding:24px}section{background:#132c44;border:1px solid #31536d;border-radius:14px;padding:20px;margin:14px 0}h1{font-size:1.6rem}h2{font-size:1.15rem}input,select,textarea,button{font:inherit;border-radius:8px;padding:10px}input,select,textarea{background:#0a1e30;color:#fff;border:1px solid #56718c;width:100%}label{display:block;margin:10px 0}button{background:#43b1e7;border:0;color:#061525;font-weight:700;cursor:pointer;margin:4px}button:disabled{opacity:.5}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.muted{color:#a7c0d4}.warn{color:#ffc78d}#app{display:none}pre{white-space:pre-wrap;word-break:break-word;background:#091d2f;padding:12px;border-radius:8px;max-height:250px;overflow:auto}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #35536b;padding:8px;text-align:left}#status{min-height:24px}
+</style></head>
+<body><header><h1>❄ IceBreaker · Registration Administration</h1><div class="muted">Separate club registrar and league administrator permissions</div></header>
+<main><p class="warn">Development system only. Do not enter real children's names, addresses, birth dates, or guardian information until the production privacy controls are deployed.</p>
+<section id="login"><h2>Administrator sign-in</h2><div class="grid"><label>Email<input id="email" type="email" autocomplete="username"></label><label>Password<input id="password" type="password" autocomplete="current-password"></label></div><button id="signIn">Sign in</button></section>
+<p id="status" role="status" aria-live="polite"></p>
+<div id="app"><section><h2 id="roleHeading"></h2><button id="reload">Refresh lists</button><button id="logout">Sign out</button><p id="scope" class="muted"></p></section>
+<section id="clubPanel"><h2>Club registrar · Create player</h2>
+<div class="grid"><label>Approved public display name<input id="displayName" placeholder="Player alias"></label><label>Legal name (private)<input id="legalName"></label><label>Date of birth (private)<input id="birthDate" type="date"></label><label>Street (private)<input id="street"></label><label>City (private)<input id="city"></label><label>Region (private)<input id="region"></label><label>Postal code (private)<input id="postalCode"></label></div>
+<button id="createPlayer">Create permanent player</button><p class="muted">Do not create duplicates by matching names. Existing players must be linked by an authorized league administrator.</p></section>
+<section><h2>Players in my scope</h2><label>Select player<select id="player"></select></label><button id="showProfile">View private profile (authorized staff only)</button><pre id="profile">Private profile not loaded</pre></section>
+<section id="submissionPanel"><h2>Club registrar · Submit season roster</h2><div class="grid"><label>Team / season<select id="team"></select></label><label>Jersey<input id="jersey" type="number" min="0" max="99"></label><label>Position<select id="position"><option>F</option><option>D</option><option>G</option><option>C</option><option>LW</option><option>RW</option><option>LD</option><option>RD</option></select></label></div><button id="submit">Submit for league approval</button></section>
+<section id="csvPanel"><h2>Club registrar · CSV import</h2><p class="muted">CSV columns: playerId,teamId,jersey,position. Existing permanent player IDs only. Preview does not change any records; submitting creates pending approvals atomically.</p><input id="csv" type="file" accept=".csv,text/csv"><button id="preview">Preview CSV</button><button id="submitCsv" disabled>Submit validated rows</button><pre id="csvResults"></pre></section>
+<section><h2>Roster approval queue</h2><div id="requests"></div></section>
+<section id="leaguePanel"><h2>League administrator · Annual training</h2>
+<div class="grid"><label>League ID<input id="leagueId" placeholder="League ID"></label><label>Season ID<input id="seasonId" placeholder="Season ID"></label><label>Requirement code<input id="code" placeholder="ANNUAL-2027"></label><label>Title<input id="title" placeholder="Required training"></label><label>Enforcement date<input id="requiredBy" type="date"></label></div>
+<button id="createRequirement">Create annual requirement</button>
+<h3>Verify completion</h3><div class="grid"><label>Requirement ID<input id="requirementId"></label><label>Completion date<input id="completedOn" type="date"></label><label>Expiration date (optional)<input id="expiresOn" type="date"></label><label>Evidence reference (not a document upload)<input id="evidenceRef"></label></div><button id="verifyTraining">Verify selected player's training</button>
+<h3>Link existing player to a club</h3><div class="grid"><label>Club ID<input id="clubId"></label><label>Permanent player ID<input id="existingPlayerId"></label></div><button id="linkExisting">Authorize club association</button></section>
+</div></main>
+<script>
+'use strict';
+(()=>{
+const $=id=>document.getElementById(id);let token='',context=null,players=[],previewRows=[];
+const status=(s,error=false)=>{$('status').textContent=s;$('status').style.color=error?'#ffb2a7':'#9ae6bd';};
+async function api(path,method='GET',body){const r=await fetch('/api/registration/v1/'+path,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});const x=await r.json();if(!r.ok)throw Error(x.error||'Request failed');return x;}
+const safe=fn=>async()=>{try{await fn();}catch(e){status(e.message,true);}};
+function options(id,rows,label){const el=$(id);el.replaceChildren();for(const r of rows){const o=document.createElement('option');o.value=r.id;o.textContent=label(r);el.append(o);}}
+async function refresh(){
+ context=await api('context');const p=await api('players'),r=await api('requests');
+ players=p.players;options('player',players,x=>x.displayName+' · '+x.id);
+ options('team',context.teams,x=>x.name+' · '+x.seasonId);
+ $('clubPanel').hidden=context.role!=='CLUB_REGISTRAR';$('submissionPanel').hidden=context.role!=='CLUB_REGISTRAR';$('csvPanel').hidden=context.role!=='CLUB_REGISTRAR';$('leaguePanel').hidden=context.role!=='LEAGUE_ADMIN';
+ $('roleHeading').textContent=context.role==='LEAGUE_ADMIN'?'League Administration':'Club Registration';
+ $('scope').textContent='Authorized scope: '+context.scopeId;
+ if(context.role==='LEAGUE_ADMIN')$('leagueId').value=context.scopeId;
+ const root=$('requests');root.replaceChildren();
+ const table=document.createElement('table'),head=document.createElement('tr');
+ for(const name of ['Player','Team','Jersey','Position','Status','Decision']){const th=document.createElement('th');th.textContent=name;head.append(th);}
+ table.append(head);
+ for(const req of r.requests){
+  const tr=document.createElement('tr');
+  for(const val of [req.displayName,req.teamId,req.jersey,req.position,req.status]){
+   const td=document.createElement('td');td.textContent=String(val);tr.append(td);
+  }
+  const action=document.createElement('td');
+  if(context.role==='LEAGUE_ADMIN'&&req.status==='SUBMITTED'){
+   for(const decision of ['APPROVED','REJECTED']){
+    const b=document.createElement('button');b.textContent=decision==='APPROVED'?'Approve':'Reject';
+    b.onclick=safe(async()=>{const reason=prompt('Reason for '+decision.toLowerCase());if(!reason?.trim())return;await api('requests/'+encodeURIComponent(req.requestId)+'/decision','POST',{decision,reason});await refresh();status('Request '+decision.toLowerCase());});
+    action.append(b);
+   }
+  }else action.textContent=req.decisionReason||'—';
+  tr.append(action);table.append(tr);
+ }
+ root.append(table);
+}
+$('signIn').onclick=safe(async()=>{const x=await api('login','POST',{email:$('email').value,password:$('password').value});token=x.token;await refresh();$('login').hidden=true;$('app').style.display='block';$('password').value='';status('Signed in.');});
+$('reload').onclick=safe(refresh);
+$('logout').onclick=()=>{token='';context=null;players=[];previewRows=[];$('app').style.display='none';$('login').hidden=false;status('Signed out locally; existing session expires server-side.');};
+$('createPlayer').onclick=safe(async()=>{const input={displayName:$('displayName').value,legalName:$('legalName').value,birthDate:$('birthDate').value,address:{street:$('street').value,city:$('city').value,region:$('region').value,postalCode:$('postalCode').value}};const x=await api('players','POST',input);await refresh();$('player').value=x.playerId;status('Permanent player created: '+x.playerId);});
+$('showProfile').onclick=safe(async()=>{const x=await api('players/'+encodeURIComponent($('player').value));$('profile').textContent=JSON.stringify(x,null,2);});
+$('submit').onclick=safe(async()=>{const x=await api('requests','POST',{playerId:$('player').value,teamId:$('team').value,jersey:Number($('jersey').value),position:$('position').value});await refresh();status('Submitted for league approval: '+x.requestId);});
+function parseCsv(text){
+ const rows=[];let row=[],field='',quote=false;
+ for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quote&&text[i+1]==='"'){field+='"';i++;}else quote=!quote;}else if(c===','&&!quote){row.push(field);field='';}else if((c==='\n'||c==='\r')&&!quote){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(v=>v.trim()))rows.push(row);row=[];field='';}else field+=c;}
+ if(quote)throw Error('Unterminated CSV quote');row.push(field);if(row.some(v=>v.trim()))rows.push(row);
+ if(!rows.length||rows[0].map(x=>x.trim()).join(',')!=='playerId,teamId,jersey,position')throw Error('Expected CSV header: playerId,teamId,jersey,position');
+ return rows.slice(1).map(x=>{if(x.length!==4)throw Error('Each CSV row needs four columns');return {playerId:x[0].trim(),teamId:x[1].trim(),jersey:Number(x[2]),position:x[3].trim()};});
+}
+$('preview').onclick=safe(async()=>{const file=$('csv').files[0];if(!file)throw Error('Select CSV file');if(file.size>25000)throw Error('CSV must be under 25 KB');previewRows=parseCsv(await file.text());const x=await api('imports/preview','POST',{rows:previewRows});$('csvResults').textContent=JSON.stringify(x.rows,null,2);$('submitCsv').disabled=!x.rows.length||x.rows.some(r=>!r.valid);status('CSV preview complete.');});
+$('submitCsv').onclick=safe(async()=>{if(!previewRows.length||!confirm('Submit every validated CSV row for league approval?'))return;const x=await api('imports/submit','POST',{rows:previewRows});previewRows=[];$('submitCsv').disabled=true;await refresh();status('Submitted '+x.submitted.length+' roster requests.');});
+$('createRequirement').onclick=safe(async()=>{const x=await api('training/requirements','POST',{leagueId:$('leagueId').value,seasonId:$('seasonId').value,code:$('code').value,title:$('title').value,requiredBy:$('requiredBy').value||null,blocksLineup:true});$('requirementId').value=x.requirementId;status('Requirement created: '+x.requirementId);});
+$('verifyTraining').onclick=safe(async()=>{const x=await api('training/completions','POST',{playerId:$('player').value,requirementId:$('requirementId').value,completedOn:$('completedOn').value,expiresOn:$('expiresOn').value||null,evidenceRef:$('evidenceRef').value||null});status('Training verified: '+x.completionId);});
+$('linkExisting').onclick=safe(async()=>{const x=await api('clubs/'+encodeURIComponent($('clubId').value)+'/players','POST',{playerId:$('existingPlayerId').value});await refresh();status('Existing player linked to club '+x.clubId);});
+})();
+</script></body></html>
