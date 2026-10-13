@@ -14,6 +14,7 @@ function sourceKey(){
   throw Error('A 32-byte ICEBREAKER_INGEST_HMAC_KEY_BASE64 is required');
  return key;
 }
+function sourceDigest(sourceType,sourceId){return crypto.createHmac('sha256',sourceKey()).update(JSON.stringify([sourceType,sourceId])).digest('hex');}
 function init(db){
  db.exec([
  "CREATE TABLE IF NOT EXISTS training_intake(id TEXT PRIMARY KEY,source_type TEXT NOT NULL CHECK(source_type IN ('EMAIL','API','MANUAL','BATCH')),source_digest TEXT NOT NULL UNIQUE,training_id TEXT NOT NULL REFERENCES training_catalog(id),subject_type TEXT NOT NULL CHECK(subject_type IN ('PLAYER','ADULT')),subject_id TEXT NOT NULL,completed_on TEXT NOT NULL,expires_on TEXT,evidence_ref TEXT,state TEXT NOT NULL CHECK(state IN ('PENDING','VERIFIED','REJECTED')),imported_by TEXT NOT NULL,imported_at TEXT NOT NULL,reviewed_by TEXT,reviewed_at TEXT,review_note TEXT,completion_id TEXT REFERENCES training_completions_v2(id))",
@@ -37,7 +38,7 @@ function stage(db,{sourceType,sourceId,trainingId,subjectType,subjectId,complete
  const subjectTable=subjectType==='PLAYER'?'players':'player_related_people';
  if(!db.prepare('SELECT 1 FROM '+subjectTable+' WHERE id=?').get(subjectId))
   throw Error('Unknown participant: manual identity reconciliation required');
- const digest=crypto.createHmac('sha256',sourceKey()).update(JSON.stringify([sourceType,sourceId])).digest('hex');
+ const digest=sourceDigest(sourceType,sourceId);
  return tx(db,()=>{
   const previous=db.prepare('SELECT * FROM training_intake WHERE source_digest=?').get(digest);
   if(previous){
@@ -84,4 +85,4 @@ function decide(db,intakeId,{decision,reviewer,note}){
   return {intakeId,state:decision,completionId};
  });
 }
-module.exports={init,stage,list,decide};
+module.exports={init,stage,list,decide,sourceDigest};
