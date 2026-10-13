@@ -127,4 +127,4 @@ class EncryptedDocuments{
   this.audit('DOCUMENT_READ',id,actor,{playerId:r.player_id});return {mime:r.mime,data};
  }
 }
-module.exports={EncryptedDocuments,seal,open,keyFromEnvironment,MAX_BYTES};
+module.exports={EncryptedDocuments,seal,open,keyFromEnvironment,signatureOk,MAX_BYTES};
