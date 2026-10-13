@@ -46,7 +46,7 @@ test('same-season transfer closes old membership without rewriting historical id
 });
 test('annual training blocks only required seasons and preserves prior-year evidence',t=>{
  const x=setup();t.after(()=>x.close());
- const game=x.league.db.prepare("SELECT * FROM games WHERE status='scheduled' AND home_team_id='maple' LIMIT 1").get();
+ const game=x.league.db.prepare("SELECT * FROM games WHERE status='scheduled' AND (home_team_id='maple' OR away_team_id='maple') LIMIT 1").get();
  const player=x.teams.roster('maple')[0],day=gameDate(x.league.db,game.id);
  const req=x.players.requireTraining({leagueId:'demo-league',seasonId:'demo-2026',code:'SAFETY-2026',title:'Annual safety module',blocksLineup:true},'league-admin');
  assert.deepEqual(x.players.trainingStatus(player.id,'maple',day).map(v=>v.complete),[false]);
@@ -54,9 +54,10 @@ test('annual training blocks only required seasons and preserves prior-year evid
  x.players.recordTraining({playerId:player.id,requirementId:req.requirementId,completedOn:'2026-09-20',expiresOn:'2026-12-31',evidenceRef:'record-001'},'registrar');
  assert.equal(x.players.trainingStatus(player.id,'maple',day)[0].complete,true);
  x.teams.confirmLineup('maple',game.id,'manager',{playerIds:[player.id],expectedRosterRevision:0});
- const away=x.teams.roster(game.away_team_id)[0];
+ const otherTeam=game.home_team_id==='maple'?game.away_team_id:game.home_team_id;
+ const away=x.teams.roster(otherTeam)[0];
  x.players.recordTraining({playerId:away.id,requirementId:req.requirementId,completedOn:'2026-09-20'},'registrar');
- x.teams.confirmLineup(game.away_team_id,game.id,'manager',{playerIds:[away.id],expectedRosterRevision:0});
+ x.teams.confirmLineup(otherTeam,game.id,'manager',{playerIds:[away.id],expectedRosterRevision:0});
  assert.equal(pregameSnapshot(x.teams.db,game.id).ready,true);
  const completion=x.players.db.prepare('SELECT id FROM player_training_completions WHERE player_id=?').get(player.id);
  // A revocation after lineup confirmation must invalidate pregame readiness.
