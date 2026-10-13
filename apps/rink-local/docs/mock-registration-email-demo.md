@@ -58,6 +58,15 @@ The league database contains only `archive:<opaque evidence ID>` as the training
 
 The attachment is initially `QUARANTINED`. The archive supports a backend-only ClamAV scan method; a scanner error leaves it quarantined and malware detection rejects it. The ordinary CLI `verify` command refuses to approve an archive-linked intake until its archive entry has a `CLEAN` scan state. In tests, the scanner is mocked; real ClamAV deployment remains a prerequisite for processing actual documents.
 
+To scan quarantined demo evidence using a **real local ClamAV service**, configure `ICEBREAKER_CLAMAV_SOCKET` and run:
+
+```bash
+node apps/rink-local/server/scan-email-evidence.js \
+  --archive /tmp/icebreaker-email-demo/encrypted-email-evidence.db
+```
+
+If ClamAV is unavailable, the evidence remains quarantined. This demo does not provide a command-line `--clean` override.
+
 After a clean scan and independent registrar verification of the issuer, certificate, and person, the existing admin CLI may approve it using the separate archive path:
 
 ```bash
