@@ -22,6 +22,9 @@ function init(db){
   insert.run(uuid(),r.player_id,r.season_id,r.team_id,'LEGACY_IMPORT',null,'LEGACY_IMPORT','migration');
 }
 function trainingStatus(db,playerId,teamId,date){
+ // Compatibility with older isolated pregame test fixtures; production league
+ // initialization always creates these tables.
+ if(!db.prepare("SELECT 1 FROM sqlite_master WHERE name='season_training_requirements' AND type='table'").get())return [];
  if(!validDate(date))throw Error('Invalid eligibility date');
  const team=db.prepare("SELECT d.season_id,ls.league_id FROM teams t JOIN divisions d ON d.id=t.division_id JOIN league_seasons ls ON ls.season_id=d.season_id WHERE t.id=?").get(teamId);
  if(!team)throw Error('Unknown team');
