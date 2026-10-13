@@ -39,3 +39,14 @@ test('division rules are versioned and locked after a completed game',t=>{
  assert.equal(r.periodSeconds,720);assert.equal(league.timingForDivision(d).version,'10U-12M-v1');
  league.db.prepare("INSERT INTO teams VALUES(?,?,?,?,?,?)").run('b-one',d,'B One','ONE','Demo','blue');league.db.prepare("INSERT INTO teams VALUES(?,?,?,?,?,?)").run('b-two',d,'B Two','TWO','Demo','red');league.db.prepare("INSERT INTO games(id,division_id,date,venue,sheet,home_team_id,away_team_id,status) VALUES(?,?,?,?,?,?,?,?)").run('b-game',d,'2026-10-12T18:00:00Z','Demo','Ice 1','b-one','b-two','final');assert.throws(()=>league.configureDivisionTiming(d,'10U-new',{periodSeconds:800}),/Cannot change division timing policy/);
 });
+
+test('division timing HTTP API is readable but edits require administrator key',async t=>{
+ const {createRinkServer}=require('../../server/rink-server');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-division-http-')),file=path.join(dir,'game.db');
+ const app=createRinkServer({dbPath:file,port:0,operatorKey:'test-admin-key'});const port=(await app.start()).port,base='http://127.0.0.1:'+port;
+ t.after(async()=>{await app.stop();fs.rmSync(dir,{recursive:true,force:true});});
+ const read=await fetch(base+'/api/league/v1/divisions/demo-10u/timing');assert.equal(read.status,200);
+ const model=await read.json();assert.equal(model.periodCount,3);
+ const reject=await fetch(base+'/api/league/v1/divisions/demo-10u/timing',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:'v2',rules:{periodCount:2,periodSeconds:600}})});assert.equal(reject.status,403);
+ const page=await fetch(base+'/division-rules.html');assert.equal(page.status,200);assert.match(await page.text(),/Configure timing/);
+});
