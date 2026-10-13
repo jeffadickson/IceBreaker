@@ -7,6 +7,9 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {penaltyClock}=require('./penalty-clock');
 const {validateTiming,verifyTime,nextPeriod,periodLength}=require('./game-timing-rules');
+const officialLength=(timing,period)=>period>timing.periodCount?timing.overtimeSeconds:periodLength(timing,period);
+const checkOfficial=(seconds,timing,period)=>verifyTime(seconds,timing,period>timing.periodCount?'OVERTIME':'PERIOD',Math.min(period,timing.periodCount));
+const effectiveClockMode=(timing,state)=>timing.mercyRunningDifferential>0&&Math.abs(state.scores.home-state.scores.away)>=timing.mercyRunningDifferential?'RUNNING':timing.clockMode;
 const validSide=x=>x==='home'||x==='away';
 const validAttr=(x,scorer=false)=>x==='TBD'||(!scorer&&x==='None')||/^\d{1,3}$/.test(String(x));
 const isInt=(x,lo,hi)=>Number.isInteger(x)&&x>=lo&&x<=hi;
@@ -33,19 +36,23 @@ function validate(c,state,timing=validateTiming()){if(!c||typeof c!=='object')th
   if(!validSide(c.team))throw Error('Invalid shot team');
  }else if(c.type==='CLOCK_UPDATED'){
   if(!['START','STOP','SET'].includes(c.action)||!Number.isInteger(c.seconds))throw Error('Invalid clock action');
-  verifyTime(c.seconds,timing,'PERIOD',state.period);
+  checkOfficial(c.seconds,timing,state.period);
  }else if(c.type==='CLOCK_SYNCED'){
   if(state.running)throw Error('Stop the game clock before syncing to arena clock');
   if(!Number.isInteger(c.seconds)||!clean(c.reason)||String(c.reason).length>200)throw Error('Clock synchronization requires valid time and reason');
   if(c.scope!==undefined&&!['GAME_ONLY','GAME_AND_PENALTIES'].includes(c.scope))throw Error('Invalid clock synchronization scope');
-  verifyTime(c.seconds,timing,'PERIOD',state.period);
+  checkOfficial(c.seconds,timing,state.period);
  }else if(['PERIOD_ENDED','PERIOD_ADVANCED','GAME_ENDED'].includes(c.type)){
-  if(c.type==='PERIOD_ADVANCED'){nextPeriod(state.period,timing);if(c.seconds!==undefined)verifyTime(c.seconds,timing,'PERIOD',state.period+1);}
+  if(c.type==='PERIOD_ADVANCED'){if(state.period>=timing.periodCount)throw Error('No additional regulation period');nextPeriod(state.period,timing);if(c.seconds!==undefined)checkOfficial(c.seconds,timing,state.period+1);}
+ }else if(c.type==='OVERTIME_STARTED'){
+  if(!timing.overtimeSeconds||state.period!==timing.periodCount||state.running||state.scores.home!==state.scores.away)throw Error('Overtime requires a tied, stopped end of regulation');
+ }else if(c.type==='TIMEOUT_TAKEN'){
+  if(!validSide(c.team)||!timing.timeoutSeconds||!timing.timeoutsPerTeam||state.running||state.timeouts[c.team]>=timing.timeoutsPerTeam)throw Error('Timeout unavailable, clock running, or allowance exhausted');
  }else if(c.type==='MERCY_MODE_CHANGED'){
   if(typeof c.active!=='boolean'||typeof c.hasTriggered!=='boolean'||!clean(c.reason))throw Error('Invalid mercy change');
  }else throw Error('Unsupported command');
 }
-function project(events,timing=validateTiming()){const state={revision:0,period:1,seconds:periodLength(timing,1),running:false,scores:{home:0,away:0},shots:{home:0,away:0},goals:new Map(),events:[],mercy:{enabled:true,threshold:5,cap:5,triggered:false},ended:false};
+function project(events,timing=validateTiming()){const state={revision:0,period:1,seconds:periodLength(timing,1),running:false,scores:{home:0,away:0},shots:{home:0,away:0},goals:new Map(),events:[],mercy:{enabled:true,threshold:5,cap:5,triggered:false},timeouts:{home:0,away:0},ended:false};
  for(const e of events){if(e.seq!==state.revision+1)throw Error('Journal sequence gap');const d=JSON.parse(e.payload_json);const item={id:e.event_id,type:e.event_type,team:d.teamId||null,period:e.period,seconds:e.clock_seconds,at:e.occurred_at_utc,details:{}};
   state.period=e.period;state.seconds=e.clock_seconds;
   if(e.event_type==='GOAL_RECORDED'){state.scores[d.teamId]++;state.shots[d.teamId]++;state.goals.set(e.event_id,{goalId:d.goalId,voided:false});item.details={scorer:unattr(d.scorer),assist1:unattr(d.assist1),assist2:unattr(d.assist2)};if(Math.abs(state.scores.home-state.scores.away)>=state.mercy.threshold)state.mercy.triggered=true;}
@@ -59,7 +66,10 @@ function project(events,timing=validateTiming()){const state={revision:0,period:
   if(e.event_type==='PERIOD_ENDED'||e.event_type==='GAME_ENDED')state.running=false;
   if(e.event_type==='PERIOD_ADVANCED'){state.period=e.period;state.seconds=e.clock_seconds;state.running=false;}
   if(e.event_type==='GAME_ENDED')state.ended=true;
+  if(e.event_type==='GOAL_RECORDED'&&d.suddenDeath){state.ended=true;state.running=false;}
   if(e.event_type==='MERCY_MODE_CHANGED')state.mercy.triggered=d.hasTriggered;
+  if(e.event_type==='TIMEOUT_TAKEN'){state.timeouts[d.teamId]++;item.details={durationSeconds:d.durationSeconds};}
+  if(e.event_type==='OVERTIME_STARTED')state.running=false;
   state.events.push(item);state.revision=e.seq;
  }
  return state;
@@ -77,8 +87,8 @@ class Authority{
  audit(action,details={}){const entry={at:new Date().toISOString(),action,details};fs.mkdirSync(path.dirname(this.auditPath),{recursive:true});fs.appendFileSync(this.auditPath,JSON.stringify(entry)+'\n');}
  repairMirror(){const lines=this.rows().map(e=>`${e.seq.toString().padStart(5,'0')} ${e.occurred_at_utc} P${e.period} ${String(Math.floor(e.clock_seconds/60)).padStart(2,'0')}:${String(e.clock_seconds%60).padStart(2,'0')} ${e.event_type} ${e.event_id} ${e.payload_json}`).join('\n');try{fs.writeFileSync(this.mirrorPath,lines+(lines?'\n':''));this.mirrorHealthy=true;}catch(err){this.mirrorHealthy=false;this.audit('TEXT_MIRROR_FAILURE',{message:err.message});}}
  currentSeconds(){if(!this.state.running||this.clockAnchor===null)return this.state.seconds;return Math.max(0,this.state.seconds-Math.floor(Number(process.hrtime.bigint()-this.clockAnchor)/1e9));}
- spectator(){const s=this.state;const penalties=penaltyClock(s.events,s.period,this.currentSeconds(),periodLength(this.timingRules,s.period));return {penalties,timingRules:this.timingRules,timingVersion:this.timingVersion,revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{...s.scores},shots:{...s.shots},ended:s.ended,events:s.events.filter(e=>['GOAL_RECORDED','PENALTY_ASSESSED','PENALTY_DELAYED','PENALTY_WHISTLE','PENALTY_DELAYED_WAVED','GOAL_ATTRIBUTION_CORRECTED','PERIOD_ENDED','PERIOD_ADVANCED','GAME_ENDED','SHOT_RECORDED'].includes(e.type)),teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'},connected:true,scorePolicy:'FULL_OFFICIAL'};}
- arena(){const s=this.state;const penalties=penaltyClock(s.events,s.period,this.currentSeconds(),periodLength(this.timingRules,s.period));let {home,away}=s.scores;const m=s.mercy;if(m.enabled&&(m.triggered||Math.abs(home-away)>=m.threshold)){if(home>away)home=Math.min(home,away+m.cap);else away=Math.min(away,home+m.cap);}return {penalties,revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{home,away},shots:{...s.shots},scorePolicy:'MERCY_DISPLAY_CAP',teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'}};}
+ spectator(){const s=this.state;const penalties=penaltyClock(s.events,s.period,this.currentSeconds(),officialLength(this.timingRules,s.period));return {penalties,clockMode:effectiveClockMode(this.timingRules,s),timeouts:{...s.timeouts},overtime:s.period>this.timingRules.periodCount,timingRules:this.timingRules,timingVersion:this.timingVersion,revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{...s.scores},shots:{...s.shots},ended:s.ended,events:s.events.filter(e=>['GOAL_RECORDED','PENALTY_ASSESSED','PENALTY_DELAYED','PENALTY_WHISTLE','PENALTY_DELAYED_WAVED','GOAL_ATTRIBUTION_CORRECTED','PERIOD_ENDED','PERIOD_ADVANCED','GAME_ENDED','SHOT_RECORDED'].includes(e.type)),teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'},connected:true,scorePolicy:'FULL_OFFICIAL'};}
+ arena(){const s=this.state;const penalties=penaltyClock(s.events,s.period,this.currentSeconds(),officialLength(this.timingRules,s.period));let {home,away}=s.scores;const m=s.mercy;if(m.enabled&&(m.triggered||Math.abs(home-away)>=m.threshold)){if(home>away)home=Math.min(home,away+m.cap);else away=Math.min(away,home+m.cap);}return {penalties,clockMode:effectiveClockMode(this.timingRules,s),timeouts:{...s.timeouts},overtime:s.period>this.timingRules.periodCount,revision:s.revision,period:s.period,seconds:this.currentSeconds(),running:s.running,scores:{home,away},shots:{...s.shots},scorePolicy:'MERCY_DISPLAY_CAP',teams:{home:'Pasadena Maple Leafs',away:'Santa Clarita Flyers'}};}
  command(c,{actor='scorekeeper',key,authorizedPostgameCorrection=false}={}){
   if(!key||!/^[-\w]{8,128}$/.test(key))throw Error('Idempotency key required');
   const duplicate=this.db.prepare('SELECT event_id,seq FROM game_events WHERE game_id=? AND idempotency_key=?').get(this.gameId,key);if(duplicate){this.audit('DUPLICATE_COMMAND',{key,eventId:duplicate.event_id});return {eventId:duplicate.event_id,revision:duplicate.seq,duplicate:true};}
@@ -91,9 +101,12 @@ class Authority{
   if(c.type==='PENALTY_WHISTLE')payload={delayedEventIds:Array.isArray(c.delayedEventIds)?c.delayedEventIds.map(x=>clean(x,80)):null};
   if(c.type==='SHOT_RECORDED')payload={teamId:c.team};
   if(c.type==='CLOCK_UPDATED'){seconds=c.action==='STOP'?this.currentSeconds():c.seconds;payload={action:c.action,secondsRemaining:seconds};}else if(c.type==='CLOCK_SYNCED'){seconds=c.seconds;payload={previousSeconds:this.currentSeconds(),secondsRemaining:seconds,scope:c.scope||'GAME_ONLY',reason:clean(c.reason,200)};}else if(this.state.running){seconds=this.currentSeconds();}
+  if(c.type==='OVERTIME_STARTED'){period=this.timingRules.periodCount+1;seconds=this.timingRules.overtimeSeconds;payload={action:'START_OVERTIME'};}
+  if(c.type==='TIMEOUT_TAKEN')payload={teamId:c.team,durationSeconds:this.timingRules.timeoutSeconds};
   if(c.type==='PERIOD_ADVANCED'){const next=nextPeriod(period,this.timingRules);period=next.period;seconds=c.seconds===undefined?next.seconds:c.seconds;}
-  if(c.type==='PERIOD_ENDED'||c.type==='GAME_ENDED'){seconds=c.seconds===undefined?seconds:verifyTime(c.seconds,this.timingRules,'PERIOD',period);}
-  verifyTime(seconds,this.timingRules,'PERIOD',period);
+  if(c.type==='PERIOD_ENDED'||c.type==='GAME_ENDED'){seconds=c.seconds===undefined?seconds:checkOfficial(c.seconds,this.timingRules,period);}
+  checkOfficial(seconds,this.timingRules,period);
+  if(c.type==='GOAL_RECORDED'&&period>this.timingRules.periodCount){payload.suddenDeath=true;}
   if(c.type==='MERCY_MODE_CHANGED')payload={active:c.active,hasTriggered:c.hasTriggered,reason:clean(c.reason,200)};
   const record={game_id:this.gameId,seq,event_id:id,idempotency_key:key,event_type:c.type,occurred_at_utc:at,actor_id:clean(actor,80),period,clock_seconds:seconds,payload_json:JSON.stringify(payload)};
   this.db.exec('BEGIN IMMEDIATE');try{this.db.prepare('INSERT INTO game_events VALUES (?,?,?,?,?,?,?,?,?,?)').run(...Object.values(record));this.db.prepare('INSERT INTO sync_outbox(event_id,game_id,seq) VALUES(?,?,?)').run(id,this.gameId,seq);this.db.exec('COMMIT');}catch(e){this.db.exec('ROLLBACK');throw e;}
