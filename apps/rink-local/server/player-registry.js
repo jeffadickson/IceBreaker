@@ -88,12 +88,12 @@ class PlayerRegistry{
   return this.tx(()=>{
    const previous=this.db.prepare("SELECT r.team_id FROM roster_memberships r JOIN teams t ON t.id=r.team_id JOIN divisions d ON d.id=t.division_id JOIN league_seasons ls ON ls.season_id=d.season_id WHERE r.player_id=? AND r.season_id=? AND ls.league_id=?").all(playerId,team.season_id,team.league_id);
    if(previous.some(r=>r.team_id===teamId))throw Error('Already on this team');
-   for(const old of previous){
+   const hasConfirmations=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='game_roster_confirmations'").get();
+   if(hasConfirmations)for(const old of previous){
     // A confirmed active lineup requires an explicit administrator amendment.
     const confirmations=this.db.prepare("SELECT c.player_ids_json FROM game_roster_confirmations c JOIN games g ON g.id=c.game_id WHERE c.team_id=? AND g.status IN ('scheduled','live')").all(old.team_id);
     if(confirmations.some(c=>JSON.parse(c.player_ids_json).includes(playerId)))throw Error('Confirmed game lineup must be amended before transfer');
    }
-   const hasConfirmations=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='game_roster_confirmations'").get();
    if(hasConfirmations){
     const targetConfirmed=this.db.prepare("SELECT 1 FROM game_roster_confirmations c JOIN games g ON g.id=c.game_id WHERE c.team_id=? AND g.status IN ('scheduled','live') LIMIT 1").get(teamId);
     if(targetConfirmed)throw Error('Target team has a confirmed game lineup; authorized amendment required');
