@@ -14,7 +14,8 @@ function verifyPackage(pkg,{adminKey,gameId,stationId}){
   p.nextEpoch!==p.expectedEpoch+1||!Array.isArray(p.events)||p.events.length>100000||
   typeof p.timingVersion!=='string')throw Error('Handoff identity or epoch mismatch');
  const serialized=JSON.stringify(p),digest=sha(serialized);
- if(digest!==pkg.digest||!crypto.timingSafeEqual(Buffer.from(crypto.createHmac('sha256',adminKey).update(serialized).digest('hex')),Buffer.from(String(pkg.signature||'').padEnd(64,' ').slice(0,64))))
+ if(digest!==pkg.digest||typeof pkg.signature!=='string'||!/^[a-f0-9]{64}$/.test(pkg.signature)||
+  !crypto.timingSafeEqual(Buffer.from(crypto.createHmac('sha256',adminKey).update(serialized).digest('hex')),Buffer.from(pkg.signature)))
   throw Error('Handoff signature or digest invalid');
  let sequence=0;
  const rows=p.events.map(e=>{
