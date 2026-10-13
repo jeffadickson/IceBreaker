@@ -39,6 +39,8 @@ public sealed class TimekeeperWindow : Window
     private readonly TextBox _goalieNumber = new() { Watermark = "Goalie jersey or EMPTY", Width = 190 };
     private readonly TextBox _goalieReason = new() { Watermark = "Reason for goalie change", Width = 240 };
     private readonly TextBlock _status = Label("Connecting to independent rink authority", 15);
+    private readonly TextBlock _recent = Label("Waiting for committed events", 14);
+    private Window? _activeDialog;
     private readonly TextBox _penaltyTeam = new() { Watermark = "home / away", Width = 130 };
     private readonly TextBox _penaltyPlayer = new() { Watermark = "Jersey #", Width = 95 };
     private readonly TextBox _penaltyInfraction = new() { Watermark = "Infraction", Width = 180 };
@@ -73,8 +75,8 @@ public sealed class TimekeeperWindow : Window
         var key = Environment.GetEnvironmentVariable("ICEBREAKER_OPERATOR_KEY") ?? "local-development-key";
         _client = new RinkClockClient(_http, key, Environment.GetEnvironmentVariable("ICEBREAKER_OPERATOR_ID") ?? "desktop-timekeeper");
 
-        // The official score and clock remain fixed while the operator changes
-        // tabs. No UI timer owns or advances the authoritative game clock.
+        // Main-screen-first workflow: scoreboard remains visible behind modal
+        // entry windows. The backend alone owns official clock and score.
         Background = new SolidColorBrush(Color.Parse("#071321"));
         var clockBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
         clockBody.Children.Add(Label("CLOCK OPERATIONS", 19));
@@ -107,16 +109,16 @@ public sealed class TimekeeperWindow : Window
             ActionButton("HOME TIMEOUT", () => _client.CommandAsync(new { type = "TIMEOUT_TAKEN", team = "home" })),
             ActionButton("AWAY TIMEOUT", () => _client.CommandAsync(new { type = "TIMEOUT_TAKEN", team = "away" }))));
 
-        var scoringBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
-        scoringBody.Children.Add(Label("GOAL · OFFICIAL JOURNAL ENTRY", 19));
-        scoringBody.Children.Add(new TextBlock
+        var goalBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
+        goalBody.Children.Add(Label("GOAL · OFFICIAL JOURNAL ENTRY", 19));
+        goalBody.Children.Add(new TextBlock
         {
             Text = "Use jersey numbers from the approved game lineup. NONE means no assist. The server validates the event before committing it.",
             TextWrapping = TextWrapping.Wrap
         });
-        scoringBody.Children.Add(Buttons(_goalTeam, _goalScorer, _goalAssist1, _goalAssist2));
-        scoringBody.Children.Add(_goalConfirm);
-        scoringBody.Children.Add(ActionButton("RECORD GOAL", async () =>
+        goalBody.Children.Add(Buttons(_goalTeam, _goalScorer, _goalAssist1, _goalAssist2));
+        goalBody.Children.Add(_goalConfirm);
+        goalBody.Children.Add(ActionButton("RECORD GOAL", async () =>
         {
             if (_goalConfirm.IsChecked != true) throw new InvalidOperationException("Verify goal details before committing");
             var scorer = RequiredJersey(_goalScorer.Text);
@@ -133,9 +135,10 @@ public sealed class TimekeeperWindow : Window
             _goalScorer.Text = "";
             _goalAssist1.Text = "NONE";
             _goalAssist2.Text = "NONE";
-        }));
-        scoringBody.Children.Add(Label("PENALTY ENTRY", 18));
-        scoringBody.Children.Add(Buttons(_penaltyTeam, _penaltyPlayer, _penaltyInfraction, _penaltySeconds,
+        }, closeOnSuccess: true));
+        var penaltyBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
+        penaltyBody.Children.Add(Label("PENALTY ENTRY", 18));
+        penaltyBody.Children.Add(Buttons(_penaltyTeam, _penaltyPlayer, _penaltyInfraction, _penaltySeconds,
             ActionButton("ASSESS PENALTY", async () =>
             {
                 if (!int.TryParse(_penaltySeconds.Text, out var seconds) || seconds < 1 || seconds > 3600)
@@ -147,14 +150,15 @@ public sealed class TimekeeperWindow : Window
                     infraction = (_penaltyInfraction.Text ?? "").Trim(), duration = seconds,
                     classification = "MINOR"
                 });
-            })));
-        scoringBody.Children.Add(Label("GOALIE CHANGE", 18));
-        scoringBody.Children.Add(new TextBlock
+            }, closeOnSuccess: true)));
+        var goalieBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
+        goalieBody.Children.Add(Label("GOALIE CHANGE", 18));
+        goalieBody.Children.Add(new TextBlock
         {
             Text = "Record a goalie substitution or enter EMPTY for a pulled goalie. This does not modify the approved roster.",
             TextWrapping = TextWrapping.Wrap
         });
-        scoringBody.Children.Add(Buttons(_goalieTeam, _goalieNumber, _goalieReason,
+        goalieBody.Children.Add(Buttons(_goalieTeam, _goalieNumber, _goalieReason,
             ActionButton("RECORD GOALIE CHANGE", async () =>
             {
                 var jersey = (_goalieNumber.Text ?? "").Trim().ToUpperInvariant();
@@ -168,7 +172,7 @@ public sealed class TimekeeperWindow : Window
                 });
                 _goalieNumber.Text = "";
                 _goalieReason.Text = "";
-            })));
+            }, closeOnSuccess: true)));
 
         var eventsBody = new StackPanel { Spacing = 12, Margin = new Thickness(18) };
         eventsBody.Children.Add(Label("COMMITTED EVENT HISTORY", 19));
@@ -189,16 +193,36 @@ public sealed class TimekeeperWindow : Window
             PaButton("SKIP SELECTED", SkipSelectedAsync)));
         paBody.Children.Add(_paStatus);
 
-        var tabs = new TabControl
+        // The two team buttons open a preselected draft with one click.
+        // Draft fields can be changed or dismissed without journal mutations.
+        var dashboard = new StackPanel { Spacing = 14, Margin = new Thickness(20, 10) };
+        dashboard.Children.Add(Label("QUICK GAME ACTIONS", 19));
+        dashboard.Children.Add(Buttons(
+            PopupButton("HOME GOAL", "Home goal", goalBody, () => _goalTeam.SelectedIndex = 0, 220),
+            PopupButton("AWAY GOAL", "Away goal", goalBody, () => _goalTeam.SelectedIndex = 1, 220)));
+        dashboard.Children.Add(Buttons(
+            PopupButton("HOME PENALTY", "Home penalty", penaltyBody, () => _penaltyTeam.Text = "home", 220),
+            PopupButton("AWAY PENALTY", "Away penalty", penaltyBody, () => _penaltyTeam.Text = "away", 220)));
+        dashboard.Children.Add(Buttons(
+            PopupButton("HOME GOALIE", "Home goalie change", goalieBody, () => _goalieTeam.SelectedIndex = 0, 220),
+            PopupButton("AWAY GOALIE", "Away goalie change", goalieBody, () => _goalieTeam.SelectedIndex = 1, 220)));
+        dashboard.Children.Add(Label("OFFICIAL CLOCK", 18));
+        dashboard.Children.Add(Buttons(
+            ActionButton("START / STOP   [SPACE]", () => _client.ToggleAsync(), 240),
+            PopupButton("CLOCK / PERIOD CONTROLS", "Clock and period controls", clockBody, width: 260)));
+        dashboard.Children.Add(Label("LIVE PENALTIES", 18));
+        dashboard.Children.Add(_penalties);
+        dashboard.Children.Add(Label("RECENT COMMITTED EVENT", 18));
+        dashboard.Children.Add(_recent);
+        dashboard.Children.Add(Buttons(
+            PopupButton("EVENT HISTORY", "Committed event history", eventsBody, width: 220),
+            PopupButton("ARENA ANNOUNCER", "Arena announcements", paBody, width: 220)));
+        dashboard.Children.Add(new TextBlock
         {
-            Items =
-            {
-                new TabItem { Header = "CLOCK & PERIODS", Content = new ScrollViewer { Content = clockBody } },
-                new TabItem { Header = "GOALS · PENALTIES · GOALIES", Content = new ScrollViewer { Content = scoringBody } },
-                new TabItem { Header = "EVENT HISTORY", Content = new ScrollViewer { Content = eventsBody } },
-                new TabItem { Header = "ARENA ANNOUNCER", Content = new ScrollViewer { Content = paBody } }
-            }
-        };
+            Text = "Before submit: edit or cancel the popup freely. After submit: corrections are logged against the original event. Goal-attribution correction is supported; penalty/score reversal remains restricted until the authority implements it.",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brushes.LightGray
+        });
         var scoreboard = new StackPanel
         {
             Spacing = 4,
@@ -231,7 +255,7 @@ public sealed class TimekeeperWindow : Window
         DockPanel.SetDock(footer, Dock.Bottom);
         shell.Children.Add(header);
         shell.Children.Add(footer);
-        shell.Children.Add(tabs);
+        shell.Children.Add(new ScrollViewer { Content = dashboard });
         Content = shell;
         KeyDown += OnKeyDown;
         _poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
@@ -275,7 +299,52 @@ public sealed class TimekeeperWindow : Window
         return panel;
     }
 
-    private Button ActionButton(string text, Func<Task> action, int width = 0)
+    private Button PopupButton(string text, string title, Control panel, Action? beforeOpen = null, int width = 0)
+    {
+        var button = new Button { Content = text, MinHeight = 62, FontWeight = FontWeight.Bold };
+        if (width > 0) button.Width = width;
+        button.Click += async (_, _) =>
+        {
+            if (_activeDialog is not null || !_connected || _busy) return;
+            beforeOpen?.Invoke();
+            await ShowPanelAsync(title, panel);
+        };
+        _mutations.Add(button);
+        return button;
+    }
+
+    private async Task ShowPanelAsync(string title, Control panel)
+    {
+        var scroller = new ScrollViewer { Content = panel };
+        var dismiss = new Button { Content = "CANCEL / CLOSE", MinHeight = 48 };
+        var layout = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(dismiss, Dock.Bottom);
+        layout.Children.Add(dismiss);
+        layout.Children.Add(scroller);
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 750,
+            Height = 570,
+            MinWidth = 500,
+            MinHeight = 400,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = new SolidColorBrush(Color.Parse("#0C2235")),
+            Content = layout
+        };
+        dismiss.Click += (_, _) => dialog.Close();
+        _activeDialog = dialog;
+        try { await dialog.ShowDialog(this); }
+        finally
+        {
+            // A panel is reused in subsequent popups; it must not remain
+            // attached to a closed window's visual tree.
+            scroller.Content = null;
+            _activeDialog = null;
+        }
+    }
+
+    private Button ActionButton(string text, Func<Task> action, int width = 0, bool closeOnSuccess = false)
     {
         var button = new Button
         {
@@ -283,7 +352,10 @@ public sealed class TimekeeperWindow : Window
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
         if (width > 0) button.Width = width;
-        button.Click += async (_, _) => await ExecuteAsync(action);
+        button.Click += async (_, _) =>
+        {
+            if (await ExecuteAsync(action) && closeOnSuccess) _activeDialog?.Close();
+        };
         _mutations.Add(button);
         return button;
     }
@@ -350,19 +422,21 @@ public sealed class TimekeeperWindow : Window
         return Task.CompletedTask;
     }
 
-    private async Task ExecuteAsync(Func<Task> action)
+    private async Task<bool> ExecuteAsync(Func<Task> action)
     {
-        if (_busy || !_connected) return;
+        if (_busy || !_connected) return false;
         _busy = true;
         SetEnabled(false);
         try
         {
             await action();
             _status.Text = "Command accepted by rink authority";
+            return true;
         }
         catch (Exception ex)
         {
             _status.Text = ex.Message;
+            return false;
         }
         finally
         {
@@ -403,6 +477,9 @@ public sealed class TimekeeperWindow : Window
             _score.Text = $"HOME {snapshot.Home}  —  {snapshot.Away} AWAY";
             _rules.Text = $"Clock mode {snapshot.ClockMode} · Rules {snapshot.TimingVersion} · Revision {snapshot.Revision}";
             _penalties.Text = "Penalty state: " + snapshot.PenaltiesJson;
+            _recent.Text = snapshot.Events?.LastOrDefault() is { } last
+                ? $"{last.Type.Replace('_', ' ')} · {(last.Team ?? "game").ToUpperInvariant()}"
+                : "No committed events";
             _eventHistory.ItemsSource = (snapshot.Events ?? [])
                 .Reverse().Take(80).Select(ev =>
                     ev.Type.Replace('_', ' ') + (ev.Team is null ? "" : " · " + ev.Team.ToUpperInvariant()) +
