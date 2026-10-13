@@ -56,6 +56,17 @@ function penaltyClock(events,currentPeriod,currentSeconds,periodSeconds=900,poli
    if(!Number.isInteger(e.period)||!Number.isFinite(e.seconds))continue;
    advance(e.period,e.seconds,(e.type==='CLOCK_UPDATED'&&e.details?.action==='SET')||e.type==='CLOCK_SYNCED');
    const d=e.details||{};
+   if(e.type==='CLOCK_SYNCED'&&d.scope==='GAME_AND_PENALTIES'){
+     const correction=Number(d.secondsRemaining)-Number(d.previousSeconds);
+     if(Number.isInteger(correction)&&Math.abs(correction)<=3600){
+       if(correction<0)tick(-correction);
+       else if(correction>0){
+         // Restore elapsed penalty time without reassessing penalties or changing manpower slots.
+         // A completed penalty cannot automatically be reactivated; that requires an official correction.
+         for(const p of penalties)if(p.status==='serving')p.remaining+=correction;
+       }
+     }
+   }
    if(e.type==='PENALTY_DELAYED'){
      if(['home','away'].includes(e.team))delayed.push({id:e.id,team:e.team,details:d});
    }else if(e.type==='PENALTY_DELAYED_WAVED'){
