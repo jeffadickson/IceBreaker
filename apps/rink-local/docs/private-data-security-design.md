@@ -55,3 +55,41 @@ Set two **different** random 32-byte base64 secrets in the backend environment, 
 The club/league portal is `/registration.html` and the separate guardian portal is `/family-registration.html`. A league administrator provisions a family account and explicitly verifies a per-child grant after independent identity/authority checks. The parent can update their own contact details, mailing address, and notification preferences and upload a fictional test PDF/PNG/JPEG. Uploads remain `QUARANTINED`; there is no web endpoint to mark a file scanner-clean. In development tests, the scanner boundary is exercised directly using a trusted internal call, not through a parent or admin HTTP request.
 
 **Production is intentionally disabled** when `ICEBREAKER_PRODUCTION_MODE=1`; the registration service fails to start until the missing release controls are implemented. The rink-local SQLite database is still shared with the demo game service. The production design must move registration and vault metadata to a separately secured central service.
+
+## Security hardening: scanner, migration, rotation and MFA
+
+### ClamAV quarantine worker
+
+Configure ClamAV clamd with a local Unix socket, not a public TCP listener. In the backend worker environment set ICEBREAKER_CLAMAV_SOCKET to the socket path and ICEBREAKER_DOCUMENT_KEK_BASE64 to the document KEK. Run:
+
+    node apps/rink-local/server/scan-quarantine.js /absolute/path/to/league.db
+
+The worker decrypts one quarantined object in memory, sends it over the Unix socket using ClamAV INSTREAM, and moves it to PENDING only on a clean response. Malware is REJECTED. Timeouts, unavailable scanners, malformed replies and key errors leave objects QUARANTINED. There is no HTTP scanner bypass. ClamAV installation, signature updates and production operational testing are still required.
+
+### Offline legacy private-field migration
+
+Stop the registration service, verify an encrypted backup stored outside the server, and configure ICEBREAKER_PRIVATE_FIELD_KEY_BASE64. Preview counts with:
+
+    node apps/rink-local/server/migrate-private-fields.js /absolute/path/to/league.db
+
+Apply only after independently verifying a backup and a test restore:
+
+    node apps/rink-local/server/migrate-private-fields.js /absolute/path/to/league.db --apply --backup-verified
+
+Enable ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION=1 after validating migration to refuse plaintext reads and writes. This covers player legal name, DOB, address, related-person name/contact and family mailing address/preferences. It does NOT yet encrypt indexed login emails, external registration identifiers or every sensitive metadata field.
+
+### Offline document key rotation
+
+Stop registration and scan workers, verify an encrypted backup, and configure distinct ICEBREAKER_OLD_DOCUMENT_KEK_BASE64 and ICEBREAKER_NEW_DOCUMENT_KEK_BASE64. Run:
+
+    node apps/rink-local/server/rewrap-document-keys.js /absolute/path/to/league.db --apply --backup-verified
+
+The operation authenticates and rewraps all document DEKs transactionally, without changing encrypted document objects. Switch the service KEK only after successful completion and tested recovery. This is not production KMS.
+
+### Administrator MFA
+
+In registration.html, staff can enroll an authenticator using the MFA section. Enrollment requires a private-field encryption key. Confirm the first TOTP code to activate MFA and invalidate prior sessions. Future login requires password plus fresh six-digit code; code replay is rejected. MFA remains optional in development, and account recovery, enforced provisioning policy and rate limiting are outstanding.
+
+### Production remains blocked
+
+ICEBREAKER_PRODUCTION_MODE=1 still refuses to start private registration. Remaining release blockers include production KMS/HSM, encrypted backup/restore drills, operational malware scanner, mandatory MFA and recovery, verified guardian consent/authority, protection for indexed emails and registration identifiers, full legacy migration, secure retention/deletion, and independent penetration testing.
