@@ -35,7 +35,7 @@ test('exclusive game ownership requires explicit administrative transfer',async 
  assert.equal((await f.push([ev(1,'SHOT_RECORDED',{team:'home'})])).status,200);
  assert.equal((await f.send('/admin/games/transfer',{gameId:f.gameId,stationId:'rink-b'},admin)).status,200);
  assert.equal((await f.push([ev(2,'SHOT_RECORDED',{team:'home'})])).status,409);
- const batch={gameId:f.gameId,stationId:'rink-b',events:[ev(2,'SHOT_RECORDED',{team:'away'})]};
+ const batch={gameId:f.gameId,stationId:'rink-b',epoch:2,events:[ev(2,'SHOT_RECORDED',{team:'away'})]};
  assert.equal((await f.send('/api/ingest/v1/batches',batch,{'x-station-signature':signBatch(keys.privateKey,batch)})).status,200);
  const snap=await (await fetch(f.base+'/api/public/v1/games/'+f.gameId)).json();
  assert.deepEqual(snap.shots,{home:1,away:1});
