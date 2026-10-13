@@ -50,6 +50,21 @@ public sealed class AnnouncementQueue : IDisposable
         var player = Jersey(Field(details, "player"));
         var infraction = Field(details, "infraction");
         if (infraction.Length is < 1 or > 100 || infraction.Any(char.IsControl)) return null;
+        // Do not forward arbitrary operator-entered text (potential youth PII)
+        // to a hosted voice provider. Unknown penalty names use generic wording.
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Tripping", "Hooking", "Holding", "Interference", "Slashing",
+            "Cross-checking", "High-sticking", "Roughing", "Boarding",
+            "Charging", "Elbowing", "Kneeing", "Spearing", "Butt-ending",
+            "Unsportsmanlike conduct", "Too many players", "Too many men",
+            "Delay of game", "Goaltender interference", "Fighting",
+            "Misconduct", "Game misconduct", "Checking from behind",
+            "Head contact", "Illegal check to the head", "Obstruction",
+            "Holding the stick", "Embellishment", "Abuse of officials",
+            "Illegal equipment", "Bench minor"
+        };
+        if (!known.Contains(infraction)) infraction = "an infraction";
         if (!int.TryParse(Field(details, "duration"), out var seconds) || seconds < 1 || seconds > 3600) return null;
         return $"Penalty to the {team}, {player}. {seconds / 60} minutes" +
                (seconds % 60 > 0 ? $" and {seconds % 60} seconds" : "") +
