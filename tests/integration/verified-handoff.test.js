@@ -102,3 +102,18 @@ test('HANDOFF-005: pinned game refuses unsafe legacy transfer path',async t=>{
  assert.equal(result.status,409);
  assert.match(result.data.error,/verified/);
 });
+
+test('HANDOFF-006: running clock and mismatched timing policy cannot be restored',async t=>{
+ const x=await fixture(t);
+ x.command(x.a,{type:'CLOCK_UPDATED',action:'START',seconds:600});
+ await x.client('a',1).flush();
+ const pkg=(await x.post('/admin/games/prepare-handoff',{gameId:x.gameId,stationId:'rink-b'})).data;
+ assert.throws(()=>verifyPackage(pkg,{adminKey:ADMIN,gameId:x.gameId,stationId:'rink-b'}),/running clock/);
+ assert.equal(x.b.rows().length,0);
+ x.command(x.a,{type:'CLOCK_UPDATED',action:'STOP',seconds:590});
+ await x.client('a',1).flush();
+ const fresh=(await x.post('/admin/games/prepare-handoff',{gameId:x.gameId,stationId:'rink-b'})).data;
+ x.b.db.prepare('UPDATE game_timing_policy SET version=? WHERE game_id=?').run('WRONG-POLICY',x.gameId);
+ assert.throws(()=>restoreIdleStandby({dbPath:x.files.b,pkg:fresh,adminKey:ADMIN,gameId:x.gameId,stationId:'rink-b'}),/timing policy differs/);
+ assert.equal(x.b.rows().length,0);
+});
