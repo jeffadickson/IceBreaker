@@ -19,6 +19,8 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
  CREATE TABLE IF NOT EXISTS assignments(game_id TEXT NOT NULL, station_id TEXT NOT NULL REFERENCES stations(id), PRIMARY KEY(game_id,station_id));
  CREATE TABLE IF NOT EXISTS game_owners(game_id TEXT PRIMARY KEY, station_id TEXT NOT NULL REFERENCES stations(id), epoch INTEGER NOT NULL DEFAULT 1);
  CREATE TABLE IF NOT EXISTS game_events(game_id TEXT NOT NULL, seq INTEGER NOT NULL, event_id TEXT NOT NULL, station_id TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL, digest TEXT NOT NULL, received_at TEXT NOT NULL, PRIMARY KEY(game_id,seq), UNIQUE(game_id,event_id));
+ CREATE TABLE IF NOT EXISTS handoff_policies(game_id TEXT PRIMARY KEY,version TEXT NOT NULL,rules_json TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS handoff_preparations(game_id TEXT PRIMARY KEY,station_id TEXT NOT NULL,expected_epoch INTEGER NOT NULL,digest TEXT NOT NULL,created_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS ingestion_audit(id INTEGER PRIMARY KEY AUTOINCREMENT, happened_at TEXT NOT NULL, action TEXT NOT NULL, game_id TEXT, station_id TEXT, detail TEXT);`);
  const listeners=new Map();
  const audit=(action,gameId,stationId,detail)=>db.prepare('INSERT INTO ingestion_audit(happened_at,action,game_id,station_id,detail) VALUES(?,?,?,?,?)').run(new Date().toISOString(),action,gameId||null,stationId||null,String(detail||'').slice(0,300));
@@ -57,10 +59,70 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
   if(accepted.length){const subscribers=listeners.get(batch.gameId)||new Set();const latest=nextSnapshot(batch.gameId);for(const res of subscribers){try{res.write(`id: ${latest.lastSequence}\nevent: update\ndata: ${JSON.stringify(latest)}\n\n`);}catch{subscribers.delete(res);}}}
   return {gameId:batch.gameId,epoch:owner?.epoch||1,accepted,duplicates,nextSequence:(db.prepare('SELECT MAX(seq) AS n FROM game_events WHERE game_id=?').get(batch.gameId).n||0)+1};
  }
+ function handoffEvents(gameId){
+  return db.prepare('SELECT seq,event_id,kind,payload,digest FROM game_events WHERE game_id=? ORDER BY seq').all(gameId)
+   .map(e=>({seq:e.seq,id:e.event_id,type:e.kind,data:JSON.parse(e.payload),digest:e.digest}));
+ }
+ function handoffPayload(gameId,stationId){
+  const owner=db.prepare('SELECT station_id,epoch FROM game_owners WHERE game_id=?').get(gameId);
+  const policy=db.prepare('SELECT version,rules_json FROM handoff_policies WHERE game_id=?').get(gameId);
+  if(!owner||!policy)throw Object.assign(new Error('Owner and pinned timing policy required'),{status:409});
+  const events=handoffEvents(gameId);
+  return {gameId,stationId,expectedEpoch:owner.epoch,nextEpoch:owner.epoch+1,
+   timingVersion:policy.version,timingRules:JSON.parse(policy.rules_json),events};
+ }
+ function digestManifest(payload){return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');}
+ function signManifest(payload){return crypto.createHmac('sha256',adminKey).update(JSON.stringify(payload)).digest('hex');}
  function nextSnapshot(gameId){const rows=db.prepare('SELECT seq,event_id,kind,payload,received_at FROM game_events WHERE game_id=? ORDER BY seq').all(gameId);let home=0,away=0,shotsHome=0,shotsAway=0,period=1,status='scheduled';for(const e of rows){const d=JSON.parse(e.payload);if(e.kind==='GOAL_RECORDED'){if((d.team||d.teamId)==='home'){home++;shotsHome++;}if((d.team||d.teamId)==='away'){away++;shotsAway++;}}if(e.kind==='SHOT_RECORDED'){if((d.team||d.teamId)==='home')shotsHome++;if((d.team||d.teamId)==='away')shotsAway++;}if(e.kind==='PERIOD_STARTED'){period=d.period;status='live';}if(e.kind==='PERIOD_ADVANCED'){period=d.period||period+1;status='live';}if(e.kind==='GAME_ENDED')status='provisional_final';}return {gameId,lastSequence:rows.at(-1)?.seq||0,status,period,score:{home,away},shots:{home:shotsHome,away:shotsAway},events:rows.map(e=>({seq:e.seq,id:e.event_id,type:e.kind,data:JSON.parse(e.payload),receivedAt:e.received_at}))};}
  const server=http.createServer(async(req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;
   try{
    if(req.method==='GET'&&pathname==='/health')return json(res,200,{status:'ok'});
+   if(req.method==='POST'&&['/admin/games/policy','/admin/games/prepare-handoff','/admin/games/commit-handoff'].includes(pathname)){
+    const supplied=String(req.headers['x-admin-key']||'');
+    if(supplied.length!==adminKey.length||!crypto.timingSafeEqual(Buffer.from(supplied),Buffer.from(adminKey)))return json(res,403,{error:'Denied'});
+    const b=await body(req);
+    if(!validId(b.gameId))throw Object.assign(new Error('Invalid game ID'),{status:400});
+    if(pathname==='/admin/games/policy'){
+     if(typeof b.version!=='string'||b.version.length<1||b.version.length>100||!b.rules||typeof b.rules!=='object'||Array.isArray(b.rules))
+      throw Object.assign(new Error('Invalid timing policy'),{status:400});
+     const rules=JSON.stringify(b.rules);
+     if(rules.length>16000)throw Object.assign(new Error('Timing policy too large'),{status:400});
+     const old=db.prepare('SELECT * FROM handoff_policies WHERE game_id=?').get(b.gameId);
+     if(old&&(old.version!==b.version||old.rules_json!==rules))throw Object.assign(new Error('Pinned timing policy immutable'),{status:409});
+     if(!db.prepare('SELECT 1 FROM game_owners WHERE game_id=?').get(b.gameId))throw Object.assign(new Error('Unassigned game'),{status:404});
+     db.prepare('INSERT OR IGNORE INTO handoff_policies VALUES(?,?,?)').run(b.gameId,b.version,rules);
+     audit('TIMING_POLICY_PINNED',b.gameId,null,b.version);
+     return json(res,200,{pinned:true});
+    }
+    if(!validId(b.stationId))throw Object.assign(new Error('Invalid station'),{status:400});
+    const station=db.prepare('SELECT enabled FROM stations WHERE id=?').get(b.stationId);
+    if(!station||!station.enabled)throw Object.assign(new Error('Station unavailable'),{status:409});
+    const owner=db.prepare('SELECT * FROM game_owners WHERE game_id=?').get(b.gameId);
+    if(!owner||owner.station_id===b.stationId)throw Object.assign(new Error('Handoff requires a different assigned owner'),{status:409});
+    if(pathname==='/admin/games/prepare-handoff'){
+     const payload=handoffPayload(b.gameId,b.stationId),digest=digestManifest(payload);
+     db.prepare('INSERT INTO handoff_preparations VALUES(?,?,?,?,?) ON CONFLICT(game_id) DO UPDATE SET station_id=excluded.station_id,expected_epoch=excluded.expected_epoch,digest=excluded.digest,created_at=excluded.created_at')
+      .run(b.gameId,b.stationId,owner.epoch,digest,new Date().toISOString());
+     audit('HANDOFF_PREPARED',b.gameId,b.stationId,'epoch='+payload.nextEpoch);
+     return json(res,200,{manifest:payload,digest,signature:signManifest(payload)});
+    }
+    if(typeof b.digest!=='string'||!/^[a-f0-9]{64}$/.test(b.digest)||!Number.isSafeInteger(b.expectedEpoch))
+     throw Object.assign(new Error('Invalid handoff acknowledgment'),{status:400});
+    db.exec('BEGIN IMMEDIATE');
+    try{
+     const prepared=db.prepare('SELECT * FROM handoff_preparations WHERE game_id=?').get(b.gameId);
+     const payload=handoffPayload(b.gameId,b.stationId);
+     if(!prepared||prepared.station_id!==b.stationId||prepared.expected_epoch!==b.expectedEpoch||
+      prepared.digest!==b.digest||digestManifest(payload)!==b.digest)
+      throw Object.assign(new Error('Handoff stale or journal changed; prepare again'),{status:409});
+     db.prepare('INSERT OR IGNORE INTO assignments(game_id,station_id) VALUES(?,?)').run(b.gameId,b.stationId);
+     db.prepare('UPDATE game_owners SET station_id=?,epoch=epoch+1 WHERE game_id=? AND epoch=?').run(b.stationId,b.gameId,b.expectedEpoch);
+     db.prepare('DELETE FROM handoff_preparations WHERE game_id=?').run(b.gameId);
+     audit('HANDOFF_COMMITTED',b.gameId,b.stationId,'epoch='+payload.nextEpoch);
+     db.exec('COMMIT');
+     return json(res,200,{transferred:true,epoch:payload.nextEpoch,digest:b.digest});
+    }catch(e){db.exec('ROLLBACK');throw e;}
+   }
    if(req.method==='POST'&&(pathname==='/admin/stations'||pathname==='/admin/assignments'||pathname==='/admin/stations/revoke'||pathname==='/admin/games/transfer')){
     const supplied=String(req.headers['x-admin-key']||'');if(supplied.length!==adminKey.length||!crypto.timingSafeEqual(Buffer.from(supplied),Buffer.from(adminKey)))return json(res,403,{error:'Denied'});
     const b=await body(req);
