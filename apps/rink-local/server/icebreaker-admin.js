@@ -14,7 +14,7 @@ function argsOf(argv){
   const arg=tail[i];
   if(!arg.startsWith('--'))throw Error('Unexpected positional argument');
   const key=arg.slice(2);
-  if(!['db','json','actor','intake','note','state','limit','subject-type','subject-id','role','scope-type','scope-id','season-id','date','attest-reviewed'].includes(key))throw Error('Unknown option');
+  if(!['db','json','actor','intake','note','state','limit','subject-type','subject-id','role','scope-type','scope-id','season-id','date','attest-reviewed','archive'].includes(key))throw Error('Unknown option');
   if(key==='attest-reviewed'){opts.attestReviewed=true;continue;}
   if(opts[key]!==undefined||i===tail.length-1||tail[i+1].startsWith('--'))throw Error('Missing or repeated option');
   opts[key]=tail[++i];
@@ -50,6 +50,18 @@ function execute(db,command,opts,{readJson=inputJson}={}){
  if(command==='verify'||command==='reject'){
   if(!opts.actor||!opts.intake||!opts.note)throw Error('--actor, --intake and --note required');
   if(command==='verify'&&!opts.attestReviewed)throw Error('Verification requires --attest-reviewed after independent review');
+  if(command==='verify'){
+   const row=db.prepare('SELECT evidence_ref FROM training_intake WHERE id=?').get(opts.intake);
+   if(!row)throw Error('Intake not found');
+   if(row.evidence_ref?.startsWith('archive:')){
+    if(!opts.archive)throw Error('--archive required to validate quarantined email evidence');
+    const {EvidenceArchive}=require('./email-evidence-archive');
+    const archive=new EvidenceArchive(opts.archive);
+    try{
+     if(archive.scanStatus(row.evidence_ref.slice(8))!=='CLEAN')throw Error('Evidence must pass malware scan before verification');
+    }finally{archive.close();}
+   }
+  }
   return intake.decide(db,opts.intake,{decision:command==='verify'?'VERIFIED':'REJECTED',reviewer:opts.actor,note:opts.note});
  }
  if(command==='status'){
