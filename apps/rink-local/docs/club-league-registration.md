@@ -52,7 +52,7 @@ For any other club/team, an authorized league bootstrap action must explicitly a
 1. Sign in with a league-scoped account.
 2. Review the league's pending registration requests and approve/reject each with a reason.
 3. Approval atomically creates the season membership and history entry; rejection never changes the roster. An already-decided request cannot be decided twice.
-4. Define annual training requirements and verify completions. Existing lineup eligibility checks still enforce expired or missing mandatory training.
+4. Optionally configure a division-specific age cutoff and allowed age range; approvals are rejected atomically if a player's private birth date makes them ineligible. Define annual training requirements and verify completions. Existing lineup eligibility checks still enforce expired or missing mandatory training.
 5. Authorize linking an existing player ID to a club when an actual identity transfer has been verified. After the transfer, revoke a former club's private-record access with an audited reason; removal is blocked while that player still has an active roster membership with the former club. Do not create duplicate player records for transfers.
 
 The team-manager portal cannot bypass approval for a team assigned to the new club registration system. It can still edit the approved **game-day lineup**.
