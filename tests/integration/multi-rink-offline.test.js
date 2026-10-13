@@ -61,7 +61,10 @@ test('DISTRIBUTED-002: two laptops cannot publish conflicting ownership or repla
  assert.equal(x.b.db.prepare('SELECT delivered FROM sync_outbox').get().delivered,0);
  assert.equal(x.snapshot().lastSequence,1);
  assert.equal((await x.post('/admin/games/transfer',{gameId:x.gameId,stationId:'rink-b'},{'x-admin-key':ADMIN})).body.epoch,2);
- await assert.rejects(()=>x.client('a').flush(),/./); // no pending: see explicit stale test below
+ command(x.a,{type:'SHOT_RECORDED',team:'home'});
+ await assert.rejects(()=>x.client('a').flush(),e=>e.status===409&&/Another station owns/.test(e.message));
+ assert.equal(x.a.db.prepare('SELECT COUNT(*) n FROM sync_outbox WHERE delivered=0').get().n,1);
+ assert.equal(x.snapshot().lastSequence,1);
 });
 test('DISTRIBUTED-003: signed fencing epochs reject stale clients even after ownership cycles',async t=>{
  const x=await setup(t);
