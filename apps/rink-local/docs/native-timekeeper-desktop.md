@@ -29,6 +29,7 @@ A browser crash does not affect the native timekeeper. The browser is not part o
 - MM:SS + reason + explicit checkbox: stopped-clock manual sync, game-only scope
 - End period / next period / begin overtime: validated by authoritative rules
 - Warmup / intermission / auxiliary start/pause: separate clock, never game or penalty time
+- Native penalty assessment form (team, jersey, infraction, duration) and team timeout controls; server validates and journals requests
 - Game score, ruleset version, penalty state, connection status: server-sourced
 
 All command requests carry a unique idempotency key and an operator identity. The current server still uses a **development shared key** and must not be exposed on public interfaces. Set `ICEBREAKER_OPERATOR_KEY` consistently in both authority and desktop environments and `ICEBREAKER_OPERATOR_ID` to identify the operator; proper RBAC is outstanding.
@@ -37,4 +38,4 @@ All command requests carry a unique idempotency key and an operator identity. Th
 
 .NET tests exercise snapshot reads, start/stop, correction validation, unique command keys, and disconnected authority. GitHub CI compiles the Avalonia desktop and publishes a Windows artifact. **Windows physical-machine smoke testing, forced desktop process termination while the authority runs, independent authority crash recovery, signed installers, OS service registration, external scoreboard drivers, and end-to-end full-game timekeeper acceptance are not yet complete.** Do not treat a successful compile as those tests passing.
 
-The current native timekeeper covers clock/phase operations, not the full goal/penalty entry and referee review UI. These can be added as native screens or separate operator stations; no duplicate clock authority should be introduced.
+The current native timekeeper covers clock/phase operations, basic penalty entry and team timeouts, but not the complete goal/assist workflow, advanced penalty classifications, or referee review UI. These can be added as native screens or separate operator stations; no duplicate clock authority should be introduced.
