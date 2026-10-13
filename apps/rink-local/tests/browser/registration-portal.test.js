@@ -31,6 +31,16 @@ test('club scope blocks private reads, team access and self-approval',t=>{
  assert.equal(x.portal.db.prepare('SELECT COUNT(*) n FROM roster_memberships WHERE player_id=?').get(playerId).n,0);
  assert.equal(JSON.stringify(x.league.snapshot()).includes('123 Private St'),false);
 });
+test('guardian contact can be reused for siblings in same club but not another club',t=>{
+ const x=setup();t.after(()=>x.close());
+ const a1=x.portal.createPlayer(x.a,{displayName:'Sibling A',legalName:'Private A',birthDate:'2016-01-02'}).playerId;
+ const a2=x.portal.createPlayer(x.a,{displayName:'Sibling B',legalName:'Private B',birthDate:'2016-02-02'}).playerId;
+ const b=x.portal.createPlayer(x.b,{displayName:'Other Club',legalName:'Private C',birthDate:'2016-03-02'}).playerId;
+ const person=x.portal.addRelatedPerson(x.a,a1,{fullName:'Fictional Guardian',relationship:'GUARDIAN'}).personId;
+ x.portal.addRelatedPerson(x.a,a2,{personId:person,relationship:'GUARDIAN'});
+ assert.equal(x.portal.profile(x.a,a2).relatedPeople[0].personId,person);
+ assert.throws(()=>x.portal.addRelatedPerson(x.b,b,{personId:person,relationship:'GUARDIAN'}),/outside club scope/);
+});
 test('league approval enrolls permanent ID atomically, rejects duplicate decisions and preserves season history',t=>{
  const x=setup();t.after(()=>x.close());
  const {playerId}=x.portal.createPlayer(x.a,{displayName:'Alias A',legalName:'Private A',birthDate:'2016-01-02'});
