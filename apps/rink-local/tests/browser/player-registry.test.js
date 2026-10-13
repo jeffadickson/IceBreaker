@@ -55,6 +55,7 @@ test('annual training blocks only required seasons and preserves prior-year evid
  assert.equal(x.players.trainingStatus(player.id,'maple',day)[0].complete,true);
  x.teams.confirmLineup('maple',game.id,'manager',{playerIds:[player.id],expectedRosterRevision:0});
  const away=x.teams.roster(game.away_team_id)[0];
+ x.players.recordTraining({playerId:away.id,requirementId:req.requirementId,completedOn:'2026-09-20'},'registrar');
  x.teams.confirmLineup(game.away_team_id,game.id,'manager',{playerIds:[away.id],expectedRosterRevision:0});
  assert.equal(pregameSnapshot(x.teams.db,game.id).ready,true);
  const completion=x.players.db.prepare('SELECT id FROM player_training_completions WHERE player_id=?').get(player.id);
