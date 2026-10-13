@@ -47,6 +47,21 @@ class PlayerRegistry{
   if(!p)throw Error('Private player profile not found');
   return {playerId:p.playerId,legalName:p.legalName,birthDate:p.birthDate,address:JSON.parse(p.addressJson)};
  }
+ ageAt(playerId,cutoffDate){
+  if(!validDate(cutoffDate))throw Error('Invalid eligibility cutoff date');
+  const birth=this.privateProfile(playerId).birthDate;
+  return Number(cutoffDate.slice(0,4))-Number(birth.slice(0,4))-(cutoffDate.slice(5)<birth.slice(5)?1:0);
+ }
+ updatePrivateProfile(playerId,{legalName,birthDate,address={}},actor){
+  if(!good(actor,100)||!good(legalName)||!validDate(birthDate)||!address||typeof address!=='object'||Array.isArray(address)||JSON.stringify(address).length>2000)throw Error('Invalid private player profile');
+  return this.tx(()=>{
+   const result=this.db.prepare('UPDATE player_private_profiles SET legal_name=?,birth_date=?,address_json=?,updated_at=?,updated_by=? WHERE player_id=?')
+    .run(legalName.trim(),birthDate,JSON.stringify(address),new Date().toISOString(),actor,playerId);
+   if(result.changes!==1)throw Error('Private player profile not found');
+   this.audit('PRIVATE_PROFILE_UPDATED',playerId,{privateFieldsChanged:true},actor);
+   return {playerId,updated:true};
+  });
+ }
  linkPerson(playerId,{personId=null,fullName,email=null,phone=null,relationship},actor){
   if(!good(actor,100)||!['PARENT','GUARDIAN','EMERGENCY_CONTACT','OTHER'].includes(relationship)||!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Invalid person link');
   if(personId===null&&(!good(fullName)||email!==null&&(!good(email,250))||phone!==null&&!good(phone,50)))throw Error('Invalid related person');
