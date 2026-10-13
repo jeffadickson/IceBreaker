@@ -48,6 +48,7 @@ public sealed class TimekeeperWindow : Window
     private readonly ComboBox _paStyle = new() { ItemsSource = new[] { "Classic arena PA", "High-energy goal call", "Calm and precise" }, SelectedIndex = 0, Width = 205 };
     private readonly TextBlock _paStatus = Label("PA is manual-approval only; AI speech is synthetic.", 14);
     private readonly HashSet<string> _seenPaEvents = new(StringComparer.Ordinal);
+    private bool _paInitialized;
     private bool _paBusy;
     private bool _busy;
     private bool _connected;
@@ -271,7 +272,8 @@ public sealed class TimekeeperWindow : Window
             var snapshot = await _client.SnapshotAsync();
             _latest = snapshot;
             foreach (var ev in snapshot.Events ?? [])
-                if (_seenPaEvents.Add(ev.Id)) _paQueue.Stage(ev);
+                if (_seenPaEvents.Add(ev.Id)) _paQueue.Stage(ev, recovered: !_paInitialized);
+            _paInitialized = true;
             if (!_paBusy) UpdatePaList();
             _connected = true;
             _connection.Text = snapshot.Running ? "● AUTHORITY CONNECTED · RUNNING" : "● AUTHORITY CONNECTED · STOPPED";
