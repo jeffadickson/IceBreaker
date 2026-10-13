@@ -42,7 +42,7 @@ class EvidenceArchive{
    const wrapped=seal(dek,keyFromEnvironment(),'icebreaker-email-dek-v1:'+id);
    this.db.exec('BEGIN IMMEDIATE');
    try{
-    this.db.prepare('INSERT INTO archived_evidence VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+    this.db.prepare('INSERT INTO archived_evidence(id,source_digest,subject_type,subject_id,training_id,mime,bytes,sha256,encrypted_data,data_nonce,data_tag,wrapped_key,key_nonce,key_tag,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
      id,sourceDigest,subjectType,subjectId,trainingId,mime,bytes.length,checksum,data.data,data.nonce,data.tag,
      wrapped.data,wrapped.nonce,wrapped.tag,new Date().toISOString());
     this.audit('EVIDENCE_ENCRYPTED',id,actor,{subjectType,subjectId});
