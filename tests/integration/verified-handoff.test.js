@@ -23,7 +23,7 @@ async function fixture(t){
  t.after(async()=>{a.close();b.close();await central.close();fs.rmSync(dir,{recursive:true,force:true});});
  const command=(x,c)=>x.command(c,{key:'handoff-'+crypto.randomUUID()});
  const client=(id,epoch)=>new RinkSyncClient({dbPath:files[id],remoteUrl:base,gameId,stationId:'rink-'+id,privateKey:keys[id].privateKey,epoch});
- return {a,b,files,base,gameId,central,post,command,client};
+ return {a,b,files,base,gameId,central,post,command,client,keys};
 }
 test('HANDOFF-001: backup restores goalie/penalty/clock journal, requires operator approval and then publishes',async t=>{
  const x=await fixture(t);
@@ -33,7 +33,7 @@ test('HANDOFF-001: backup restores goalie/penalty/clock journal, requires operat
  x.command(x.a,{type:'CLOCK_UPDATED',action:'SET',seconds:420});
  await x.client('a',1).flush();
  let shown;
- const result=await handoff({remoteUrl:x.base,dbPath:x.files.b,gameId:x.gameId,stationId:'rink-b',adminKey:ADMIN,
+ const result=await handoff({remoteUrl:x.base,dbPath:x.files.b,gameId:x.gameId,stationId:'rink-b',adminKey:ADMIN,privateKey:x.keys.b.privateKey,
   confirm:async details=>{shown=details;return true;}});
  assert.equal(result.active,true);
  assert.equal(result.restored,4);
@@ -61,7 +61,7 @@ test('HANDOFF-002: declined confirmation leaves owner unchanged and standby empt
  const x=await fixture(t);
  x.command(x.a,{type:'SHOT_RECORDED',team:'home'});
  await x.client('a',1).flush();
- await assert.rejects(()=>handoff({remoteUrl:x.base,dbPath:x.files.b,gameId:x.gameId,stationId:'rink-b',adminKey:ADMIN,
+ await assert.rejects(()=>handoff({remoteUrl:x.base,dbPath:x.files.b,gameId:x.gameId,stationId:'rink-b',adminKey:ADMIN,privateKey:x.keys.b.privateKey,
   confirm:async()=>false}),/did not confirm/);
  assert.equal(x.b.rows().length,0);
  assert.equal(x.central.db.prepare('SELECT station_id FROM game_owners WHERE game_id=?').get(x.gameId).station_id,'rink-a');
@@ -77,5 +77,6 @@ test('HANDOFF-003: tampered manifest, divergent standby, changed central journal
  x.command(x.b,{type:'SHOT_RECORDED',team:'away'});
  assert.throws(()=>restoreIdleStandby({dbPath:x.files.b,pkg:prepared,adminKey:ADMIN,gameId:x.gameId,stationId:'rink-b'}),/contains a game journal/);
  const changed=(await x.post('/admin/games/commit-handoff',{gameId:x.gameId,stationId:'rink-b',expectedEpoch:1,digest:prepared.digest}));
- assert.equal(changed.status,200); // this test shows that commit API alone is admin-authorized, not proof of standby restore
+ assert.equal(changed.status,401); // no station-signed restoration receipt
+ assert.equal(x.central.db.prepare('SELECT station_id FROM game_owners WHERE game_id=?').get(x.gameId).station_id,'rink-a');
 });
