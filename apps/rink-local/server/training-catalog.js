@@ -42,6 +42,8 @@ function addPolicy(db,{trainingId,scopeType,scopeId,seasonId='',role,renewalMode
  if(seasonId&&!db.prepare('SELECT 1 FROM seasons WHERE id=?').get(seasonId))throw Error('Unknown season');
  // Revisions are append-only; a later effectiveFrom supersedes earlier
  // revisions for the same course/scope/role. No retroactive rule mutation.
+ const previous=db.prepare('SELECT MAX(effective_from) latest FROM training_policy_versions WHERE training_id=? AND scope_type=? AND scope_id=? AND season_id=? AND role=?').get(trainingId,scopeType,scopeId,seasonId,role);
+ if(previous.latest&&effectiveFrom<=previous.latest)throw Error('New policy revision must have a later effective date');
  const revision=db.prepare('SELECT COALESCE(MAX(revision),0)+1 n FROM training_policy_versions WHERE training_id=? AND scope_type=? AND scope_id=? AND season_id=? AND role=?').get(trainingId,scopeType,scopeId,seasonId,role).n;
  const id=uid();
  db.prepare('INSERT INTO training_policy_versions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
