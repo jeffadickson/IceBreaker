@@ -41,6 +41,8 @@ test('quarantine, encryption, scoped document access and verified guardian grant
  assert.throws(()=>x.portal.listDocuments(family,playerId),/denied/);
  x.portal.grantGuardian(x.admin,{personId,playerId,canViewDocuments:true,canUploadDocuments:true});
  assert.equal(x.portal.family.children(family).length,1);
+ x.portal.family.updateDetails(family,{preferredName:'Fictional Guardian',address:{street:'Fictional Family Street',city:'Demo City'},contactByEmail:true,contactBySms:false});
+ assert.equal(x.portal.family.ownContact(family).details.address.city,'Demo City');
  const doc=x.portal.uploadDocument(family,{playerId,documentType:'BIRTH_CERTIFICATE',mime:'application/pdf',base64:pdf.toString('base64')});
  assert.equal(doc.status,'QUARANTINED');
  const raw=fs.readFileSync(x.portal.documents.objectPath(doc.documentId));
@@ -88,5 +90,7 @@ test('private player and related-person fields encrypt with opt-in field key',t=
  assert.match(raw.email,/^enc:v1:/);
  assert.equal(x.portal.registry.relatedPeople(playerId)[0].email,'private@example.invalid');
  delete process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;
+ const parentId=x.portal.registry.relatedPeople(playerId)[0].personId;
+ assert.throws(()=>x.portal.registry.relatedPeople(playerId),/requires configured key/);
  assert.throws(()=>x.portal.registry.privateProfile(playerId),/requires configured key/);
 });
