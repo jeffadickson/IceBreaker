@@ -42,7 +42,7 @@ For any other club/team, an authorized league bootstrap action must explicitly a
 ## Club registrar workflow
 
 1. Sign in to `registration.html`. Only players linked to that club are listed.
-2. Create a fictional permanent player profile (or ask the league to link an existing player ID). Add related parents/guardians and update the private profile as needed.
+2. Create a fictional permanent player profile (or ask the league to link an existing player ID). Add related parents/guardians and update the private profile as needed. For siblings already in the same club, reuse an existing related-person ID rather than creating a duplicate contact.
 3. Select a team, jersey and position; submit a **pending registration**. This does not immediately change the approved roster.
 4. For bulk data, upload a CSV with header `playerId,teamId,jersey,position`. Preview validation and submit up to 250 rows atomically. Rows must reference **existing permanent player IDs**; never merge identities by name.
 5. For annual rollover, select prior-season and next-season teams within the same club, preview the players, then submit the new season requests for league approval. The permanent player IDs and historical statistics do not change.
@@ -53,7 +53,7 @@ For any other club/team, an authorized league bootstrap action must explicitly a
 2. Review the league's pending registration requests and approve/reject each with a reason.
 3. Approval atomically creates the season membership and history entry; rejection never changes the roster. An already-decided request cannot be decided twice.
 4. Define annual training requirements and verify completions. Existing lineup eligibility checks still enforce expired or missing mandatory training.
-5. Authorize linking an existing player ID to a club when an actual identity transfer has been verified. Do not create duplicate player records for transfers.
+5. Authorize linking an existing player ID to a club when an actual identity transfer has been verified. After the transfer, revoke a former club's private-record access with an audited reason; removal is blocked while that player still has an active roster membership with the former club. Do not create duplicate player records for transfers.
 
 The team-manager portal cannot bypass approval for a team assigned to the new club registration system. It can still edit the approved **game-day lineup**.
 
@@ -67,7 +67,7 @@ The team-manager portal cannot bypass approval for a team assigned to the new cl
 
 ## Remaining release blockers
 
-Verified parent/guardian self-service and correction requests, MFA, account invitation/recovery, audit of sensitive profile reads, encrypted storage/backups, retention and consent policies, duplicate-identity review/merge, registrar-managed transfers with revocation of prior club access, secure evidence uploads, and an actual production deployment security assessment. A successful test run is not permission to use this with real minors' records.
+Verified parent/guardian self-service and correction requests, MFA, account invitation/recovery, audit of sensitive profile reads, encrypted storage/backups, retention and consent policies, duplicate-identity review/merge, production consent checks on transfers, secure evidence uploads, and an actual production deployment security assessment. A successful test run is not permission to use this with real minors' records.
 
 ## Tests
 
