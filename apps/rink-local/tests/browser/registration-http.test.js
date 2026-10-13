@@ -35,4 +35,6 @@ test('registration web API enforces distinct club/league roles, private profile 
  assert.equal((await call('requests','GET',null,club)).data.requests[0].status,'APPROVED');
  assert.equal((await call('players','GET',null,league)).data.players[0].id,playerId);
  assert.equal(JSON.stringify(await call('context','GET',null,club)).includes('Fiction City'),false);
+ assert.equal((await call('logout','POST',null,club)).status,200);
+ assert.equal((await call('context','GET',null,club)).status,403);
 });
