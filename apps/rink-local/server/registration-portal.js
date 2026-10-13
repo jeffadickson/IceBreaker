@@ -89,6 +89,14 @@ class RegistrationPortal{
    this.audit('REGISTRATION_'+decision,requestId,u.id,{playerId:r.player_id,teamId:r.team_id});return {requestId,status:decision};
   });
  }
+ rolloverPreview(u,{fromTeamId,toTeamId}){
+  this.requireClub(u,u.scopeId);
+  const from=this.team(fromTeamId),to=this.team(toTeamId);
+  if(from.seasonId===to.seasonId)throw Error('Annual rollover requires a different season');
+  for(const teamId of [fromTeamId,toTeamId])if(!this.db.prepare('SELECT 1 FROM registration_club_teams WHERE club_id=? AND team_id=?').get(u.scopeId,teamId))throw Error('Team outside club scope');
+  const rows=this.db.prepare('SELECT player_id playerId,jersey,position FROM roster_memberships WHERE team_id=? AND season_id=? ORDER BY jersey').all(fromTeamId,from.seasonId);
+  return this.preview(u,rows.filter(r=>this.owns(u.scopeId,r.playerId)).map(r=>({...r,teamId:toTeamId})));
+ }
  preview(u,rows){
   this.requireClub(u,u.scopeId);if(!Array.isArray(rows)||rows.length>250)throw Error('Preview supports at most 250 rows');
   const seen=new Set();return rows.map((row,index)=>{const playerId=String(row?.playerId||'').trim(),teamId=String(row?.teamId||'').trim(),jersey=Number(row?.jersey),position=String(row?.position||'').trim().toUpperCase(),errors=[];
@@ -96,6 +104,7 @@ class RegistrationPortal{
    if(!this.db.prepare('SELECT 1 FROM registration_club_teams WHERE club_id=? AND team_id=?').get(u.scopeId,teamId))errors.push('Team outside club scope');
    if(!Number.isInteger(jersey)||jersey<0||jersey>99)errors.push('Invalid jersey');
    if(!['F','D','G','C','LW','RW','LD','RD'].includes(position))errors.push('Invalid position');
+   if(this.db.prepare('SELECT 1 FROM roster_memberships WHERE player_id=? AND team_id=?').get(playerId,teamId))errors.push('Player already enrolled on target team');
    const key=playerId+':'+teamId;if(seen.has(key))errors.push('Duplicate player/team');seen.add(key);
    return {row:index+1,playerId,teamId,jersey,position,valid:errors.length===0,errors};
   });
