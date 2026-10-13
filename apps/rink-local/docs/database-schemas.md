@@ -1,0 +1,277 @@
+# IceBreaker Database Schema Reference
+
+**Source-derived DDL inventory.** These are the schema definitions in the codebase. The exact installed SQLite schema, including `ALTER TABLE` columns, foreign keys and indexes, can be regenerated using [the introspection tool](../tools/schema-catalog.js). No player records or document contents are included.
+
+## Trust boundaries
+
+- **League/rink prototype SQLite:** seasons, teams, schedules, scoring, registration, family, compliance and certification; this development file is not suitable for production private data.
+- **Encrypted email evidence SQLite:** separate AES-256-GCM certificate image archive, quarantine status and audit.
+- **Central ingest SQLite:** station identities, signed event batches and replay protection; not interchangeable with the rink event journal.
+- **C# desktop SQLite:** game authority, outbox, PA announcements and pinned game policy.
+
+## Core relationships
+
+`leagues` → `league_seasons` → `seasons` → `divisions` → `teams` → `roster_memberships` → `players`. `games` link two teams; `goal_attributions` and `certified_goalie_stats` depend on certification. `player_person_links` associate players and adult contacts. `training_catalog` defines courses; `training_policy_versions` defines scope/renewal; `training_completions_v2` holds verified evidence; `training_intake` holds pending claims.
+
+## Schema DDL by owner
+
+### apps/rink-local/server/league-store.js
+
+**`seasons`**
+
+```sql
+CREATE TABLE IF NOT EXISTS seasons(id TEXT PRIMARY KEY,name TEXT NOT NULL,start_date TEXT NOT NULL,end_date TEXT NOT NULL);
+```
+
+**`leagues`**
+
+```sql
+CREATE TABLE IF NOT EXISTS leagues(id TEXT PRIMARY KEY,name TEXT NOT NULL,public_scoreboard_enabled INTEGER NOT NULL DEFAULT 1 CHECK(public_scoreboard_enabled IN (0,1)),timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles');
+```
+
+**`league_seasons`**
+
+```sql
+CREATE TABLE IF NOT EXISTS league_seasons(league_id TEXT NOT NULL REFERENCES leagues(id),season_id TEXT NOT NULL REFERENCES seasons(id),PRIMARY KEY(league_id,season_id),UNIQUE(season_id));
+```
+
+**`divisions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS divisions(id TEXT PRIMARY KEY,season_id TEXT NOT NULL REFERENCES seasons(id),name TEXT NOT NULL,rules_version TEXT NOT NULL);
+```
+
+**`division_timing_rules`**
+
+```sql
+CREATE TABLE IF NOT EXISTS division_timing_rules(division_id TEXT NOT NULL REFERENCES divisions(id),version TEXT NOT NULL,rules_json TEXT NOT NULL,PRIMARY KEY(division_id,version));
+```
+
+**`teams`**
+
+```sql
+CREATE TABLE IF NOT EXISTS teams(id TEXT PRIMARY KEY,division_id TEXT NOT NULL REFERENCES divisions(id),name TEXT NOT NULL,short TEXT NOT NULL,city TEXT NOT NULL,tone TEXT NOT NULL);
+```
+
+**`players`**
+
+```sql
+CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY,display_name TEXT NOT NULL,privacy_status TEXT NOT NULL DEFAULT 'PUBLIC_ALIAS');
+```
+
+**`roster_memberships`**
+
+```sql
+CREATE TABLE IF NOT EXISTS roster_memberships(season_id TEXT NOT NULL REFERENCES seasons(id),team_id TEXT NOT NULL REFERENCES teams(id),player_id TEXT NOT NULL REFERENCES players(id),jersey INTEGER NOT NULL,position TEXT NOT NULL,PRIMARY KEY(season_id,team_id,player_id));
+```
+
+**`games`**
+
+```sql
+CREATE TABLE IF NOT EXISTS games(id TEXT PRIMARY KEY,division_id TEXT NOT NULL REFERENCES divisions(id),date TEXT NOT NULL,venue TEXT NOT NULL,sheet TEXT NOT NULL,home_team_id TEXT NOT NULL REFERENCES teams(id),away_team_id TEXT NOT NULL REFERENCES teams(id),status TEXT NOT NULL CHECK(status IN ('scheduled','live','final')),home_score INTEGER,away_score INTEGER,certified_at TEXT,certified_by TEXT,version INTEGER NOT NULL DEFAULT 0,CHECK(home_team_id<>away_team_id));
+```
+
+**`goal_attributions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS goal_attributions(id TEXT PRIMARY KEY,game_id TEXT NOT NULL REFERENCES games(id),team_id TEXT NOT NULL REFERENCES teams(id),scorer_id TEXT REFERENCES players(id),assist1_id TEXT REFERENCES players(id),assist2_id TEXT REFERENCES players(id),CHECK(scorer_id IS NULL OR scorer_id<>assist1_id),CHECK(scorer_id IS NULL OR scorer_id<>assist2_id),CHECK(assist1_id IS NULL OR assist2_id IS NULL OR assist1_id<>assist2_id));
+```
+
+**`certified_goalie_stats`**
+
+```sql
+CREATE TABLE IF NOT EXISTS certified_goalie_stats(game_id TEXT NOT NULL REFERENCES games(id),team_id TEXT NOT NULL REFERENCES teams(id),player_id TEXT NOT NULL REFERENCES players(id),shots_against INTEGER NOT NULL CHECK(shots_against>=0),saves INTEGER NOT NULL CHECK(saves>=0),goals_against INTEGER NOT NULL CHECK(goals_against>=0),PRIMARY KEY(game_id,team_id,player_id),CHECK(shots_against=saves+goals_against));
+```
+
+**`league_audit`**
+
+```sql
+CREATE TABLE IF NOT EXISTS league_audit(id TEXT PRIMARY KEY,at TEXT NOT NULL,actor TEXT NOT NULL,action TEXT NOT NULL,entity_id TEXT NOT NULL,payload_json TEXT NOT NULL);
+```
+
+### apps/rink-local/server/player-registry.js
+
+**`player_private_profiles`**
+
+```sql
+CREATE TABLE IF NOT EXISTS player_private_profiles(player_id TEXT PRIMARY KEY REFERENCES players(id),legal_name TEXT NOT NULL,birth_date TEXT NOT NULL,address_json TEXT NOT NULL,updated_at TEXT NOT NULL,updated_by TEXT NOT NULL);
+```
+
+**`player_related_people`**
+
+```sql
+CREATE TABLE IF NOT EXISTS player_related_people(id TEXT PRIMARY KEY,full_name TEXT NOT NULL,email TEXT,phone TEXT);
+```
+
+**`player_registration_identifiers`**
+
+```sql
+CREATE TABLE IF NOT EXISTS player_registration_identifiers(player_id TEXT NOT NULL REFERENCES players(id),issuer TEXT NOT NULL,identifier TEXT NOT NULL,season_id TEXT REFERENCES seasons(id),PRIMARY KEY(issuer,identifier),UNIQUE(player_id,issuer,season_id));
+```
+
+**`player_person_links`**
+
+```sql
+CREATE TABLE IF NOT EXISTS player_person_links(player_id TEXT NOT NULL REFERENCES players(id),person_id TEXT NOT NULL REFERENCES player_related_people(id),relationship TEXT NOT NULL CHECK(relationship IN ('PARENT','GUARDIAN','EMERGENCY_CONTACT','OTHER')),PRIMARY KEY(player_id,person_id,relationship));
+```
+
+**`season_training_requirements`**
+
+```sql
+CREATE TABLE IF NOT EXISTS season_training_requirements(id TEXT PRIMARY KEY,league_id TEXT NOT NULL REFERENCES leagues(id),season_id TEXT NOT NULL REFERENCES seasons(id),code TEXT NOT NULL,title TEXT NOT NULL,required_by TEXT,blocks_lineup INTEGER NOT NULL CHECK(blocks_lineup IN (0,1)),UNIQUE(league_id,season_id,code));
+```
+
+**`player_training_completions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS player_training_completions(id TEXT PRIMARY KEY,player_id TEXT NOT NULL REFERENCES players(id),requirement_id TEXT NOT NULL REFERENCES season_training_requirements(id),completed_on TEXT NOT NULL,expires_on TEXT,evidence_ref TEXT,verified_by TEXT NOT NULL,verified_at TEXT NOT NULL,revoked_at TEXT,UNIQUE(player_id,requirement_id,completed_on));
+```
+
+**`player_membership_history`**
+
+```sql
+CREATE TABLE IF NOT EXISTS player_membership_history(id TEXT PRIMARY KEY,player_id TEXT NOT NULL REFERENCES players(id),season_id TEXT NOT NULL REFERENCES seasons(id),team_id TEXT NOT NULL REFERENCES teams(id),joined_at TEXT NOT NULL,left_at TEXT,reason TEXT NOT NULL,actor TEXT NOT NULL);
+```
+
+### apps/rink-local/server/registration-portal.js
+
+**`registration_clubs`**
+
+```sql
+CREATE TABLE IF NOT EXISTS registration_clubs(id TEXT PRIMARY KEY,name TEXT NOT NULL,league_id TEXT NOT NULL REFERENCES leagues(id));
+```
+
+**`registration_club_teams`**
+
+```sql
+CREATE TABLE IF NOT EXISTS registration_club_teams(club_id TEXT NOT NULL REFERENCES registration_clubs(id),team_id TEXT NOT NULL REFERENCES teams(id),PRIMARY KEY(club_id,team_id),UNIQUE(team_id));
+```
+
+**`registration_player_clubs`**
+
+```sql
+CREATE TABLE IF NOT EXISTS registration_player_clubs(club_id TEXT NOT NULL REFERENCES registration_clubs(id),player_id TEXT NOT NULL REFERENCES players(id),created_at TEXT NOT NULL,PRIMARY KEY(club_id,player_id));
+```
+
+**`registration_users`**
+
+```sql
+CREATE TABLE IF NOT EXISTS registration_users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('CLUB_REGISTRAR','LEAGUE_ADMIN')),scope_id TEXT NOT NULL,created_at TEXT NOT NULL);
+```
+
+**`registration_sessions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS registration_sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES registration_users(id),expires_ms INTEGER NOT NULL);
+```
+
+**`registration_requests`**
+
+```sql
+CREATE TABLE IF NOT EXISTS registration_requests(id TEXT PRIMARY KEY,club_id TEXT NOT NULL REFERENCES registration_clubs(id),league_id TEXT NOT NULL REFERENCES leagues(id),player_id TEXT NOT NULL REFERENCES players(id),team_id TEXT NOT NULL REFERENCES teams(id),jersey INTEGER NOT NULL,position TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('SUBMITTED','APPROVED','REJECTED')),created_by TEXT NOT NULL,created_at TEXT NOT NULL,decided_by TEXT,decided_at TEXT,decision_reason TEXT);
+```
+
+**`registration_division_age_rules`**
+
+```sql
+CREATE TABLE IF NOT EXISTS registration_division_age_rules(division_id TEXT PRIMARY KEY REFERENCES divisions(id),cutoff_date TEXT NOT NULL,min_age INTEGER NOT NULL,max_age INTEGER NOT NULL,CHECK(min_age>=0 AND max_age>=min_age AND max_age<=99));
+```
+
+### apps/rink-local/server/team-accounts.js
+
+**`team_users`**
+
+```sql
+CREATE TABLE IF NOT EXISTS team_users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL);
+```
+
+**`team_members`**
+
+```sql
+CREATE TABLE IF NOT EXISTS team_members(user_id TEXT NOT NULL REFERENCES team_users(id),team_id TEXT NOT NULL REFERENCES teams(id),role TEXT NOT NULL CHECK(role IN ('manager','coach','viewer')),PRIMARY KEY(user_id,team_id));
+```
+
+**`team_sessions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS team_sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES team_users(id),expires_ms INTEGER NOT NULL);
+```
+
+**`team_roster_revisions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS team_roster_revisions(team_id TEXT NOT NULL REFERENCES teams(id),revision INTEGER NOT NULL,at TEXT NOT NULL,actor TEXT NOT NULL,PRIMARY KEY(team_id,revision));
+```
+
+**`game_roster_confirmations`**
+
+```sql
+CREATE TABLE IF NOT EXISTS game_roster_confirmations(game_id TEXT NOT NULL REFERENCES games(id),team_id TEXT NOT NULL REFERENCES teams(id),roster_revision INTEGER NOT NULL,player_ids_json TEXT NOT NULL,confirmed_by TEXT NOT NULL,confirmed_at TEXT NOT NULL,PRIMARY KEY(game_id,team_id));
+```
+
+**`team_roster_audit`**
+
+```sql
+CREATE TABLE IF NOT EXISTS team_roster_audit(id TEXT PRIMARY KEY,at TEXT NOT NULL,actor TEXT NOT NULL,team_id TEXT NOT NULL,action TEXT NOT NULL,details TEXT NOT NULL);
+```
+
+### apps/rink-local/server/participant-compliance.js
+
+**`participant_external_ids`**
+
+```sql
+CREATE TABLE IF NOT EXISTS participant_external_ids(id TEXT PRIMARY KEY,subject_type TEXT NOT NULL CHECK(subject_type IN ('PLAYER','ADULT')),subject_id TEXT NOT NULL,issuer TEXT NOT NULL,season_id TEXT NOT NULL DEFAULT '',identifier_ciphertext TEXT NOT NULL,lookup_hmac TEXT NOT NULL UNIQUE,verified_by TEXT NOT NULL,verified_at TEXT NOT NULL,UNIQUE(subject_type,subject_id,issuer,season_id));
+```
+
+**`participant_role_assignments`**
+
+```sql
+CREATE TABLE IF NOT EXISTS participant_role_assignments(id TEXT PRIMARY KEY,subject_type TEXT NOT NULL CHECK(subject_type IN ('PLAYER','ADULT')),subject_id TEXT NOT NULL,role TEXT NOT NULL,scope_type TEXT NOT NULL CHECK(scope_type IN ('LEAGUE','TOURNAMENT')),scope_id TEXT NOT NULL,season_id TEXT NOT NULL DEFAULT '',UNIQUE(subject_type,subject_id,role,scope_type,scope_id,season_id));
+```
+
+**`competition_policies`**
+
+```sql
+CREATE TABLE IF NOT EXISTS competition_policies(game_id TEXT PRIMARY KEY REFERENCES games(id),competition_type TEXT NOT NULL CHECK(competition_type IN ('LEAGUE','TOURNAMENT')),require_legacy_player_training INTEGER NOT NULL CHECK(require_legacy_player_training IN (0,1)),policy_note TEXT NOT NULL,updated_by TEXT NOT NULL,updated_at TEXT NOT NULL);
+```
+
+**`competition_training_rules`**
+
+```sql
+CREATE TABLE IF NOT EXISTS competition_training_rules(id TEXT PRIMARY KEY,scope_type TEXT NOT NULL CHECK(scope_type IN ('LEAGUE','TOURNAMENT')),scope_id TEXT NOT NULL,season_id TEXT NOT NULL DEFAULT '',role TEXT NOT NULL,code TEXT NOT NULL,title TEXT NOT NULL,required INTEGER NOT NULL CHECK(required IN (0,1)),UNIQUE(scope_type,scope_id,season_id,role,code));
+```
+
+**`participant_training_evidence`**
+
+```sql
+CREATE TABLE IF NOT EXISTS participant_training_evidence(id TEXT PRIMARY KEY,subject_type TEXT NOT NULL CHECK(subject_type IN ('PLAYER','ADULT')),subject_id TEXT NOT NULL,code TEXT NOT NULL,completed_on TEXT NOT NULL,expires_on TEXT,verified_by TEXT NOT NULL,revoked_at TEXT);
+```
+
+### apps/rink-local/server/training-catalog.js
+
+**`training_catalog`**
+
+```sql
+CREATE TABLE IF NOT EXISTS training_catalog(id TEXT PRIMARY KEY,code TEXT NOT NULL UNIQUE,title TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',issuer TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),created_at TEXT NOT NULL);
+```
+
+**`training_policy_versions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS training_policy_versions(id TEXT PRIMARY KEY,training_id TEXT NOT NULL REFERENCES training_catalog(id),scope_type TEXT NOT NULL CHECK(scope_type IN ('LEAGUE','TOURNAMENT')),scope_id TEXT NOT NULL,season_id TEXT NOT NULL DEFAULT '',role TEXT NOT NULL,renewal_mode TEXT NOT NULL CHECK(renewal_mode IN ('ONCE','ANNUAL_CALENDAR','ANNUAL_SEASON','ROLLING_DAYS')),validity_days INTEGER,required INTEGER NOT NULL CHECK(required IN (0,1)),effective_from TEXT NOT NULL,effective_to TEXT,revision INTEGER NOT NULL,created_by TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(training_id,scope_type,scope_id,season_id,role,revision),CHECK(effective_to IS NULL OR effective_to>=effective_from));
+```
+
+**`training_completions_v2`**
+
+```sql
+CREATE TABLE IF NOT EXISTS training_completions_v2(id TEXT PRIMARY KEY,training_id TEXT NOT NULL REFERENCES training_catalog(id),subject_type TEXT NOT NULL CHECK(subject_type IN ('PLAYER','ADULT')),subject_id TEXT NOT NULL,completed_on TEXT NOT NULL,expires_on TEXT,verified_by TEXT NOT NULL,verified_at TEXT NOT NULL,evidence_ref TEXT,revoked_at TEXT,revoked_by TEXT,revocation_reason TEXT);
+```
+
+### apps/rink-local/server/training-intake.js
+
+**`training_intake`**
+
+```sql
+CREATE TABLE IF NOT EXISTS training_intake(id TEXT PRIMARY KEY,source_type TEXT NOT NULL CHECK(source_type IN ('EMAIL','API','MANUAL','BATCH')),source_digest TEXT NOT NULL UNIQUE,training_id TEXT NOT NULL REFERENCES training_catalog(id),subject_type TEXT NOT NULL CHECK(subject_type IN ('PLAYER','ADULT')),subject_id TEXT NOT NULL,completed_on TEXT NOT NULL,expires_on TEXT,evidence_ref TEXT,state TEXT NOT NULL CHECK(state IN ('PENDING','VERIFIED','REJECTED')),imported_by TEXT NOT NULL,imported_at TEXT NOT NULL,reviewed_by TEXT,reviewed_at TEXT,review_note TEXT,completion_id TEXT REFERENCES training_completions_v2(id));
+```
+
