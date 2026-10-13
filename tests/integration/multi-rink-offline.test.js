@@ -85,7 +85,7 @@ test('DISTRIBUTED-003: signed fencing epochs reject stale clients even after own
  assert.equal(x.snapshot().lastSequence,2);
  assert.deepEqual(x.snapshot().shots,{home:2,away:0});
 });
-test('DISTRIBUTED-004: lost acknowledgement, retry, conflicting replay and central restart are safe',async t=>{
+test('DISTRIBUTED-004: lost acknowledgement, retry and conflicting replay are safe',async t=>{
  const x=await setup(t);
  command(x.a,{type:'GOAL_RECORDED',team:'home',scorer:'17',assist1:'None',assist2:'None'});
  const lost=async(url,opts)=>{
@@ -98,7 +98,6 @@ test('DISTRIBUTED-004: lost acknowledgement, retry, conflicting replay and centr
  assert.equal(x.a.db.prepare('SELECT delivered FROM sync_outbox').get().delivered,0);
  assert.deepEqual((await x.client('a').flush()).duplicates,[1]);
  assert.equal(x.a.db.prepare('SELECT delivered FROM sync_outbox').get().delivered,1);
- const other=crypto.generateKeyPairSync('ed25519');
  const bad={gameId:x.gameId,stationId:'rink-a',epoch:1,events:[{seq:1,id:'forged-event',type:'GOAL_RECORDED',data:{team:'away'}}]};
  assert.equal((await x.post('/api/ingest/v1/batches',bad,{'x-station-signature':signBatch(x.keys.a.privateKey,bad)})).status,409);
  assert.deepEqual(x.snapshot().score,{home:1,away:0});
