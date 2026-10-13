@@ -55,7 +55,7 @@ class PlayerRegistry{
   return Number(cutoffDate.slice(0,4))-Number(birth.slice(0,4))-(cutoffDate.slice(5)<birth.slice(5)?1:0);
  }
  updatePrivateProfile(playerId,{legalName,birthDate,address={}},actor){
-  if(!good(actor,100)||!good(legalName)||!validDate(birthDate)||!address||typeof address!=='object'||Array.isArray(address)||JSON.stringify(address).length>2000)throw Error('Invalid private player profile');
+  if(!good(actor,100)||!good(legalName)||!validDate(birthDate)||!validAddress(address))throw Error('Invalid private player profile');
   return this.tx(()=>{
    const result=this.db.prepare('UPDATE player_private_profiles SET legal_name=?,birth_date=?,address_json=?,updated_at=?,updated_by=? WHERE player_id=?')
     .run(legalName.trim(),birthDate,JSON.stringify(address),new Date().toISOString(),actor,playerId);
