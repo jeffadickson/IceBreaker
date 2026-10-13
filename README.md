@@ -32,6 +32,12 @@ IceBreaker now includes a separate [family registration page](apps/rink-local/we
 
 **Do not upload real birth certificates or children's personal information.** Production mode intentionally refuses to start private registration until KMS, malware scanning, MFA, verified consent, encrypted legacy-data migration, and secure backups are implemented. See [security design](apps/rink-local/docs/private-data-security-design.md) and [requirements](requirements/private-data-and-documents.md).
 
+## Private registration security hardening (development)
+
+New backend-only [ClamAV quarantine scanner](apps/rink-local/server/scan-quarantine.js), [offline legacy PII migration](apps/rink-local/server/migrate-private-fields.js), [offline document key rotation](apps/rink-local/server/rewrap-document-keys.js), and opt-in encrypted staff TOTP MFA are implemented. The [security design and operations guide](apps/rink-local/docs/private-data-security-design.md) explains key configuration, dry runs, verified backups, and acceptance testing.
+
+**Production registration is still disabled** until KMS, encrypted backup/restore, scanner deployment, mandatory MFA/recovery, verified guardian consent and full legacy-data protection are complete.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
