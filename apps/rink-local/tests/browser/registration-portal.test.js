@@ -134,6 +134,19 @@ test('annual rollover proposes same permanent ID into next-season club team',t=>
  assert.deepEqual(x.portal.registry.history(playerId).map(h=>h.seasonId),['demo-2026','demo-2027']);
  assert.throws(()=>x.portal.rolloverPreview(x.b,{fromTeamId:'maple',toTeamId:'club-a-2027'}),/scope/);
 });
+test('tournament guest needs no external registration or annual training but requires league approval',t=>{
+ const x=setup();t.after(()=>x.close());
+ const game=x.league.db.prepare("SELECT id,home_team_id home FROM games WHERE status='scheduled' LIMIT 1").get();
+ assert.throws(()=>x.portal.addTournamentGuest(x.admin,{gameId:game.id,teamId:game.home,displayName:'Guest Alias',jersey:90,position:'F'}),/Tournament policy/);
+ x.portal.setGamePolicy(x.admin,{gameId:game.id,type:'TOURNAMENT',note:'Independent event'});
+ assert.throws(()=>x.portal.addTournamentGuest(x.a,{gameId:game.id,teamId:game.home,displayName:'Guest Alias',jersey:90,position:'F'}),/access denied/);
+ const guest=x.portal.addTournamentGuest(x.admin,{gameId:game.id,teamId:game.home,displayName:'Guest Alias',jersey:90,position:'F'});
+ assert.equal(guest.guest,true);
+ assert.equal(x.portal.db.prepare('SELECT COUNT(*) n FROM player_private_profiles WHERE player_id=?').get(guest.playerId).n,0);
+ assert.equal(x.portal.db.prepare('SELECT COUNT(*) n FROM participant_external_ids WHERE subject_id=?').get(guest.playerId).n,0);
+ assert.equal(x.teamAccounts.roster(game.home).some(p=>p.id===guest.playerId),true);
+ assert.throws(()=>x.portal.addTournamentGuest(x.admin,{gameId:game.id,teamId:game.home,displayName:'Another',jersey:90,position:'F'}),/Jersey in use/);
+});
 test('hashed expiring sessions and role-bound scope prevent credential crossover',t=>{
  const x=setup();t.after(()=>x.close());
  assert.throws(()=>x.portal.login('a@example.invalid','wrong'),/Invalid credentials/);
