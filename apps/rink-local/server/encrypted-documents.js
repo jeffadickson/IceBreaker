@@ -3,6 +3,7 @@
 // encrypted backups, consent and security review.
 const crypto=require('node:crypto'),fs=require('node:fs'),path=require('node:path');
 const uuid=()=>crypto.randomUUID();
+const {scanWithClamav}=require('./malware-scanner');
 const types=new Set(['BIRTH_CERTIFICATE','AGE_VERIFICATION','TRAINING_CERTIFICATE','REGISTRATION']);
 const mimes=new Set(['application/pdf','image/png','image/jpeg']),MAX_BYTES=1024*1024;
 function keyFromEnvironment(){
@@ -56,13 +57,38 @@ class EncryptedDocuments{
  }
  row(id){const r=this.db.prepare('SELECT * FROM private_documents WHERE id=?').get(id);if(!r)throw Error('Document not found');return r;}
  list(playerId){return this.db.prepare("SELECT id documentId,document_type documentType,mime,bytes,status,uploaded_at uploadedAt,verified_at verifiedAt FROM private_documents WHERE player_id=? ORDER BY uploaded_at DESC").all(playerId);}
- // Only a separate scanner service should attest a passing malware scan.
- // Development quarantine has no scanner, so documents remain quarantined.
- releaseFromQuarantine(id,actor,scanPassed){
-  if(scanPassed!==true)throw Error('Malware scan attestation required');
-  const r=this.row(id);if(r.status!=='QUARANTINED')throw Error('Document is not quarantined');
-  this.db.prepare("UPDATE private_documents SET status='PENDING' WHERE id=?").run(id);
-  this.audit('DOCUMENT_SCAN_PASSED',id,actor);return {documentId:id,status:'PENDING'};
+ // Internal worker operation only; no HTTP route exposes it. The scanner
+ // receives plaintext in memory over a local Unix socket. An error keeps
+ // the document quarantined; a positive detection rejects it.
+ async scanQuarantined(id,actor,scanner=scanWithClamav){
+  const row=this.row(id);
+  if(row.status!=='QUARANTINED')throw Error('Document is not quarantined');
+  const plaintext=this.decrypt(row);
+  let result;
+  try{result=await scanner(plaintext);}
+  finally{plaintext.fill(0);}
+  if(!result||typeof result.clean!=='boolean'||result.engine!=='clamav')
+   throw Error('Untrusted malware scan result');
+  const next=result.clean?'PENDING':'REJECTED';
+  this.db.exec('BEGIN IMMEDIATE');
+  try{
+   const updated=this.db.prepare('UPDATE private_documents SET status=? WHERE id=? AND status=?')
+    .run(next,id,'QUARANTINED');
+   if(updated.changes!==1)throw Error('Document scan state changed');
+   this.audit(result.clean?'DOCUMENT_SCAN_PASSED':'DOCUMENT_SCAN_REJECTED',id,actor,{engine:'clamav'});
+   this.db.exec('COMMIT');
+  }catch(error){this.db.exec('ROLLBACK');throw error;}
+  return {documentId:id,status:next};
+ }
+ decrypt(r){
+  const dek=open(r.wrapped_key,keyFromEnvironment(),r.key_nonce,r.key_tag,'icebreaker-dek-v1:'+r.id);
+  try{
+   const data=open(fs.readFileSync(this.objectPath(r.id)),dek,r.data_nonce,r.data_tag,
+    'icebreaker-doc-v1:'+r.id+':'+r.player_id+':'+r.document_type);
+   if(data.length!==r.bytes||crypto.createHash('sha256').update(data).digest('hex')!==r.digest_sha256)
+    throw Error('Document integrity verification failed');
+   return data;
+  }finally{dek.fill(0);}
  }
  decide(id,actor,decision,note){
   if(!['VERIFIED','REJECTED','REVOKED'].includes(decision)||typeof note!=='string'||!note.trim()||note.length>300)throw Error('Invalid document decision');
@@ -73,12 +99,8 @@ class EncryptedDocuments{
  }
  read(id,actor){
   const r=this.row(id);if(r.status!=='PENDING'&&r.status!=='VERIFIED')throw Error('Document not available for viewing');
-  const dek=open(r.wrapped_key,keyFromEnvironment(),r.key_nonce,r.key_tag,'icebreaker-dek-v1:'+id);
-  try{
-   const data=open(fs.readFileSync(this.objectPath(id)),dek,r.data_nonce,r.data_tag,'icebreaker-doc-v1:'+id+':'+r.player_id+':'+r.document_type);
-   if(data.length!==r.bytes||crypto.createHash('sha256').update(data).digest('hex')!==r.digest_sha256)throw Error('Document integrity verification failed');
-   this.audit('DOCUMENT_READ',id,actor,{playerId:r.player_id});return {mime:r.mime,data};
-  }finally{dek.fill(0);}
+  const data=this.decrypt(r);
+  this.audit('DOCUMENT_READ',id,actor,{playerId:r.player_id});return {mime:r.mime,data};
  }
 }
 module.exports={EncryptedDocuments,seal,open,keyFromEnvironment,MAX_BYTES};
