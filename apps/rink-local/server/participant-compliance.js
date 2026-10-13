@@ -84,14 +84,17 @@ function recordCourse(db,{subjectType,subjectId,code,completedOn,expiresOn=null}
  db.prepare('INSERT INTO participant_training_evidence VALUES(?,?,?,?,?,?,?,NULL)').run(id,subjectType,subjectId,code,completedOn,expiresOn,actor);
  audit(db,'PARTICIPANT_TRAINING_VERIFIED',subjectId,actor,{code,subjectType});return {id};
 }
+const trainingCatalog=require('./training-catalog');
 function trainingForRole(db,{subjectType,subjectId,role,scopeType,scopeId,seasonId='',date}){
  if(!validDate(date)||!ROLES.has(role)||!TYPES.has(scopeType)||!exists(db,subjectType,subjectId))throw Error('Invalid compliance query');
- return db.prepare("SELECT code,title,required FROM competition_training_rules WHERE scope_type=? AND scope_id=? AND (season_id='' OR season_id=?) AND role=? ORDER BY code")
+ const legacy=db.prepare("SELECT code,title,required FROM competition_training_rules WHERE scope_type=? AND scope_id=? AND (season_id='' OR season_id=?) AND role=? ORDER BY code")
   .all(scopeType,scopeId,seasonId,role).map(r=>{
    const complete=!!db.prepare('SELECT 1 FROM participant_training_evidence WHERE subject_type=? AND subject_id=? AND code=? AND completed_on<=? AND (expires_on IS NULL OR expires_on>=?) AND revoked_at IS NULL LIMIT 1')
     .get(subjectType,subjectId,r.code,date,date);
    return {code:r.code,title:r.title,required:!!r.required,complete,eligible:!r.required||complete};
   });
+ const modern=trainingCatalog.status(db,{subjectType,subjectId,role,scopeType,scopeId,seasonId,date});
+ return [...legacy,...modern];
 }
 function gamePlayerTraining(db,playerId,teamId,gameId,date){
  const policy=competitionForGame(db,gameId);
