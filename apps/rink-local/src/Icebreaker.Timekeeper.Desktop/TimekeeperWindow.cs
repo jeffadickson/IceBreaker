@@ -40,6 +40,11 @@ public sealed class TimekeeperWindow : Window
     private readonly TextBox _goalieReason = new() { Watermark = "Reason for goalie change", Width = 240 };
     private readonly TextBlock _status = Label("Connecting to independent rink authority", 15);
     private readonly TextBlock _recent = Label("Waiting for committed events", 14);
+    private readonly ComboBox _correctionGoal = new() { MinWidth = 440 };
+    private readonly TextBox _correctScorer = new() { Watermark = "Correct scorer jersey", Width = 150 };
+    private readonly TextBox _correctAssist1 = new() { Watermark = "Assist 1 or NONE", Text = "NONE", Width = 160 };
+    private readonly TextBox _correctAssist2 = new() { Watermark = "Assist 2 or NONE", Text = "NONE", Width = 160 };
+    private readonly TextBox _correctReason = new() { Watermark = "Why is this correction necessary?", Width = 360 };
     private Window? _activeDialog;
     private readonly TextBox _penaltyTeam = new() { Watermark = "home / away", Width = 130 };
     private readonly TextBox _penaltyPlayer = new() { Watermark = "Jersey #", Width = 95 };
@@ -174,6 +179,35 @@ public sealed class TimekeeperWindow : Window
                 _goalieReason.Text = "";
             }, closeOnSuccess: true)));
 
+        var correctionBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
+        correctionBody.Children.Add(Label("AUDITED GOAL ATTRIBUTION CORRECTION", 19));
+        correctionBody.Children.Add(new TextBlock
+        {
+            Text = "Select the original committed goal. This appends a new correction event; the original remains in the journal. A correction reason is mandatory. Goal voiding and penalty reversals are not available here.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        correctionBody.Children.Add(_correctionGoal);
+        correctionBody.Children.Add(Buttons(_correctScorer, _correctAssist1, _correctAssist2));
+        correctionBody.Children.Add(_correctReason);
+        correctionBody.Children.Add(ActionButton("SUBMIT AUDITED CORRECTION", async () =>
+        {
+            if (_correctionGoal.SelectedItem is not GoalChoice goal)
+                throw new InvalidOperationException("Select the original goal event");
+            var scorer = RequiredJersey(_correctScorer.Text);
+            var assist1 = OptionalJersey(_correctAssist1.Text);
+            var assist2 = OptionalJersey(_correctAssist2.Text);
+            if (scorer == assist1 || scorer == assist2 || (assist1 != "NONE" && assist1 == assist2))
+                throw new InvalidOperationException("Scorer and assists must be different players");
+            if (string.IsNullOrWhiteSpace(_correctReason.Text))
+                throw new InvalidOperationException("A correction reason is required");
+            await _client.CommandAsync(new
+            {
+                type = "GOAL_ATTRIBUTION_CORRECTED", originalEventId = goal.Id,
+                scorer, assist1, assist2, reason = _correctReason.Text.Trim()
+            });
+            _correctReason.Text = "";
+        }, closeOnSuccess: true));
+
         var eventsBody = new StackPanel { Spacing = 12, Margin = new Thickness(18) };
         eventsBody.Children.Add(Label("COMMITTED EVENT HISTORY", 19));
         eventsBody.Children.Add(new TextBlock { Text = "Read-only events from the rink authority; drafts do not appear here." });
@@ -215,6 +249,7 @@ public sealed class TimekeeperWindow : Window
         dashboard.Children.Add(Label("RECENT COMMITTED EVENT", 18));
         dashboard.Children.Add(_recent);
         dashboard.Children.Add(Buttons(
+            PopupButton("CORRECT GOAL", "Audited goal correction", correctionBody, PopulateGoalCorrections, 220),
             PopupButton("EVENT HISTORY", "Committed event history", eventsBody, width: 220),
             PopupButton("ARENA ANNOUNCER", "Arena announcements", paBody, width: 220)));
         dashboard.Children.Add(new TextBlock
@@ -297,6 +332,21 @@ public sealed class TimekeeperWindow : Window
             panel.Children.Add(control);
         }
         return panel;
+    }
+
+    private sealed record GoalChoice(string Id, string Description)
+    {
+        public override string ToString() => Description;
+    }
+
+    private void PopulateGoalCorrections()
+    {
+        _correctionGoal.ItemsSource = (_latest?.Events ?? [])
+            .Where(ev => ev.Type == "GOAL_RECORDED")
+            .Reverse().Take(30)
+            .Select(ev => new GoalChoice(ev.Id, $"{(ev.Team ?? "game").ToUpperInvariant()} · {ev.DetailsJson}"))
+            .ToArray();
+        _correctionGoal.SelectedIndex = _correctionGoal.ItemCount > 0 ? 0 : -1;
     }
 
     private Button PopupButton(string text, string title, Control panel, Action? beforeOpen = null, int width = 0)
