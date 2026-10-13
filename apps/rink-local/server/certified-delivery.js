@@ -19,12 +19,25 @@ class CertifiedDelivery {
   const roster=this.leagueStore.db.prepare('SELECT team_id,player_id,jersey FROM roster_memberships WHERE season_id=? AND team_id IN (?,?)').all(season,game.home_team_id,game.away_team_id);
   function resolved(side,value){if(value==='None')return null;if(value==='TBD'||value===undefined||value===null)throw Error('Unresolved certified attribution');const team=side==='home'?game.home_team_id:game.away_team_id;const rows=roster.filter(x=>x.team_id===team&&String(x.jersey)===String(value));if(rows.length!==1)throw Error('Ambiguous or unknown player number '+value);return rows[0].player_id;}
   const goals=rev.document.goals.map(x=>({side:x.team,scorerId:resolved(x.team,x.details.scorer),assist1Id:resolved(x.team,x.details.assist1),assist2Id:resolved(x.team,x.details.assist2)}));
+  // Goalie statistics are taken from the signed document, not a mutable live
+  // snapshot. Resolve every goalie jersey against this game's season roster.
+  const goalieStats=[];
+  if(rev.document.goalieStats){
+   for(const side of ['home','away']){
+    const group=rev.document.goalieStats[side]||{};
+    if(!group||typeof group!=='object'||Array.isArray(group))throw Error('Malformed signed goalie statistics');
+    for(const [jersey,v] of Object.entries(group)){
+     if(!v||![v.shotsAgainst,v.saves,v.goalsAgainst].every(x=>Number.isSafeInteger(x)&&x>=0)||v.shotsAgainst!==v.saves+v.goalsAgainst)throw Error('Invalid signed goalie totals');
+     goalieStats.push({side,playerId:resolved(side,jersey),shotsAgainst:v.shotsAgainst,saves:v.saves,goalsAgainst:v.goalsAgainst});
+    }
+   }
+  }
   const preexisting=this.leagueStore.db.prepare('SELECT * FROM games WHERE id=?').get(this.leagueGameId);
   if(preexisting.status==='final'){
     if(preexisting.certified_by===`scoresheet:${rev.revision}:${rev.digest}`)return {id:this.leagueGameId,status:'final',version:preexisting.version,recoveredAcknowledgment:true};
     throw Error('Existing final result requires explicit certified-revision amendment');
   }
-  return this.leagueStore.certifyGame(this.leagueGameId,{homeScore:rev.document.score.home,awayScore:rev.document.score.away,goals,expectedVersion:game.version,actor:`scoresheet:${rev.revision}:${rev.digest}`});
+  return this.leagueStore.certifyGame(this.leagueGameId,{homeScore:rev.document.score.home,awayScore:rev.document.score.away,goals,goalieStats,expectedVersion:game.version,actor:`scoresheet:${rev.revision}:${rev.digest}`});
  }
  queueParentReports(row){
   if(!this.leagueGameId)throw Error('League game binding required for parent report delivery');
