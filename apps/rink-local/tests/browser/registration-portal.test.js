@@ -23,6 +23,8 @@ test('club scope blocks private reads, team access and self-approval',t=>{
  const {playerId}=x.portal.createPlayer(x.a,{displayName:'Alias X',legalName:'Private Legal X',birthDate:'2016-01-02',address:{street:'123 Private St'}});
  assert.equal(x.portal.players(x.a).length,1);
  assert.equal(x.portal.players(x.b).length,0);
+ assert.equal(x.portal.profile(x.a,playerId).profile.playerId,playerId);
+ assert.equal(x.portal.db.prepare("SELECT COUNT(*) n FROM league_audit WHERE action='PRIVATE_PROFILE_READ' AND entity_id=?").get(playerId).n,1);
  assert.throws(()=>x.portal.profile(x.b,playerId),/scope/);
  assert.throws(()=>x.portal.submit(x.b,{playerId,teamId:'flyers',jersey:7,position:'F'}),/scope/);
  assert.throws(()=>x.portal.submit(x.a,{playerId,teamId:'flyers',jersey:7,position:'F'}),/scope/);
