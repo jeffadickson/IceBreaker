@@ -79,6 +79,10 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
    const link=route.match(/^clubs\/([-\w]+)\/players$/);
    if(link&&req.method==='POST'){const b=await body();reply(201,portal.linkExisting(user,link[1],b.playerId));return true;}
    if(link&&req.method==='DELETE'){const b=await body();reply(200,portal.unlinkExisting(user,link[1],b.playerId,b.reason));return true;}
+   if(route==='competitions/policy'&&req.method==='POST'){reply(200,portal.setGamePolicy(user,await body()));return true;}
+   if(route==='participants/external-id'&&req.method==='POST'){reply(201,portal.linkParticipantNumber(user,await body()));return true;}
+   if(route==='participants/role-requirements'&&req.method==='POST'){reply(201,portal.setRoleRequirement(user,await body()));return true;}
+   if(route==='participants/training-evidence'&&req.method==='POST'){reply(201,portal.verifyRoleTraining(user,await body()));return true;}
    if(route==='eligibility/division-age'&&req.method==='POST'){reply(200,portal.setAgeRule(user,await body()));return true;}
    if(route==='training/requirements'&&req.method==='POST'){
     const b=await body();portal.requireLeague(user,b.leagueId);
