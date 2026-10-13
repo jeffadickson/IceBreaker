@@ -82,6 +82,12 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
    if(route==='competitions/guests'&&req.method==='POST'){reply(201,portal.addTournamentGuest(user,await body()));return true;}
    if(route==='competitions/policy'&&req.method==='POST'){reply(200,portal.setGamePolicy(user,await body()));return true;}
    if(route==='participants/external-id'&&req.method==='POST'){reply(201,portal.linkParticipantNumber(user,await body()));return true;}
+   if(route==='training/catalog'&&req.method==='GET'){reply(200,{courses:portal.listTrainingCatalog(user)});return true;}
+   if(route==='training/catalog'&&req.method==='POST'){reply(201,portal.createTrainingDefinition(user,await body()));return true;}
+   if(route==='training/policies'&&req.method==='POST'){reply(201,portal.createTrainingPolicy(user,await body()));return true;}
+   if(route==='training/verify'&&req.method==='POST'){reply(201,portal.verifyTrainingCompletion(user,await body()));return true;}
+   if(route==='training/revoke'&&req.method==='POST'){reply(200,portal.revokeTrainingCompletion(user,await body()));return true;}
+   if(route==='training/role-status'&&req.method==='POST'){reply(200,{status:portal.trainingStatusForRole(user,await body())});return true;}
    if(route==='participants/role-requirements'&&req.method==='POST'){reply(201,portal.setRoleRequirement(user,await body()));return true;}
    if(route==='participants/training-evidence'&&req.method==='POST'){reply(201,portal.verifyRoleTraining(user,await body()));return true;}
    if(route==='eligibility/division-age'&&req.method==='POST'){reply(200,portal.setAgeRule(user,await body()));return true;}
