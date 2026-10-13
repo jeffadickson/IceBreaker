@@ -66,10 +66,10 @@ public sealed class TimekeeperWindow : Window
     public TimekeeperWindow()
     {
         Title = "IceBreaker — Native Timekeeper";
-        Width = 950;
-        Height = 760;
-        MinWidth = 690;
-        MinHeight = 570;
+        Width = 1180;
+        Height = 790;
+        MinWidth = 760;
+        MinHeight = 590;
         var key = Environment.GetEnvironmentVariable("ICEBREAKER_OPERATOR_KEY") ?? "local-development-key";
         _client = new RinkClockClient(_http, key, Environment.GetEnvironmentVariable("ICEBREAKER_OPERATOR_ID") ?? "desktop-timekeeper");
 
@@ -262,10 +262,16 @@ public sealed class TimekeeperWindow : Window
         TextWrapping = TextWrapping.Wrap
     };
 
-    private static StackPanel Buttons(params Control[] controls)
+    private static WrapPanel Buttons(params Control[] controls)
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 9 };
-        foreach (var control in controls) panel.Children.Add(control);
+        // A rink laptop may be 1366x768. Wrap controls rather than clipping
+        // right-side actions when the window is resized or touch-scaled.
+        var panel = new WrapPanel { Orientation = Orientation.Horizontal };
+        foreach (var control in controls)
+        {
+            control.Margin = new Thickness(0, 0, 10, 10);
+            panel.Children.Add(control);
+        }
         return panel;
     }
 
