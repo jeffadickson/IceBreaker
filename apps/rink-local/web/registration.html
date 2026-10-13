@@ -57,7 +57,7 @@ async function refresh(){
  $('clubPanel').hidden=context.role!=='CLUB_REGISTRAR';$('familyPanel').hidden=context.role!=='CLUB_REGISTRAR';$('submissionPanel').hidden=context.role!=='CLUB_REGISTRAR';$('csvPanel').hidden=context.role!=='CLUB_REGISTRAR';$('rolloverPanel').hidden=context.role!=='CLUB_REGISTRAR';$('leaguePanel').hidden=context.role!=='LEAGUE_ADMIN';$('guardianAdmin').hidden=context.role!=='LEAGUE_ADMIN';$('agePanel').hidden=context.role!=='LEAGUE_ADMIN';$('hockeyCompliance').hidden=context.role!=='LEAGUE_ADMIN';$('trainingCatalogPanel').hidden=context.role!=='LEAGUE_ADMIN';
  $('roleHeading').textContent=context.role==='LEAGUE_ADMIN'?'League Administration':'Club Registration';
  $('scope').textContent='Authorized scope: '+context.scopeId;
- if(context.role==='LEAGUE_ADMIN')$('leagueId').value=context.scopeId;
+ if(context.role==='LEAGUE_ADMIN')$('leagueId').value=context.scopeId;if(context.role==='LEAGUE_ADMIN'){await loadCatalog();$('catalogScopeId').value=context.scopeId;}
  const root=$('requests');root.replaceChildren();
  const table=document.createElement('table'),head=document.createElement('tr');
  for(const name of ['Player','Team','Jersey','Position','Status','Decision']){const th=document.createElement('th');th.textContent=name;head.append(th);}
