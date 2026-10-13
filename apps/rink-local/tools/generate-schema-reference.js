@@ -5,7 +5,7 @@
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {createRinkServer}=require('../server/rink-server');
 const {EvidenceArchive}=require('../server/email-evidence-archive');
-const {createCentralServer}=require('../../../../services/ingest/central-server');
+const {createCentralServer}=require('../../../services/ingest/central-server');
 const {inventory,render}=require('./schema-catalog');
 async function generate(){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-schema-'));
