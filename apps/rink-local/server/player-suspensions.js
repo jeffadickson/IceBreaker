@@ -24,6 +24,8 @@ function gameDate(db,gameId){
 }
 function activeForGame(db,gameId,playerIds){
  if(!playerIds.length)return [];
+ // Legacy isolated pregame fixtures may not initialize the league schema.
+ if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='player_suspensions'").get())return [];
  const date=gameDate(db,gameId);
  const rows=db.prepare(`SELECT id,player_id playerId,start_date startDate,end_date endDate,reason
  FROM player_suspensions WHERE revoked_at IS NULL AND start_date<=? AND end_date>=?`).all(date,date);
