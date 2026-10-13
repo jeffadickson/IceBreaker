@@ -71,6 +71,8 @@ test('document KEK loss, wrong key, swapped ciphertext and bad signatures fail c
  assert.throws(()=>x.portal.uploadDocument(x.a,{playerId,documentType:'BIRTH_CERTIFICATE',mime:'application/pdf',base64:Buffer.from('not pdf').toString('base64')}),/signature/);
  const doc=x.portal.uploadDocument(x.a,{playerId,documentType:'BIRTH_CERTIFICATE',mime:'application/pdf',base64:pdf.toString('base64')});
  x.portal.documents.releaseFromQuarantine(doc.documentId,'test-scanner',true);
+ const object=x.portal.documents.objectPath(doc.documentId),original=fs.readFileSync(object),modified=Buffer.from(original);modified[0]^=1;fs.writeFileSync(object,modified);
+ assert.throws(()=>x.portal.readDocument(x.a,doc.documentId));fs.writeFileSync(object,original);
  process.env.ICEBREAKER_DOCUMENT_KEK_BASE64=crypto.randomBytes(32).toString('base64');
  assert.throws(()=>x.portal.readDocument(x.a,doc.documentId));
  delete process.env.ICEBREAKER_DOCUMENT_KEK_BASE64;
