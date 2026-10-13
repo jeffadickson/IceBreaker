@@ -20,6 +20,7 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
     else reply(404,{error:'Unknown bootstrap action'});
     return true;
    }
+   if(route==='logout'&&req.method==='POST'){reply(200,portal.logout(String(req.headers.authorization||'').replace(/^Bearer /i,'')));return true;}
    const user=portal.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));
    if(route==='context'&&req.method==='GET'){reply(200,{role:user.role,scopeId:user.scopeId,teams:portal.teams(user)});return true;}
    if(route==='players'&&req.method==='GET'){reply(200,{players:portal.players(user)});return true;}
