@@ -1,0 +1,74 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {LeagueStore}=require('../../server/league-store');
+const {RegistrationPortal}=require('../../server/registration-portal');
+const {TeamAccounts}=require('../../server/team-accounts');
+function setup(){
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-registration-')),file=path.join(dir,'league.db');
+ const league=new LeagueStore(file,{seedDemo:true}),portal=new RegistrationPortal(file),teamAccounts=new TeamAccounts(file);
+ portal.createClub({id:'club-a',name:'Club A',leagueId:'demo-league'});
+ portal.createClub({id:'club-b',name:'Club B',leagueId:'demo-league'});
+ portal.assignTeam('club-a','maple');portal.assignTeam('club-b','flyers');
+ portal.createUser({email:'a@example.invalid',password:'a-long-secret-password',role:'CLUB_REGISTRAR',scopeId:'club-a'});
+ portal.createUser({email:'b@example.invalid',password:'b-long-secret-password',role:'CLUB_REGISTRAR',scopeId:'club-b'});
+ portal.createUser({email:'league@example.invalid',password:'league-secret-password',role:'LEAGUE_ADMIN',scopeId:'demo-league'});
+ const a=portal.authenticate(portal.login('a@example.invalid','a-long-secret-password').token);
+ const b=portal.authenticate(portal.login('b@example.invalid','b-long-secret-password').token);
+ const admin=portal.authenticate(portal.login('league@example.invalid','league-secret-password').token);
+ return {league,portal,teamAccounts,a,b,admin,close(){teamAccounts.close();portal.close();league.close();fs.rmSync(dir,{recursive:true,force:true});}};
+}
+test('club scope blocks private reads, team access and self-approval',t=>{
+ const x=setup();t.after(()=>x.close());
+ const {playerId}=x.portal.createPlayer(x.a,{displayName:'Alias X',legalName:'Private Legal X',birthDate:'2016-01-02',address:{street:'123 Private St'}});
+ assert.equal(x.portal.players(x.a).length,1);
+ assert.equal(x.portal.players(x.b).length,0);
+ assert.throws(()=>x.portal.profile(x.b,playerId),/scope/);
+ assert.throws(()=>x.portal.submit(x.b,{playerId,teamId:'flyers',jersey:7,position:'F'}),/scope/);
+ assert.throws(()=>x.portal.submit(x.a,{playerId,teamId:'flyers',jersey:7,position:'F'}),/scope/);
+ const req=x.portal.submit(x.a,{playerId,teamId:'maple',jersey:7,position:'F'});
+ assert.throws(()=>x.portal.decide(x.a,req.requestId,{decision:'APPROVED',reason:'self'}),/access denied/);
+ assert.equal(x.portal.db.prepare('SELECT COUNT(*) n FROM roster_memberships WHERE player_id=?').get(playerId).n,0);
+ assert.equal(JSON.stringify(x.league.snapshot()).includes('123 Private St'),false);
+});
+test('league approval enrolls permanent ID atomically, rejects duplicate decisions and preserves season history',t=>{
+ const x=setup();t.after(()=>x.close());
+ const {playerId}=x.portal.createPlayer(x.a,{displayName:'Alias A',legalName:'Private A',birthDate:'2016-01-02'});
+ const req=x.portal.submit(x.a,{playerId,teamId:'maple',jersey:37,position:'G'});
+ assert.equal(x.portal.requests(x.admin)[0].status,'SUBMITTED');
+ assert.equal(x.portal.decide(x.admin,req.requestId,{decision:'APPROVED',reason:'Roster eligible'}).status,'APPROVED');
+ assert.equal(x.portal.db.prepare('SELECT jersey FROM roster_memberships WHERE player_id=?').get(playerId).jersey,37);
+ assert.equal(x.portal.registry.history(playerId).length,1);
+ assert.throws(()=>x.portal.decide(x.admin,req.requestId,{decision:'APPROVED',reason:'again'}),/already decided/);
+ const again=x.portal.submit(x.a,{playerId,teamId:'maple',jersey:37,position:'G'});
+ assert.throws(()=>x.portal.decide(x.admin,again.requestId,{decision:'APPROVED',reason:'duplicate'}),/Already on this team/);
+ assert.equal(x.portal.requests(x.admin).find(r=>r.requestId===again.requestId).status,'SUBMITTED');
+ assert.equal(x.portal.db.prepare('SELECT COUNT(*) n FROM player_membership_history WHERE player_id=?').get(playerId).n,1);
+});
+test('rejection leaves roster unchanged; batch preview and submit are all-or-nothing',t=>{
+ const x=setup();t.after(()=>x.close());
+ const one=x.portal.createPlayer(x.a,{displayName:'Alias 1',legalName:'Private 1',birthDate:'2016-01-02'}).playerId;
+ const two=x.portal.createPlayer(x.a,{displayName:'Alias 2',legalName:'Private 2',birthDate:'2016-02-03'}).playerId;
+ const req=x.portal.submit(x.a,{playerId:one,teamId:'maple',jersey:11,position:'F'});
+ x.portal.decide(x.admin,req.requestId,{decision:'REJECTED',reason:'Incomplete paperwork'});
+ assert.equal(x.portal.db.prepare('SELECT COUNT(*) n FROM roster_memberships WHERE player_id=?').get(one).n,0);
+ const rows=[{playerId:one,teamId:'maple',jersey:11,position:'F'},{playerId:two,teamId:'maple',jersey:12,position:'D'}];
+ assert.equal(x.portal.preview(x.a,rows).every(r=>r.valid),true);
+ assert.throws(()=>x.portal.submitBatch(x.a,[...rows,rows[0]]),/invalid/);
+ const count=x.portal.db.prepare("SELECT COUNT(*) n FROM registration_requests WHERE status='SUBMITTED'").get().n;
+ assert.equal(count,0);
+ const submitted=x.portal.submitBatch(x.a,rows);
+ assert.equal(submitted.length,2);
+ assert.equal(x.portal.db.prepare("SELECT COUNT(*) n FROM registration_requests WHERE status='SUBMITTED'").get().n,2);
+ assert.throws(()=>x.portal.submitBatch(x.a,rows),/UNIQUE/);
+ assert.equal(x.portal.db.prepare("SELECT COUNT(*) n FROM registration_requests WHERE status='SUBMITTED'").get().n,2);
+});
+test('hashed expiring sessions and role-bound scope prevent credential crossover',t=>{
+ const x=setup();t.after(()=>x.close());
+ assert.throws(()=>x.portal.login('a@example.invalid','wrong'),/Invalid credentials/);
+ const session=x.portal.login('a@example.invalid','a-long-secret-password');
+ assert.equal(x.portal.db.prepare('SELECT token_hash FROM registration_sessions ORDER BY expires_ms DESC LIMIT 1').get().token_hash===session.token,false);
+ assert.equal(x.portal.authenticate(session.token).scopeId,'club-a');
+ x.portal.db.prepare('UPDATE registration_sessions SET expires_ms=0 WHERE token_hash=?').run(require('node:crypto').createHash('sha256').update(session.token).digest('hex'));
+ assert.throws(()=>x.portal.authenticate(session.token),/sign-in/);
+});
