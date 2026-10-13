@@ -25,6 +25,7 @@ Status: development implementation; **do not enter real minors' PII** until encr
 - REG-021 (P0): League administrators define yearly training requirements and verify completions; only compliance status is visible to managers.
 - REG-022 (P0): Suspensions remain league-owned and prevent game-day lineup participation.
 - REG-023 (P1): Approved transfers with existing confirmed lineups require a separate audited amendment, not silent replacement.
+- REG-024 (P0): League administrators may configure division-specific minimum/maximum age and cutoff date. Approval must calculate age from the private DOB and atomically reject an ineligible enrollment.
 
 ## Family self-service (next security milestone)
 - REG-030 (P0 before production): A parent/guardian can access **only their verified child relationships** and request profile corrections, subject to registrar approval.
