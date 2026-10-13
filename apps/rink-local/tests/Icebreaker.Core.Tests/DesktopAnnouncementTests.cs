@@ -36,6 +36,9 @@ public sealed class DesktopAnnouncementTests
                 queue.Stage(ev);
                 queue.Stage(ev);
                 Assert.Single(queue.Read());
+                queue.Stage(new RinkEvent("old-goal", "GOAL_RECORDED", "away", """{"scorer":"31"}"""), recovered: true);
+                Assert.Equal("NEEDS_REVIEW", queue.Read().Single(x => x.Id == "old-goal").State);
+                queue.Mark("old-goal", "SKIPPED", "NEEDS_REVIEW");
                 queue.Mark("goal-1", "PLAYING", "PENDING");
             }
             using (var recovered = new AnnouncementQueue(file))
