@@ -39,6 +39,7 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
     if(route==='family/context'&&req.method==='GET'){reply(200,{children:portal.family.children(family)});return true;}
     if(route==='family/contact'&&req.method==='GET'){reply(200,portal.family.ownContact(family));return true;}
     if(route==='family/contact'&&req.method==='PUT'){reply(200,portal.family.updateContact(family,await body()));return true;}
+    if(route==='family/details'&&req.method==='PUT'){reply(200,portal.family.updateDetails(family,await body()));return true;}
     const child=route.match(/^family\/players\/([-\w]+)\/documents$/);
     if(child&&req.method==='GET'){reply(200,{documents:portal.listDocuments(family,child[1])});return true;}
     if(child&&req.method==='POST'){const b=await documentBody();reply(201,portal.uploadDocument(family,{...b,playerId:child[1]}));return true;}
