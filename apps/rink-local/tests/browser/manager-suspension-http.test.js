@@ -20,7 +20,7 @@ test('manager receives only own schedule, cannot suspend, and sees suspension el
  assert.ok((await schedule.json()).games.some(x=>x.id===g.id));
  const other=await fetch(base+'/api/team/v1/teams/'+g.away_team_id+'/schedule',{headers:{Authorization:'Bearer '+token}});
  assert.equal(other.status,403);
- const date=gameDate(league.db,g.id),payload={playerId:p.id,startDate:date,endDate:date,reason:'League-only disciplinary record'};
+ const date=gameDate(league.db,g.id),payload={leagueId:'demo-league',playerId:p.id,startDate:date,endDate:date,reason:'League-only disciplinary record'};
  const forbidden=await fetch(base+'/api/league/v1/suspensions',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
  assert.equal(forbidden.status,403);
  const created=await fetch(base+'/api/league/v1/suspensions',{method:'POST',headers:{'X-Operator-Key':'league-admin-secret','Content-Type':'application/json'},body:JSON.stringify(payload)});
