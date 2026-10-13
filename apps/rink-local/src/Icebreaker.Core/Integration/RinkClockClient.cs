@@ -29,7 +29,13 @@ public sealed class RinkClockClient(HttpClient http, string operatorKey, string 
             score.GetProperty("away").GetInt32(),
             root.TryGetProperty("clockMode", out var mode) ? mode.GetString() ?? "STOP" : "STOP",
             root.TryGetProperty("timingVersion", out var version) ? version.GetString() ?? "DEFAULT" : "DEFAULT",
-            root.TryGetProperty("penalties", out var penalties) ? penalties.GetRawText() : "{}");
+            root.TryGetProperty("penalties", out var penalties) ? penalties.GetRawText() : "{}",
+            root.TryGetProperty("events", out var events) && events.ValueKind == JsonValueKind.Array
+                ? events.EnumerateArray().Select(e => new RinkEvent(
+                    e.GetProperty("id").GetString() ?? "", e.GetProperty("type").GetString() ?? "",
+                    e.TryGetProperty("team", out var t) ? t.GetString() : null,
+                    e.TryGetProperty("details", out var d) ? d.GetRawText() : "{}")).ToArray()
+                : []);
     }
 
     public async Task CommandAsync(object command, CancellationToken token = default)
@@ -103,7 +109,9 @@ public sealed class RinkClockClient(HttpClient http, string operatorKey, string 
 }
 
 public sealed record RinkClockSnapshot(int Revision, int Period, int Seconds, bool Running,
-    bool Ended, int Home, int Away, string ClockMode, string TimingVersion, string PenaltiesJson)
+    bool Ended, int Home, int Away, string ClockMode, string TimingVersion, string PenaltiesJson,
+    IReadOnlyList<RinkEvent>? Events = null)
 {
     public string DisplayTime => $"{Seconds / 60:00}:{Seconds % 60:00}";
 }
+\npublic sealed record RinkEvent(string Id, string Type, string? Team, string DetailsJson);\n
