@@ -56,15 +56,15 @@ class RegistrationPortal{
  createPlayer(u,input){this.requireClub(u,u.scopeId);return this.tx(()=>{const r=this.registry.createPlayer(input,u.id,{withinTransaction:true});this.db.prepare('INSERT INTO registration_player_clubs VALUES(?,?,?)').run(u.scopeId,r.playerId,new Date().toISOString());this.audit('CLUB_PLAYER_CREATED',r.playerId,u.id,{clubId:u.scopeId});return r;});}
  profile(u,playerId){if(!this.canRead(u,playerId))throw Error('Player outside authorized scope');return {profile:this.registry.privateProfile(playerId),relatedPeople:this.registry.relatedPeople(playerId),history:this.registry.history(playerId)};}
  linkExisting(u,clubId,playerId){const c=this.club(clubId);this.requireLeague(u,c.league_id);if(!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Unknown player');return this.tx(()=>{this.db.prepare('INSERT INTO registration_player_clubs VALUES(?,?,?)').run(clubId,playerId,new Date().toISOString());this.audit('CLUB_PLAYER_LINKED',playerId,u.id,{clubId});return {clubId,playerId};});}
- submit(u,{playerId,teamId,jersey,position}){
+ submit(u,{playerId,teamId,jersey,position},{withinTransaction=false}={}){
   this.requireClub(u,u.scopeId);
   if(!this.owns(u.scopeId,playerId))throw Error('Player outside club scope');
   if(!this.db.prepare('SELECT 1 FROM registration_club_teams WHERE club_id=? AND team_id=?').get(u.scopeId,teamId))throw Error('Team outside club scope');
   if(!Number.isInteger(jersey)||jersey<0||jersey>99||!['F','D','G','C','LW','RW','LD','RD'].includes(position))throw Error('Invalid roster details');
-  return this.tx(()=>{const requestId=uid(),club=this.club(u.scopeId),team=this.team(teamId);
+  const apply=()=>{const requestId=uid(),club=this.club(u.scopeId),team=this.team(teamId);
    this.db.prepare("INSERT INTO registration_requests(id,club_id,league_id,player_id,team_id,jersey,position,status,created_by,created_at) VALUES(?,?,?,?,?,?,?,'SUBMITTED',?,?)").run(requestId,u.scopeId,club.league_id,playerId,teamId,jersey,position,u.id,new Date().toISOString());
    this.audit('REGISTRATION_SUBMITTED',requestId,u.id,{playerId,teamId,seasonId:team.seasonId});return {requestId,status:'SUBMITTED'};
-  });
+  };return withinTransaction?apply():this.tx(apply);
  }
  requests(u){const field=u.role==='CLUB_REGISTRAR'?'club_id':'league_id';return this.db.prepare('SELECT r.id requestId,r.club_id clubId,r.player_id playerId,p.display_name displayName,r.team_id teamId,r.jersey,r.position,r.status,r.created_at createdAt,r.decision_reason decisionReason FROM registration_requests r JOIN players p ON p.id=r.player_id WHERE r.'+field+'=? ORDER BY r.created_at DESC,r.id DESC LIMIT 500').all(u.scopeId);}
  decide(u,requestId,{decision,reason}){
@@ -88,6 +88,11 @@ class RegistrationPortal{
    const key=playerId+':'+teamId;if(seen.has(key))errors.push('Duplicate player/team');seen.add(key);
    return {row:index+1,playerId,teamId,jersey,position,valid:errors.length===0,errors};
   });
+ }
+ submitBatch(u,rows){
+  const preview=this.preview(u,rows);
+  if(!preview.length||preview.some(r=>!r.valid))throw Error('Import contains invalid or empty rows; preview and correct before submitting');
+  return this.tx(()=>preview.map(r=>this.submit(u,r,{withinTransaction:true})));
  }
  close(){this.db.close();}
 }
