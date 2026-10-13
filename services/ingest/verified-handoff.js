@@ -64,8 +64,8 @@ function restoreIdleStandby({dbPath,pkg,adminKey,gameId,stationId}){
    period:verified.state.period,seconds:verified.state.seconds,goalies:verified.state.goalies};
  }finally{db.close();}
 }
-async function handoff({remoteUrl,dbPath,gameId,stationId,adminKey,confirm,fetchImpl=fetch}){
- if(typeof confirm!=='function')throw Error('Explicit operator confirmation callback required');
+async function handoff({remoteUrl,dbPath,gameId,stationId,adminKey,privateKey,confirm,fetchImpl=fetch}){
+ if(typeof confirm!=='function'||!privateKey)throw Error('Operator confirmation and standby signing key required');
  const base=remoteUrl.replace(/\/$/,'');
  const post=async(path,body)=>{
   const res=await fetchImpl(base+path,{method:'POST',headers:{'content-type':'application/json','x-admin-key':adminKey},body:JSON.stringify(body)});
@@ -79,7 +79,9 @@ async function handoff({remoteUrl,dbPath,gameId,stationId,adminKey,confirm,fetch
   period:verified.state.period,seconds:verified.state.seconds,goalies:verified.state.goalies});
  if(approved!==true)throw Error('Operator did not confirm takeover');
  const restored=restoreIdleStandby({dbPath,pkg,adminKey,gameId,stationId});
- const committed=await post('/admin/games/commit-handoff',{gameId,stationId,expectedEpoch:pkg.manifest.expectedEpoch,digest:pkg.digest});
+ const receipt=JSON.stringify({gameId,stationId,digest:pkg.digest,expectedEpoch:pkg.manifest.expectedEpoch});
+ const stationSignature=crypto.sign(null,Buffer.from(receipt),privateKey).toString('base64');
+ const committed=await post('/admin/games/commit-handoff',{gameId,stationId,expectedEpoch:pkg.manifest.expectedEpoch,digest:pkg.digest,stationSignature});
  if(committed.epoch!==restored.epoch||committed.digest!==restored.digest)throw Error('Handoff acknowledgment mismatch');
  return {active:true,...restored};
 }
