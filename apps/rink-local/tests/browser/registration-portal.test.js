@@ -55,6 +55,16 @@ test('league approval enrolls permanent ID atomically, rejects duplicate decisio
  assert.equal(x.portal.requests(x.admin).find(r=>r.requestId===again.requestId).status,'SUBMITTED');
  assert.equal(x.portal.db.prepare('SELECT COUNT(*) n FROM player_membership_history WHERE player_id=?').get(playerId).n,1);
 });
+test('league can revoke former club private access with audit after transfer',t=>{
+ const x=setup();t.after(()=>x.close());
+ const {playerId}=x.portal.createPlayer(x.a,{displayName:'Transfer Alias',legalName:'Private Transfer',birthDate:'2016-04-04'});
+ x.portal.linkExisting(x.admin,'club-b',playerId);
+ assert.equal(x.portal.profile(x.b,playerId).profile.playerId,playerId);
+ assert.throws(()=>x.portal.unlinkExisting(x.a,'club-b',playerId,'Transfer'),/access denied/);
+ x.portal.unlinkExisting(x.admin,'club-b',playerId,'Club association ended');
+ assert.throws(()=>x.portal.profile(x.b,playerId),/outside authorized scope/);
+ assert.equal(x.portal.profile(x.a,playerId).profile.playerId,playerId);
+});
 test('rejection leaves roster unchanged; batch preview and submit are all-or-nothing',t=>{
  const x=setup();t.after(()=>x.close());
  const one=x.portal.createPlayer(x.a,{displayName:'Alias 1',legalName:'Private 1',birthDate:'2016-01-02'}).playerId;
