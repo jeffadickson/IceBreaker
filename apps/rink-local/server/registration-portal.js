@@ -42,6 +42,7 @@ class RegistrationPortal{
   const token=crypto.randomBytes(32).toString('base64url');this.db.prepare('INSERT INTO registration_sessions VALUES(?,?,?)').run(hash(token),u.id,Date.now()+8*3600_000);
   return {token,role:u.role,scopeId:u.scope_id,expiresInSeconds:28800};
  }
+ logout(token){if(typeof token!=='string'||token.length<30)return {signedOut:true};this.db.prepare('DELETE FROM registration_sessions WHERE token_hash=?').run(hash(token));return {signedOut:true};}
  authenticate(token){
   if(typeof token!=='string'||token.length<30)throw Error('Registration sign-in required');
   const u=this.db.prepare('SELECT u.id,u.role,u.scope_id scopeId FROM registration_sessions s JOIN registration_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_ms>?').get(hash(token),Date.now());
