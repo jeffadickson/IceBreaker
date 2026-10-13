@@ -38,6 +38,15 @@ public sealed class TimekeeperWindow : Window
     private readonly TextBox _reason = new() { Watermark = "Reason for correction", Width = 250 };
     private readonly CheckBox _confirm = new() { Content = "Confirm clock correction" };
     private readonly List<Button> _mutations = [];
+    private readonly AnnouncementQueue _paQueue = new(
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "IceBreaker", "desktop-pa.sqlite"));
+    private readonly AnnouncementSpeech _speech = new(new HttpClient { Timeout = TimeSpan.FromSeconds(25) });
+    private readonly ListBox _announcements = new() { Height = 140, Width = 850 };
+    private readonly ComboBox _voiceMode = new() { ItemsSource = new[] { "Offline Windows voice", "AI arena announcer (cloud)" }, SelectedIndex = 0, Width = 245 };
+    private readonly ComboBox _aiVoice = new() { ItemsSource = new[] { "onyx", "marin", "cedar", "echo", "alloy", "nova" }, SelectedIndex = 0, Width = 115 };
+    private readonly TextBlock _paStatus = Label("PA is manual-approval only; AI speech is synthetic.", 14);
+    private bool _paBusy;
     private bool _busy;
     private bool _connected;
     private RinkClockSnapshot? _latest;
@@ -99,6 +108,19 @@ public sealed class TimekeeperWindow : Window
             ActionButton("INTERMISSION", () => _client.AuxiliaryAsync("RESET", "INTERMISSION")),
             ActionButton("AUX START", () => _client.AuxiliaryAsync("START")),
             ActionButton("AUX PAUSE", () => _client.AuxiliaryAsync("PAUSE"))));
+        body.Children.Add(Label("PUBLIC ADDRESS · MANUAL APPROVAL", 18));
+        body.Children.Add(new TextBlock
+        {
+            Text = "AI speech is synthetic. Voice selection is optional and requires internet. " +
+                   "Only committed event scripts using jersey numbers are sent to the provider.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        body.Children.Add(Buttons(_voiceMode, _aiVoice));
+        body.Children.Add(_announcements);
+        body.Children.Add(Buttons(
+            PaButton("PREVIEW / PLAY SELECTED", PlaySelectedAsync),
+            PaButton("SKIP SELECTED", SkipSelectedAsync)));
+        body.Children.Add(_paStatus);
         body.Children.Add(_status);
         body.Children.Add(new TextBlock
         {
@@ -113,7 +135,7 @@ public sealed class TimekeeperWindow : Window
         _poll.Tick += async (_, _) => await RefreshAsync();
         _poll.Start();
         Opened += async (_, _) => await RefreshAsync();
-        Closed += (_, _) => { _poll.Stop(); _http.Dispose(); };
+        Closed += (_, _) => { _poll.Stop(); _http.Dispose(); _paQueue.Dispose(); };
         SetEnabled(false);
     }
 
@@ -141,6 +163,62 @@ public sealed class TimekeeperWindow : Window
         button.Click += async (_, _) => await ExecuteAsync(action);
         _mutations.Add(button);
         return button;
+    }
+
+    private Button PaButton(string text, Func<Task> action)
+    {
+        var button = new Button { Content = text, MinHeight = 54 };
+        button.Click += async (_, _) =>
+        {
+            if (_paBusy) return;
+            _paBusy = true;
+            try { await action(); }
+            catch (Exception ex) { _paStatus.Text = ex.Message; }
+            finally { _paBusy = false; UpdatePaList(); }
+        };
+        return button;
+    }
+
+    private void UpdatePaList()
+    {
+        var previous = (_announcements.SelectedItem as AnnouncementItem)?.Id;
+        var items = _paQueue.Read();
+        _announcements.ItemsSource = items;
+        _announcements.SelectedItem = items.FirstOrDefault(x => x.Id == previous);
+    }
+
+    private async Task PlaySelectedAsync()
+    {
+        if (_announcements.SelectedItem is not AnnouncementItem item)
+            throw new InvalidOperationException("Select an announcement first");
+        // Synthesize before claiming; a failed provider request leaves it pending.
+        // Playback may be uncertain after a crash, so claim before sending audio.
+        var ai = _voiceMode.SelectedIndex == 1;
+        _paStatus.Text = ai ? "Generating synthetic AI speech…" : "Generating offline speech…";
+        var wav = await _speech.SynthesizeAsync(item.Script, ai,
+            _aiVoice.SelectedItem?.ToString() ?? "onyx");
+        _paQueue.Mark(item.Id, "PLAYING", "PENDING", "NEEDS_REVIEW");
+        try
+        {
+            _paStatus.Text = "Playing announcement on default Windows audio output…";
+            await AnnouncementSpeech.PlayWavAsync(wav);
+            _paQueue.Mark(item.Id, "PLAYED", "PLAYING");
+            _paStatus.Text = "Announcement played.";
+        }
+        catch
+        {
+            _paQueue.Mark(item.Id, "NEEDS_REVIEW", "PLAYING");
+            throw;
+        }
+    }
+
+    private Task SkipSelectedAsync()
+    {
+        if (_announcements.SelectedItem is not AnnouncementItem item)
+            throw new InvalidOperationException("Select an announcement first");
+        _paQueue.Mark(item.Id, "SKIPPED", "PENDING", "NEEDS_REVIEW");
+        _paStatus.Text = "Announcement skipped; no audio sent.";
+        return Task.CompletedTask;
     }
 
     private async Task ExecuteAsync(Func<Task> action)
@@ -184,6 +262,8 @@ public sealed class TimekeeperWindow : Window
         {
             var snapshot = await _client.SnapshotAsync();
             _latest = snapshot;
+            foreach (var ev in snapshot.Events ?? []) _paQueue.Stage(ev);
+            if (!_paBusy) UpdatePaList();
             _connected = true;
             _connection.Text = snapshot.Running ? "● AUTHORITY CONNECTED · RUNNING" : "● AUTHORITY CONNECTED · STOPPED";
             _connection.Foreground = Brushes.LightGreen;
