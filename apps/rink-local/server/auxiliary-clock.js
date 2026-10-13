@@ -9,7 +9,7 @@ class AuxiliaryClock {
  CREATE TABLE IF NOT EXISTS auxiliary_clock_history(game_id TEXT NOT NULL,seq INTEGER NOT NULL,event_id TEXT NOT NULL UNIQUE,action TEXT NOT NULL,phase TEXT NOT NULL,remaining INTEGER NOT NULL,actor TEXT NOT NULL,at TEXT NOT NULL,PRIMARY KEY(game_id,seq));`);
   db.prepare("INSERT OR IGNORE INTO auxiliary_clock_state VALUES(?, 'WARMUP', ?, 0, 0)").run(gameId,this.timing.warmupSeconds);
   const row=this.row();
-  if(row.running){db.prepare('UPDATE auxiliary_clock_state SET running=0 WHERE game_id=?').run(gameId);this.audit('AUX_TIMER_RECOVERED_PAUSED',{gameId,phase:row.phase,remaining:row.remaining});}
+  if(row.running){db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE auxiliary_clock_state SET running=0,revision=revision+1 WHERE game_id=? AND revision=?').run(gameId,row.revision);db.prepare('INSERT INTO auxiliary_clock_history VALUES(?,?,?,?,?,?,?,?)').run(gameId,row.revision+1,crypto.randomUUID(),'RECOVER_PAUSED',row.phase,row.remaining,'system-recovery',new Date().toISOString());db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}this.audit('AUX_TIMER_RECOVERED_PAUSED',{gameId,phase:row.phase,remaining:row.remaining});}
  }
  row(){return this.db.prepare('SELECT phase,remaining,running,revision FROM auxiliary_clock_state WHERE game_id=?').get(this.gameId);}
  currentSeconds(){const s=this.row();return s.running&&this.anchor!==null?Math.max(0,s.remaining-Math.floor(Number(this.now()-this.anchor)/1e9)):s.remaining;}
