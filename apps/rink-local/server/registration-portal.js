@@ -5,6 +5,7 @@ const crypto=require('node:crypto');
 const {DatabaseSync}=require('node:sqlite');
 const {PlayerRegistry}=require('./player-registry');
 const {FamilyAccess}=require('./family-access');
+const participant=require('./participant-compliance');
 const {EncryptedDocuments,MAX_BYTES}=require('./encrypted-documents');
 const {encryptField,decryptField,fieldKey}=require('./private-fields');
 const totp=require('./mfa-totp');
@@ -234,6 +235,30 @@ class RegistrationPortal{
   const row=this.documents.row(id);
   if(user.role!=='LEAGUE_ADMIN'||!this.canRead(user,row.player_id))throw Error('League document verification denied');
   return this.documents.decide(id,user.id,decision,note);
+ }
+ gameLeague(gameId){
+  const row=this.db.prepare('SELECT ls.league_id leagueId FROM games g JOIN divisions d ON d.id=g.division_id JOIN league_seasons ls ON ls.season_id=d.season_id WHERE g.id=?').get(gameId);
+  if(!row)throw Error('Unknown game');return row.leagueId;
+ }
+ setGamePolicy(user,{gameId,type,requireLegacyPlayerTraining=null,note}){
+  this.requireLeague(user,this.gameLeague(gameId));
+  return participant.setCompetition(this.db,{gameId,type,requireLegacyPlayerTraining,note},user.id);
+ }
+ linkParticipantNumber(user,{subjectType,subjectId,issuer,identifier,seasonId=''}){
+  this.requireLeague(user,user.scopeId);
+  if(subjectType==='PLAYER'?!this.canRead(user,subjectId):!this.personInLeague(subjectId,user.scopeId))
+   throw Error('Participant outside league scope');
+  return participant.linkExternalId(this.db,{subjectType,subjectId,issuer,identifier,seasonId},user.id);
+ }
+ setRoleRequirement(user,input){
+  this.requireLeague(user,input.scopeType==='TOURNAMENT'?this.gameLeague(input.scopeId):input.scopeId);
+  return participant.requireCourse(this.db,input,user.id);
+ }
+ verifyRoleTraining(user,input){
+  this.requireLeague(user,user.scopeId);
+  if(input.subjectType==='PLAYER'?!this.canRead(user,input.subjectId):!this.personInLeague(input.subjectId,user.scopeId))
+   throw Error('Participant outside league scope');
+  return participant.recordCourse(this.db,input,user.id);
  }
  close(){this.db.close();}
 }
