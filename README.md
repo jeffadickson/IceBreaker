@@ -10,6 +10,10 @@ Run `START_ICEBREAKER_DESKTOP_WINDOWS.cmd` on a Windows laptop with Node.js 22.1
 
 See [native timekeeper guide](apps/rink-local/docs/native-timekeeper-desktop.md) and [desktop requirements](requirements/desktop-timekeeper.md). GitHub CI compiles the native app and publishes a Windows x64 artifact. The current shared development operator key, incomplete hardware drivers and unperformed physical-machine crash testing mean this is **not yet a production deployment**.
 
+## Optional AI arena announcer
+
+The native Windows timekeeper has a manual-approval PA queue for committed goal and penalty events. Select the **Offline Windows voice** (default) or an optional **AI arena announcer** voice, then choose an announcement to play or skip. The AI voice requires an `OPENAI_API_KEY` in the desktop process environment and internet access; it does not alter scoring or send credentials to the rink backend. Player jersey numbers are used by default, not youth names. See [AI PA announcer guide](apps/rink-local/docs/ai-pa-announcer.md) and [requirements](requirements/ai-pa-announcer.md). Arena speaker playback and cloud provider integration still need physical acceptance testing.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
