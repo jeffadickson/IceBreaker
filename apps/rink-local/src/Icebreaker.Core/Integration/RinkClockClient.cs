@@ -114,4 +114,5 @@ public sealed record RinkClockSnapshot(int Revision, int Period, int Seconds, bo
 {
     public string DisplayTime => $"{Seconds / 60:00}:{Seconds % 60:00}";
 }
-\npublic sealed record RinkEvent(string Id, string Type, string? Team, string DetailsJson);\n
+
+public sealed record RinkEvent(string Id, string Type, string? Team, string DetailsJson);
