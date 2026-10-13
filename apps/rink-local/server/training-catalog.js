@@ -40,6 +40,12 @@ function addPolicy(db,{trainingId,scopeType,scopeId,seasonId='',role,renewalMode
  if(scopeType==='LEAGUE'&&!db.prepare('SELECT 1 FROM leagues WHERE id=?').get(scopeId))throw Error('Unknown league');
  if(scopeType==='TOURNAMENT'&&!db.prepare('SELECT 1 FROM games WHERE id=?').get(scopeId))throw Error('Unknown tournament game');
  if(seasonId&&!db.prepare('SELECT 1 FROM seasons WHERE id=?').get(seasonId))throw Error('Unknown season');
+ if(scopeType==='LEAGUE'&&seasonId&&!db.prepare('SELECT 1 FROM league_seasons WHERE league_id=? AND season_id=?').get(scopeId,seasonId))
+  throw Error('Season does not belong to league');
+ if(scopeType==='TOURNAMENT'){
+  const game=db.prepare('SELECT competition_type type FROM competition_policies WHERE game_id=?').get(scopeId);
+  if(!game||game.type!=='TOURNAMENT')throw Error('Tournament policy must be enabled for this game');
+ }
  // Revisions are append-only; a later effectiveFrom supersedes earlier
  // revisions for the same course/scope/role. No retroactive rule mutation.
  const previous=db.prepare('SELECT MAX(effective_from) latest FROM training_policy_versions WHERE training_id=? AND scope_type=? AND scope_id=? AND season_id=? AND role=?').get(trainingId,scopeType,scopeId,seasonId,role);
