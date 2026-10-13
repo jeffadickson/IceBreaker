@@ -38,6 +38,10 @@ New backend-only [ClamAV quarantine scanner](apps/rink-local/server/scan-quarant
 
 **Production registration is still disabled** until KMS, encrypted backup/restore, scanner deployment, mandatory MFA/recovery, verified guardian consent and full legacy-data protection are complete.
 
+## Configurable annual training
+
+League administrators can now define training courses once and assign versioned requirements by role, league or tournament, and season. Renewal can be once, per hockey season, per calendar year, or after a configurable number of days. Verified completion and revocation history is retained across seasons, and the game-day roster gate checks current requirements. See [training catalog and renewal requirements](requirements/training-catalog-and-renewals.md). The league administrator editor is available in `/registration.html`.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
