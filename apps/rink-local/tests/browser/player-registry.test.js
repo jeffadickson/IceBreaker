@@ -50,6 +50,16 @@ test('same-season transfer closes old membership without rewriting historical id
  assert.ok(h[0].leftAt);assert.equal(h[1].leftAt,null);
  assert.throws(()=>x.players.enroll(playerId,'flyers',{jersey:42,position:'D'},'registrar'),/Already/);
 });
+test('confirmed game lineups block silent midseason player transfers',t=>{
+ const x=setup();t.after(()=>x.close());
+ const {playerId}=x.players.createPlayer({displayName:'Roster Transfer',legalName:'Private Transfer',birthDate:'2016-05-01'},'registrar');
+ x.players.enroll(playerId,'maple',{jersey:45,position:'F'},'registrar');
+ const game=x.league.db.prepare("SELECT id FROM games WHERE status='scheduled' AND (home_team_id='maple' OR away_team_id='maple') LIMIT 1").get();
+ x.teams.confirmLineup('maple',game.id,'manager',{playerIds:[playerId],expectedRosterRevision:x.teams.currentRevision('maple')});
+ assert.throws(()=>x.players.enroll(playerId,'flyers',{jersey:45,position:'F',reason:'TRANSFER'},'registrar'),/Confirmed game lineup/);
+ assert.equal(x.teams.roster('maple').some(p=>p.id===playerId),true);
+ assert.equal(x.teams.roster('flyers').some(p=>p.id===playerId),false);
+});
 test('annual training blocks only required seasons and preserves prior-year evidence',t=>{
  const x=setup();t.after(()=>x.close());
  const game=x.league.db.prepare("SELECT * FROM games WHERE status='scheduled' AND (home_team_id='maple' OR away_team_id='maple') LIMIT 1").get();
