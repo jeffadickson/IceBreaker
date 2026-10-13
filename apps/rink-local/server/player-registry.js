@@ -40,9 +40,9 @@ class PlayerRegistry{
  constructor(dbPath){this.db=new DatabaseSync(dbPath);init(this.db);}
  tx(fn){this.db.exec('BEGIN IMMEDIATE');try{const x=fn();this.db.exec('COMMIT');return x;}catch(e){this.db.exec('ROLLBACK');throw e;}}
  audit(action,entity,payload,actor){this.db.prepare("INSERT INTO league_audit VALUES(?,?,?,?,?,?)").run(uuid(),new Date().toISOString(),actor,action,entity,JSON.stringify(payload));}
- createPlayer({displayName,legalName,birthDate,address={}},actor){
+ createPlayer({displayName,legalName,birthDate,address={}},actor,{withinTransaction=false}={}){
   if(!good(actor,100)||!good(displayName,120)||!good(legalName)||!validDate(birthDate)||!validAddress(address))throw Error('Invalid private player profile');
-  return this.tx(()=>{const playerId=uuid();this.db.prepare("INSERT INTO players(id,display_name,privacy_status) VALUES(?,?,'PRIVATE')").run(playerId,displayName.trim());this.db.prepare("INSERT INTO player_private_profiles VALUES(?,?,?,?,?,?)").run(playerId,legalName.trim(),birthDate,JSON.stringify(address),new Date().toISOString(),actor);this.audit('PLAYER_CREATED',playerId,{privateProfile:true},actor);return {playerId};});
+  const apply=()=>{const playerId=uuid();this.db.prepare("INSERT INTO players(id,display_name,privacy_status) VALUES(?,?,'PRIVATE')").run(playerId,displayName.trim());this.db.prepare("INSERT INTO player_private_profiles VALUES(?,?,?,?,?,?)").run(playerId,legalName.trim(),birthDate,JSON.stringify(address),new Date().toISOString(),actor);this.audit('PLAYER_CREATED',playerId,{privateProfile:true},actor);return {playerId};};return withinTransaction?apply():this.tx(apply);
  }
  privateProfile(playerId){
   const p=this.db.prepare("SELECT player_id playerId,legal_name legalName,birth_date birthDate,address_json addressJson FROM player_private_profiles WHERE player_id=?").get(playerId);
