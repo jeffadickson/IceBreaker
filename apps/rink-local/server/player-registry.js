@@ -31,7 +31,7 @@ function trainingStatus(db,playerId,teamId,date){
  return db.prepare("SELECT id,code,title,required_by requiredBy,blocks_lineup blocksLineup FROM season_training_requirements WHERE league_id=? AND season_id=? ORDER BY code").all(team.league_id,team.season_id).map(r=>{
   const row=db.prepare("SELECT completed_on FROM player_training_completions WHERE player_id=? AND requirement_id=? AND revoked_at IS NULL AND completed_on<=? AND (expires_on IS NULL OR expires_on>=?) ORDER BY completed_on DESC LIMIT 1").get(playerId,r.id,date,date);
   const complete=!!row&&(!r.requiredBy||row.completed_on<=r.requiredBy);
-  return {code:r.code,title:r.title,complete,blocksLineup:!!r.blocksLineup,requiredBy:r.requiredBy};
+  return {code:r.code,title:r.title,complete,blocksLineup:!!r.blocksLineup&&(!r.requiredBy||date>=r.requiredBy),requiredBy:r.requiredBy};
  });
 }
 class PlayerRegistry{
