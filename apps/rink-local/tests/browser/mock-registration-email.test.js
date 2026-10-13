@@ -37,7 +37,7 @@ test('confirmed fake email encrypts attachment in separate DB and stages PENDING
  const archive=new EvidenceArchive(x.paths.archive);
  const row=archive.db.prepare('SELECT * FROM archived_evidence WHERE id=?').get(result.evidenceId);
  assert.equal(row.scan_state,'QUARANTINED');
- assert.equal(row.encrypted_data.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),false);
+ assert.equal(Buffer.from(row.encrypted_data).subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),false);
  assert.equal(archive.db.prepare('SELECT COUNT(*) n FROM evidence_audit').get().n,1);
  const original=archive.decryptForReview(result.evidenceId,'test-review');
  assert.equal(original.mime,'image/png');assert.equal(original.bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),true);
