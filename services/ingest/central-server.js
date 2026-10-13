@@ -8,8 +8,8 @@ const { DatabaseSync } = require('node:sqlite');
 const { URL } = require('node:url');
 const MAX_BYTES = 256 * 1024;
 const MAX_EVENTS = 128;
-const ALLOWED_TYPES = new Set(['GOAL_RECORDED','GOAL_ATTRIBUTION_CORRECTED','SHOT_RECORDED','PENALTY_ASSESSED','CLOCK_UPDATED','PERIOD_ENDED','PERIOD_ADVANCED','PERIOD_STARTED','GAME_ENDED','MERCY_MODE_CHANGED']);
-function canonical(batch) { return JSON.stringify({gameId:batch.gameId,stationId:batch.stationId,events:batch.events}); }
+const ALLOWED_TYPES = new Set(['GOAL_RECORDED','GOAL_ATTRIBUTION_CORRECTED','SHOT_RECORDED','PENALTY_ASSESSED','PENALTY_DELAYED','PENALTY_WHISTLE','PENALTY_DELAYED_WAVED','GOALIE_CHANGED','CLOCK_UPDATED','CLOCK_SYNCED','PERIOD_ENDED','PERIOD_ADVANCED','PERIOD_STARTED','GAME_ENDED','MERCY_MODE_CHANGED','OVERTIME_STARTED','TIMEOUT_TAKEN']);
+function canonical(batch) { return JSON.stringify({gameId:batch.gameId,stationId:batch.stationId,...(batch.epoch===undefined?{}:{epoch:batch.epoch}),events:batch.events}); }
 function signBatch(privateKey, batch) { return crypto.sign(null,Buffer.from(canonical(batch)),privateKey).toString('base64'); }
 function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey=process.env.ICEBREAKER_INGEST_ADMIN_KEY}={}) {
  if(!adminKey || adminKey.length<24)throw Error('Configure an admin key of at least 24 characters');
@@ -26,10 +26,16 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
  async function body(req){let parts=[],n=0;for await(const part of req){n+=part.length;if(n>MAX_BYTES)throw Object.assign(new Error('Too large'),{status:413});parts.push(part);}try{return JSON.parse(Buffer.concat(parts).toString('utf8'));}catch{throw Object.assign(new Error('Invalid JSON'),{status:400});}}
  function validId(s){return typeof s==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(s);}
  function ingest(batch, signature){
-  if(!batch||!validId(batch.gameId)||!validId(batch.stationId)||!Array.isArray(batch.events)||batch.events.length<1||batch.events.length>MAX_EVENTS)throw Object.assign(new Error('Invalid batch'),{status:400});
+  if(!batch||!validId(batch.gameId)||!validId(batch.stationId)||(batch.epoch!==undefined&&(!Number.isSafeInteger(batch.epoch)||batch.epoch<1))||!Array.isArray(batch.events)||batch.events.length<1||batch.events.length>MAX_EVENTS)throw Object.assign(new Error('Invalid batch'),{status:400});
   const station=db.prepare('SELECT * FROM stations WHERE id=?').get(batch.stationId);
   const owner=db.prepare('SELECT station_id,epoch FROM game_owners WHERE game_id=?').get(batch.gameId);
   if(owner && owner.station_id!==batch.stationId){audit('DENIED',batch.gameId,batch.stationId,'fenced: another station owns game');throw Object.assign(new Error('Another station owns this game'),{status:409});}
+  // Fencing epoch is signed as part of the batch. Legacy epoch-1 clients are
+  // accepted only before the first ownership transfer; they cannot return later.
+  if(owner && (batch.epoch===undefined?owner.epoch!==1:batch.epoch!==owner.epoch)){
+   audit('DENIED',batch.gameId,batch.stationId,'stale ownership epoch');
+   throw Object.assign(new Error('Stale ownership epoch'),{status:409,expectedEpoch:owner.epoch});
+  }
   if(!station||!station.enabled||!db.prepare('SELECT 1 FROM assignments WHERE game_id=? AND station_id=?').get(batch.gameId,batch.stationId)){audit('DENIED',batch.gameId,batch.stationId,'unassigned station');throw Object.assign(new Error('Station not authorized for game'),{status:403});}
   let verified=false;try{verified=crypto.verify(null,Buffer.from(canonical(batch)),crypto.createPublicKey(station.public_key),Buffer.from(String(signature||''),'base64'));}catch{}
   if(!verified){audit('DENIED',batch.gameId,batch.stationId,'invalid signature');throw Object.assign(new Error('Invalid signature'),{status:401});}
@@ -49,7 +55,7 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
    audit('BATCH_ACCEPTED',batch.gameId,batch.stationId,`accepted=${accepted.length}; duplicates=${duplicates.length}`);db.exec('COMMIT');
   }catch(e){db.exec('ROLLBACK');audit('BATCH_REJECTED',batch.gameId,batch.stationId,e.message);throw e;}
   if(accepted.length){const subscribers=listeners.get(batch.gameId)||new Set();const latest=nextSnapshot(batch.gameId);for(const res of subscribers){try{res.write(`id: ${latest.lastSequence}\nevent: update\ndata: ${JSON.stringify(latest)}\n\n`);}catch{subscribers.delete(res);}}}
-  return {gameId:batch.gameId,accepted,duplicates,nextSequence:(db.prepare('SELECT MAX(seq) AS n FROM game_events WHERE game_id=?').get(batch.gameId).n||0)+1};
+  return {gameId:batch.gameId,epoch:owner?.epoch||1,accepted,duplicates,nextSequence:(db.prepare('SELECT MAX(seq) AS n FROM game_events WHERE game_id=?').get(batch.gameId).n||0)+1};
  }
  function nextSnapshot(gameId){const rows=db.prepare('SELECT seq,event_id,kind,payload,received_at FROM game_events WHERE game_id=? ORDER BY seq').all(gameId);let home=0,away=0,shotsHome=0,shotsAway=0,period=1,status='scheduled';for(const e of rows){const d=JSON.parse(e.payload);if(e.kind==='GOAL_RECORDED'){if((d.team||d.teamId)==='home'){home++;shotsHome++;}if((d.team||d.teamId)==='away'){away++;shotsAway++;}}if(e.kind==='SHOT_RECORDED'){if((d.team||d.teamId)==='home')shotsHome++;if((d.team||d.teamId)==='away')shotsAway++;}if(e.kind==='PERIOD_STARTED'){period=d.period;status='live';}if(e.kind==='PERIOD_ADVANCED'){period=d.period||period+1;status='live';}if(e.kind==='GAME_ENDED')status='provisional_final';}return {gameId,lastSequence:rows.at(-1)?.seq||0,status,period,score:{home,away},shots:{home:shotsHome,away:shotsAway},events:rows.map(e=>({seq:e.seq,id:e.event_id,type:e.kind,data:JSON.parse(e.payload),receivedAt:e.received_at}))};}
  const server=http.createServer(async(req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;
@@ -95,7 +101,7 @@ function createCentralServer({dbPath=':memory:',host='127.0.0.1',port=0,adminKey
    const match=pathname.match(/^\/api\/public\/v1\/games\/([a-zA-Z0-9_-]+)(\/events)?$/);
    if(req.method==='GET'&&match){const id=match[1];if(match[2]){res.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-store','x-accel-buffering':'no'});if(!listeners.has(id))listeners.set(id,new Set());listeners.get(id).add(res);res.write(`event: snapshot\ndata: ${JSON.stringify(nextSnapshot(id))}\n\n`);req.on('close',()=>listeners.get(id)?.delete(res));return;}return json(res,200,nextSnapshot(id));}
    return json(res,404,{error:'Not found'});
-  }catch(e){return json(res,e.status||400,{error:e.message,...(e.expectedSequence?{expectedSequence:e.expectedSequence}:{})});}
+  }catch(e){return json(res,e.status||400,{error:e.message,...(e.expectedSequence?{expectedSequence:e.expectedSequence}:{}),...(e.expectedEpoch?{expectedEpoch:e.expectedEpoch}:{})});}
  });
  return {start:()=>new Promise(r=>server.listen(port,host,()=>r(server.address())),),close:()=>new Promise(r=>server.close(()=>{db.close();r();})),db,ingest,snapshot:nextSnapshot};
 }
