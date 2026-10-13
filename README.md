@@ -14,6 +14,12 @@ See [native timekeeper guide](apps/rink-local/docs/native-timekeeper-desktop.md)
 
 The native Windows timekeeper has a manual-approval PA queue for committed goal and penalty events. Select the **Offline Windows voice** (default) or an optional **AI arena announcer** voice, then choose an announcement to play or skip. The AI voice requires an `OPENAI_API_KEY` in the desktop process environment and internet access; it does not alter scoring or send credentials to the rink backend. Player jersey numbers are used by default, not youth names. See [AI PA announcer guide](apps/rink-local/docs/ai-pa-announcer.md) and [requirements](requirements/ai-pa-announcer.md). Arena speaker playback and cloud provider integration still need physical acceptance testing.
 
+## Player identity and annual compliance (development)
+
+The league now has a permanent player registry independent of team/season membership, with private birth date/address records, linked related people, season-by-season roster history, and annually verified training requirements. Training eligibility is checked at game-day lineup confirmation and again before game start. See [player identity and compliance requirements](requirements/player-identity-and-annual-compliance.md).
+
+**Do not enter real minors' private information in the development database.** Production registrar authentication, encrypted storage, access auditing, secure backup/retention, and guardian-consent workflows remain to be completed. The private registry currently has internal APIs, not a production registrar portal.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
