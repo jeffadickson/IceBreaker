@@ -63,6 +63,11 @@ test('rejection leaves roster unchanged; batch preview and submit are all-or-not
  assert.throws(()=>x.portal.submitBatch(x.a,rows),/UNIQUE/);
  assert.equal(x.portal.db.prepare("SELECT COUNT(*) n FROM registration_requests WHERE status='SUBMITTED'").get().n,2);
 });
+test('club-managed team manager cannot bypass league approval with roster edit',t=>{
+ const x=setup();t.after(()=>x.close());
+ assert.throws(()=>x.teamAccounts.editRoster('maple','manager',{playerId:'rogue-player',displayName:'Rogue',jersey:77,position:'F',expectedRevision:0}),/League-approved club roster/);
+ assert.equal(x.teamAccounts.roster('maple').some(p=>p.id==='rogue-player'),false);
+});
 test('hashed expiring sessions and role-bound scope prevent credential crossover',t=>{
  const x=setup();t.after(()=>x.close());
  assert.throws(()=>x.portal.login('a@example.invalid','wrong'),/Invalid credentials/);
