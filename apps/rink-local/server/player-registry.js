@@ -92,6 +92,11 @@ class PlayerRegistry{
     const confirmations=this.db.prepare("SELECT c.player_ids_json FROM game_roster_confirmations c JOIN games g ON g.id=c.game_id WHERE c.team_id=? AND g.status IN ('scheduled','live')").all(old.team_id);
     if(confirmations.some(c=>JSON.parse(c.player_ids_json).includes(playerId)))throw Error('Confirmed game lineup must be amended before transfer');
    }
+   const hasConfirmations=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='game_roster_confirmations'").get();
+   if(hasConfirmations){
+    const targetConfirmed=this.db.prepare("SELECT 1 FROM game_roster_confirmations c JOIN games g ON g.id=c.game_id WHERE c.team_id=? AND g.status IN ('scheduled','live') LIMIT 1").get(teamId);
+    if(targetConfirmed)throw Error('Target team has a confirmed game lineup; authorized amendment required');
+   }
    const now=new Date().toISOString();
    for(const old of previous){
     this.db.prepare('DELETE FROM roster_memberships WHERE season_id=? AND team_id=? AND player_id=?').run(team.season_id,old.team_id,playerId);
@@ -99,6 +104,14 @@ class PlayerRegistry{
    }
    this.db.prepare('INSERT INTO roster_memberships VALUES(?,?,?,?,?)').run(team.season_id,teamId,playerId,jersey,position);
    this.db.prepare('INSERT INTO player_membership_history VALUES(?,?,?,?,?,?,?,?)').run(uuid(),playerId,team.season_id,teamId,now,null,reason,actor);
+   // Invalidate stale manager roster revisions after an authorized transfer.
+   if(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_roster_revisions'").get()){
+    for(const changed of [teamId,...previous.map(x=>x.team_id)]){
+     const rev=this.db.prepare('SELECT COALESCE(MAX(revision),0)+1 n FROM team_roster_revisions WHERE team_id=?').get(changed).n;
+     this.db.prepare('INSERT INTO team_roster_revisions VALUES(?,?,?,?,?)'.replace('?,?,?,?,?','?,?,?,?'))
+      .run(changed,rev,now,actor);
+    }
+   }
    this.audit('PLAYER_ENROLLED',playerId,{seasonId:team.season_id,teamId,previousTeams:previous.map(x=>x.team_id)},actor);
    return {playerId,teamId,seasonId:team.season_id,previousTeams:previous.map(x=>x.team_id)};
   });
