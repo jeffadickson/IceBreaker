@@ -1,0 +1,45 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const crypto=require('node:crypto'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {LeagueStore}=require('../../server/league-store');
+const {PlayerRegistry}=require('../../server/player-registry');
+const {FamilyAccess}=require('../../server/family-access');
+const {migration}=require('../../server/migrate-private-fields');
+test('offline migration encrypts legacy PII transactionally and strict mode rejects plaintext',t=>{
+ const oldKey=process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64,oldStrict=process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION;
+ delete process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;delete process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION;
+ t.after(()=>{if(oldKey===undefined)delete process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;else process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64=oldKey;
+  if(oldStrict===undefined)delete process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION;else process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION=oldStrict;});
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-migration-')),file=path.join(dir,'league.db');
+ const league=new LeagueStore(file,{seedDemo:true}),registry=new PlayerRegistry(file),family=new FamilyAccess(registry.db);
+ t.after(()=>{registry.close();league.close();fs.rmSync(dir,{recursive:true,force:true});});
+ const {playerId}=registry.createPlayer({displayName:'Alias',legalName:'Fictional Legal Name',birthDate:'2016-03-01',address:{street:'Fictional Address'}},'registrar');
+ const {personId}=registry.linkPerson(playerId,{fullName:'Fictional Parent',email:'parent@example.invalid',relationship:'PARENT'},'registrar');
+ family.updateDetails({personId,accountId:'test'}, {preferredName:'Fictional Parent',address:{city:'Demo City'}});
+ const before=registry.db.prepare('SELECT birth_date FROM player_private_profiles WHERE player_id=?').get(playerId);
+ assert.equal(before.birth_date,'2016-03-01');
+ process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64=crypto.randomBytes(32).toString('base64');
+ const preview=migration(registry.db);
+ assert.equal(preview.applied,false);assert.ok(preview.fieldsToEncrypt>=7);
+ assert.equal(registry.db.prepare('SELECT birth_date FROM player_private_profiles WHERE player_id=?').get(playerId).birth_date,'2016-03-01');
+ assert.throws(()=>migration(registry.db,{apply:true}),/backup/);
+ const result=migration(registry.db,{apply:true,backupVerified:true});
+ assert.equal(result.applied,true);
+ assert.match(registry.db.prepare('SELECT birth_date FROM player_private_profiles WHERE player_id=?').get(playerId).birth_date,/^enc:v1:/);
+ assert.equal(registry.privateProfile(playerId).birthDate,'2016-03-01');
+ assert.equal(registry.relatedPeople(playerId)[0].email,'parent@example.invalid');
+ assert.equal(family.ownContact({personId,accountId:'test'}).details.address.city,'Demo City');
+ assert.equal(migration(registry.db,{apply:true,backupVerified:true}).fieldsToEncrypt,0);
+ process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION='1';
+ assert.equal(registry.privateProfile(playerId).birthDate,'2016-03-01');
+ assert.throws(()=>registry.createPlayer({displayName:'X',legalName:'Y',birthDate:'2016-01-01'},'registrar'),/Invalid private player profile|encryption/); // Missing address is valid; key still present, so create may succeed.
+});
+test('strict mode without encryption key fails closed on private writes',t=>{
+ const oldKey=process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64,oldStrict=process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION;
+ delete process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION='1';
+ t.after(()=>{if(oldKey===undefined)delete process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;else process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64=oldKey;
+  if(oldStrict===undefined)delete process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION;else process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION=oldStrict;});
+ const {encryptField,decryptField}=require('../../server/private-fields');
+ assert.throws(()=>encryptField('secret','p1','birthDate'),/mandatory/);
+ assert.throws(()=>decryptField('2016-01-01','p1','birthDate'),/legacy/);
+});
