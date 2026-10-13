@@ -3,7 +3,11 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {URL}=require('node:url');const {dailyBoard}=require('./daily-scoreboard');const {CertifiedDelivery}=require('./certified-delivery');const {ScoresheetCertification}=require('./scoresheet-certification');const {snapshotForGame,assertGameRosterEligible}=require('./game-roster-policy');const {reportFromState,renderReport,topPenalties}=require('./game-report');const {createParentAuth}=require('./parent-auth');const {Authority}=require('./authority-sqlite');const {LeagueStore}=require('./league-store');const {TeamAccounts}=require('./team-accounts');
 function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='127.0.0.1',port=8090,operatorKey=process.env.ICEBREAKER_OPERATOR_KEY||'local-development-key',leagueGameId=process.env.ICEBREAKER_LEAGUE_GAME_ID||null}={}){
- const parentAuth=createParentAuth({dbPath});const authority=new Authority({dbPath});const leagueStore=new LeagueStore(dbPath,{seedDemo:true});const teamAccounts=new TeamAccounts(dbPath);const certification=new ScoresheetCertification(authority.db,authority,{leagueGameId});const delivery=new CertifiedDelivery({db:authority.db,workflow:certification.workflow,certification,leagueStore,leagueGameId});const clients=new Set();const root=path.resolve(__dirname,'../web');
+ const parentAuth=createParentAuth({dbPath});const leagueStore=new LeagueStore(dbPath,{seedDemo:true});
+ const binding=leagueGameId?leagueStore.db.prepare('SELECT division_id FROM games WHERE id=?').get(leagueGameId):null;
+ if(leagueGameId&&!binding)throw Error('Bound league game not found');
+ const timing=binding?leagueStore.timingForDivision(binding.division_id):null;
+ const authority=new Authority({dbPath,timingRules:timing?{periodCount:timing.periodCount,periodSeconds:timing.periodSeconds,warmupSeconds:timing.warmupSeconds,intermissionSeconds:timing.intermissionSeconds,overtimeSeconds:timing.overtimeSeconds}:null,timingVersion:timing?.version||'DEFAULT'});const teamAccounts=new TeamAccounts(dbPath);const certification=new ScoresheetCertification(authority.db,authority,{leagueGameId});const delivery=new CertifiedDelivery({db:authority.db,workflow:certification.workflow,certification,leagueStore,leagueGameId});const clients=new Set();const root=path.resolve(__dirname,'../web');
  const send=(res,code,obj)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(obj));};
  const broadcast=()=>{const msg=`id: ${authority.state.revision}\nevent: snapshot\ndata: ${JSON.stringify(authority.spectator())}\n\n`;for(const r of clients){try{r.write(msg);}catch{clients.delete(r);}}};
  const auth=req=>{const k=req.headers['x-operator-key'];return typeof k==='string'&&k.length===operatorKey.length&&crypto.timingSafeEqual(Buffer.from(k),Buffer.from(operatorKey));};
@@ -60,6 +64,7 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
    return send(res,200,delivery.run());
   }
   if(req.method==='GET'&&pathname==='/api/scoresheet/v1/pregame'){if(!auth(req))return send(res,403,{error:'Operator credential required'});if(!leagueGameId)return send(res,200,{bound:false,ready:null});try{const {pregameSnapshot}=require('./pregame-gate');return send(res,200,{bound:true,...pregameSnapshot(authority.db,leagueGameId)});}catch(e){return send(res,409,{error:e.message});}}
+  if(req.method==='GET'&&pathname==='/api/operator/timing-rules'){if(!auth(req))return send(res,403,{error:'Operator credential required'});return send(res,200,{gameId:authority.gameId,divisionId:binding?.division_id||null,version:authority.timingVersion,timing:authority.timingRules});}
   if(req.method==='GET'&&pathname==='/api/operator/status'){
    if(!auth(req))return send(res,403,{error:'Operator credential required'});
    const pending=authority.db.prepare('SELECT COUNT(*) AS count FROM sync_outbox WHERE delivered=0').get().count;
