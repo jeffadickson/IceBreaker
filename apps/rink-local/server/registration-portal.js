@@ -64,7 +64,10 @@ class RegistrationPortal{
  addRelatedPerson(u,playerId,input){
   this.requireClub(u,u.scopeId);
   if(!this.owns(u.scopeId,playerId))throw Error('Player outside club scope');
-  if(input?.personId!=null)throw Error('Existing contact linking requires registrar identity review');
+  if(input?.personId!=null){
+   const allowed=this.db.prepare('SELECT 1 FROM player_person_links l JOIN registration_player_clubs pc ON pc.player_id=l.player_id WHERE l.person_id=? AND pc.club_id=?').get(input.personId,u.scopeId);
+   if(!allowed)throw Error('Related person outside club scope');
+  }
   return this.registry.linkPerson(playerId,input,u.id);
  }
  linkExisting(u,clubId,playerId){const c=this.club(clubId);this.requireLeague(u,c.league_id);if(!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Unknown player');return this.tx(()=>{this.db.prepare('INSERT INTO registration_player_clubs VALUES(?,?,?)').run(clubId,playerId,new Date().toISOString());this.audit('CLUB_PLAYER_LINKED',playerId,u.id,{clubId});return {clubId,playerId};});}
