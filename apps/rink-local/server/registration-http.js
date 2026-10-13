@@ -2,9 +2,25 @@
 // Dedicated scoped registrar routes. The local rink operator key is used
 // ONLY for development provisioning, never to read private player records.
 const {RegistrationPortal}=require('./registration-portal');
+const {LoginThrottle}=require('./login-throttle');
 function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
  if(process.env.ICEBREAKER_PRODUCTION_MODE==='1')throw Error('Private registration cannot start in production mode until KMS, malware scanning, MFA, consent and encrypted migration are implemented');
  const portal=new RegistrationPortal(dbPath);
+ const loginThrottle=new LoginThrottle();
+ function limitedLogin(req,res,scope,principal,authenticate,reply){
+  const ip=req.socket?.remoteAddress||'unknown';
+  if(!loginThrottle.allowed(scope,ip,principal)){
+   reply(429,{error:'Too many login attempts; try again later'});return;
+  }
+  try{
+   const result=authenticate();
+   loginThrottle.success(scope,ip,principal);
+   reply(200,result);
+  }catch(error){
+   loginThrottle.failure(scope,ip,principal);
+   throw error;
+  }
+ }
  async function handle(req,res,pathname){
   if(!pathname.startsWith('/api/registration/v1/'))return false;
   const route=pathname.slice('/api/registration/v1/'.length);
@@ -18,7 +34,7 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
   }
   const reply=(code,data)=>send(res,code,data);
   try{
-   if(route==='login'&&req.method==='POST'){const b=await body();reply(200,portal.login(b.email,b.password,b.mfaCode||null));return true;}
+   if(route==='login'&&req.method==='POST'){const b=await body();limitedLogin(req,res,'staff',b.email,()=>portal.login(b.email,b.password,b.mfaCode||null),reply);return true;}
    if(route.startsWith('bootstrap/')&&req.method==='POST'){
     if(!bootstrapAuth(req)){reply(403,{error:'Development bootstrap credential required'});return true;}
     const b=await body();
@@ -30,7 +46,7 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
    }
    if(route==='logout'&&req.method==='POST'){reply(200,portal.logout(String(req.headers.authorization||'').replace(/^Bearer /i,'')));return true;}
    if(route==='family/login'&&req.method==='POST'){
-    const b=await body();reply(200,portal.family.login(b.email,b.password));return true;
+    const b=await body();limitedLogin(req,res,'family',b.email,()=>portal.family.login(b.email,b.password),reply);return true;
    }
    if(route==='family/logout'&&req.method==='POST'){
     reply(200,portal.family.logout(String(req.headers.authorization||'').replace(/^Bearer /i,'')));return true;
