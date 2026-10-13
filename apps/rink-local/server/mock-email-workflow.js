@@ -30,6 +30,7 @@ function preview(db,mail,{subjectType,subjectId}){
   nameMatches:normalize(parsed.claimedName)===normalize(legalName)};
 }
 function commit(db,mail,{subjectType,subjectId,confirmedName,actor,archivePath}){
+ if(process.env.ICEBREAKER_PRODUCTION_MODE==='1')throw Error('Fictional email demo cannot commit in production mode');
  const p=preview(db,mail,{subjectType,subjectId});
  if(!p.nameMatches)throw Error('Certificate name differs from selected person; manual reconciliation required');
  if(typeof confirmedName!=='string'||confirmedName!==p.legalName)
