@@ -30,6 +30,8 @@ test('family and encrypted-document HTTP routes enforce verified child grants an
  assert.equal((await call('guardian-admin/provision','POST',{personId,email:'parent@example.invalid',password:'fictional-family-password'},league)).status,201);
  const family=(await call('family/login','POST',{email:'parent@example.invalid',password:'fictional-family-password'})).data.token;
  assert.equal((await call('family/context','GET',null,family)).data.children.length,0);
+ assert.equal((await call('family/details','PUT',{preferredName:'Fictional Parent',address:{city:'Demo City'},contactByEmail:true,contactBySms:false},family)).status,200);
+ assert.equal((await call('family/contact','GET',null,family)).data.details.address.city,'Demo City');
  const data=Buffer.from('%PDF-1.7\nFAKE CHILD RECORD\n%%EOF');
  const upload={documentType:'BIRTH_CERTIFICATE',mime:'application/pdf',base64:data.toString('base64')};
  assert.equal((await call('family/players/'+playerId+'/documents','POST',upload,family)).status,403);
