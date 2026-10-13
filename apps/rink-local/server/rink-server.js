@@ -28,7 +28,7 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
   if(teamRoute){const teamId=teamRoute[1],gameId=teamRoute[2],bearer=String(req.headers.authorization||'').replace(/^Bearer /i,'');try{
    const user=teamAccounts.authenticate(bearer,teamId,req.method!=='GET');
    if(req.method==='GET'&&gameId)return send(res,200,teamAccounts.getLineup(teamId,gameId));
-   if(req.method==='GET')return send(res,200,{teamId,revision:teamAccounts.currentRevision(teamId),players:teamAccounts.roster(teamId)});
+   if(req.method==='GET')return send(res,200,{teamId,revision:teamAccounts.currentRevision(teamId),clubManaged:teamAccounts.clubManaged(teamId),players:teamAccounts.roster(teamId)});
    if(req.method==='PUT'&&gameId)return send(res,200,teamAccounts.confirmLineup(teamId,gameId,user.user_id,await readBody(req)));
    if(req.method==='PUT')return send(res,200,teamAccounts.editRoster(teamId,user.user_id,await readBody(req)));
    return send(res,405,{error:'Method not allowed'});
