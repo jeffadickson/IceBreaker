@@ -15,6 +15,8 @@ test('permanent player identity retains private DOB/address and guardian relatio
  const x=setup();t.after(()=>x.close());
  const {playerId}=x.players.createPlayer({displayName:'Player X',legalName:'Fictional Minor X',birthDate:'2016-04-15',address:{street:'123 Demo Street',city:'Fictionville'}},'registrar');
  const guardian=x.players.linkPerson(playerId,{fullName:'Fictional Guardian',email:'guardian@example.invalid',relationship:'GUARDIAN'},'registrar');
+ x.players.linkRegistration(playerId,{issuer:'Demo Federation',identifier:'DEMO-2026-REG-999',seasonId:'demo-2026'},'registrar');
+ assert.throws(()=>x.players.linkRegistration('m17',{issuer:'Demo Federation',identifier:'DEMO-2026-REG-999',seasonId:'demo-2026'},'registrar'),/UNIQUE/);
  assert.equal(x.players.privateProfile(playerId).birthDate,'2016-04-15');
  assert.equal(x.players.ageAt(playerId,'2026-01-01'),9);
  assert.equal(x.players.ageAt(playerId,'2026-04-15'),10);
@@ -34,7 +36,7 @@ test('permanent player identity retains private DOB/address and guardian relatio
  x.players.updatePrivateProfile(playerId,{legalName:'Fictional Minor X',birthDate:'2016-04-15',address:{city:'New Fictionville'}},'registrar');
  assert.equal(x.players.privateProfile(playerId).address.city,'New Fictionville');
  const publicSnapshot=JSON.stringify(x.league.snapshot());
- for(const secret of ['2016-04-15','123 Demo Street','Fictional Guardian','guardian@example.invalid','Fictional Minor X'])assert.equal(publicSnapshot.includes(secret),false);
+ for(const secret of ['DEMO-2026-REG-999','2016-04-15','123 Demo Street','Fictional Guardian','guardian@example.invalid','Fictional Minor X'])assert.equal(publicSnapshot.includes(secret),false);
 });
 test('same-season transfer closes old membership without rewriting historical identity',t=>{
  const x=setup();t.after(()=>x.close());
