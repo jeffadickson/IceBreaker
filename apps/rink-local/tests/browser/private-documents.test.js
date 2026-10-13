@@ -27,7 +27,7 @@ test('AES-GCM envelope roundtrip, wrong AAD and tampering fail authentication',(
  const tampered=Buffer.from(x.data);tampered[0]^=1;
  assert.throws(()=>open(tampered,key,x.nonce,x.tag,'player-1'));
 });
-test('quarantine, encryption, scoped document access and verified guardian grant',t=>{
+test('quarantine, encryption, scoped document access and verified guardian grant',async t=>{
  const prev=process.env.ICEBREAKER_DOCUMENT_KEK_BASE64;
  process.env.ICEBREAKER_DOCUMENT_KEK_BASE64=crypto.randomBytes(32).toString('base64');
  t.after(()=>{if(prev===undefined)delete process.env.ICEBREAKER_DOCUMENT_KEK_BASE64;else process.env.ICEBREAKER_DOCUMENT_KEK_BASE64=prev;});
@@ -50,9 +50,9 @@ test('quarantine, encryption, scoped document access and verified guardian grant
  assert.equal(raw.includes(Buffer.from('fictional-document')),false);
  assert.throws(()=>x.portal.readDocument(family,doc.documentId),/not available/);
  assert.throws(()=>x.portal.listDocuments(x.b,playerId),/scope/);
- assert.throws(()=>x.portal.documents.releaseFromQuarantine(doc.documentId,x.admin.id,false),/attestation/);
- // Trusted scanner attestation is internal only, never exposed as an HTTP bypass.
- x.portal.documents.releaseFromQuarantine(doc.documentId,'test-scanner',true);
+ await assert.rejects(()=>x.portal.documents.scanQuarantined(doc.documentId,'test-scanner',async()=>{throw Error('scanner offline');}),/scanner offline/);
+ assert.equal(x.portal.documents.row(doc.documentId).status,'QUARANTINED');
+ await x.portal.documents.scanQuarantined(doc.documentId,'test-scanner',async()=>({clean:true,engine:'clamav'}));
  assert.deepEqual(x.portal.readDocument(family,doc.documentId).data,pdf);
  assert.deepEqual(x.portal.readDocument(x.a,doc.documentId).data,pdf);
  assert.throws(()=>x.portal.readDocument(x.b,doc.documentId),/scope/);
@@ -62,7 +62,7 @@ test('quarantine, encryption, scoped document access and verified guardian grant
  assert.throws(()=>x.portal.readDocument(family,doc.documentId),/denied/);
  assert.deepEqual(x.portal.readDocument(x.a,doc.documentId).data,pdf);
 });
-test('document KEK loss, wrong key, swapped ciphertext and bad signatures fail closed',t=>{
+test('document KEK loss, wrong key, swapped ciphertext and bad signatures fail closed',async t=>{
  const previous=process.env.ICEBREAKER_DOCUMENT_KEK_BASE64;
  process.env.ICEBREAKER_DOCUMENT_KEK_BASE64=crypto.randomBytes(32).toString('base64');
  t.after(()=>{if(previous===undefined)delete process.env.ICEBREAKER_DOCUMENT_KEK_BASE64;else process.env.ICEBREAKER_DOCUMENT_KEK_BASE64=previous;});
@@ -70,7 +70,7 @@ test('document KEK loss, wrong key, swapped ciphertext and bad signatures fail c
  const playerId=x.portal.createPlayer(x.a,{displayName:'Fictional',legalName:'Private',birthDate:'2016-02-02'}).playerId;
  assert.throws(()=>x.portal.uploadDocument(x.a,{playerId,documentType:'BIRTH_CERTIFICATE',mime:'application/pdf',base64:Buffer.from('not pdf').toString('base64')}),/signature/);
  const doc=x.portal.uploadDocument(x.a,{playerId,documentType:'BIRTH_CERTIFICATE',mime:'application/pdf',base64:pdf.toString('base64')});
- x.portal.documents.releaseFromQuarantine(doc.documentId,'test-scanner',true);
+ await x.portal.documents.scanQuarantined(doc.documentId,'test-scanner',async()=>({clean:true,engine:'clamav'}));
  const object=x.portal.documents.objectPath(doc.documentId),original=fs.readFileSync(object),modified=Buffer.from(original);modified[0]^=1;fs.writeFileSync(object,modified);
  assert.throws(()=>x.portal.readDocument(x.a,doc.documentId));fs.writeFileSync(object,original);
  process.env.ICEBREAKER_DOCUMENT_KEK_BASE64=crypto.randomBytes(32).toString('base64');
