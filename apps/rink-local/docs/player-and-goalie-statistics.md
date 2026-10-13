@@ -14,10 +14,10 @@ The rink spectator snapshot exposes `goalies` and `goalieStats`; the operator pa
 
 ## Important limitations before claiming official season goalie stats
 
-- Goalies have **provisional** per-game saves, shots against, and goals against, but certified season goalie aggregates and games-in-goal are not yet wired into `LeagueStore.snapshot`.
+- Signed scoresheets now include per-game goalie saves, shots against, goals against, substitution events, empty-net goals, and unattributed shots. Certified delivery resolves goalie jersey numbers to stable roster player IDs and verifies shot conservation. The league database persists certified goalie statistics atomically with the final game result and exposes season aggregates, games in goal, and save percentage. Historical demonstration fixtures without goalie event evidence are deliberately not assigned invented goalie statistics.
 - Current shot events do not distinguish blocked/missed shots; only verified shots on goal should be entered.
-- Net-empty goals are not yet separately counted in a dedicated EN column; the scoreboard's overall goal totals remain correct.
-- We do not derive exact time on ice, start decisions, win/loss/tie decisions, shutouts, save percentage, or GAA without stronger goalie-stint timing semantics and certified game decisions.
+- Empty-net goals are counted separately from shots that could not be attributed because no starting goalie was assigned. Both cases remain excluded from individual goalie goals against.
+- We do not derive exact time on ice, start decisions, win/loss/tie decisions, shutouts, or GAA without stronger goalie-stint timing semantics and certified game decisions. Save percentage is available from certified shots against and saves (null if no shots).
 - Goalie swaps while the clock is running are journaled against the game time sampled by the authoritative actor. Roster substitutions should be confirmed at the game boundary where possible.
 - Goalie change does not magically create or correct historical shots. Prior shots before assigning a starting goalie remain unattributed. For production scoring, the starting goalie should be assigned before recording any shots.
 - The status of the skater's listed position is not changed by an on-ice goalie substitution.
