@@ -101,3 +101,21 @@ test('private player and related-person fields encrypt with opt-in field key',t=
  assert.throws(()=>x.portal.registry.relatedPeople(playerId),/requires configured key/);
  assert.throws(()=>x.portal.registry.privateProfile(playerId),/requires configured key/);
 });
+
+test('offline key rotation rewraps document keys without rewriting encrypted objects',async t=>{
+ const previous=process.env.ICEBREAKER_DOCUMENT_KEK_BASE64;
+ const old=crypto.randomBytes(32),next=crypto.randomBytes(32);
+ process.env.ICEBREAKER_DOCUMENT_KEK_BASE64=old.toString('base64');
+ t.after(()=>{if(previous===undefined)delete process.env.ICEBREAKER_DOCUMENT_KEK_BASE64;else process.env.ICEBREAKER_DOCUMENT_KEK_BASE64=previous;});
+ const x=setup(t);
+ const playerId=x.portal.createPlayer(x.a,{displayName:'Fictional',legalName:'Private',birthDate:'2016-02-02'}).playerId;
+ const doc=x.portal.uploadDocument(x.a,{playerId,documentType:'BIRTH_CERTIFICATE',mime:'application/pdf',base64:pdf.toString('base64')});
+ await x.portal.documents.scanQuarantined(doc.documentId,'test-scanner',async()=>({clean:true,engine:'clamav'}));
+ const object=x.portal.documents.objectPath(doc.documentId),before=fs.readFileSync(object);
+ assert.throws(()=>x.portal.documents.rewrapKeys(old,next),/backup/);
+ assert.equal(x.portal.documents.rewrapKeys(old,next,{backupVerified:true}).rewrapped,1);
+ assert.deepEqual(fs.readFileSync(object),before);
+ assert.throws(()=>x.portal.readDocument(x.a,doc.documentId));
+ process.env.ICEBREAKER_DOCUMENT_KEK_BASE64=next.toString('base64');
+ assert.deepEqual(x.portal.readDocument(x.a,doc.documentId).data,pdf);
+});
