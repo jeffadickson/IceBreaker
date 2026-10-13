@@ -17,7 +17,7 @@ class AuxiliaryClock {
  command({action,phase},{actor='scorekeeper',officialClockRunning=false}={}){
   if(officialClockRunning)throw Error('Stop official game clock before operating auxiliary timer');
   if(!['START','PAUSE','RESET'].includes(action))throw Error('Invalid auxiliary timer command');
-  if(phase!==undefined&&!['WARMUP','INTERMISSION'].includes(phase))throw Error('Invalid auxiliary timer phase');
+  if(phase!==undefined&&!['WARMUP','INTERMISSION','TIMEOUT'].includes(phase))throw Error('Invalid auxiliary timer phase');
   const before=this.snapshot();if(action==='START'&&before.running)throw Error('Timer already running');
   if(action==='START'&&before.seconds<=0)throw Error('Reset expired timer first');
   const selected=action==='RESET'?(phase||before.phase):before.phase;
