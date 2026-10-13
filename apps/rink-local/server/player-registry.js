@@ -80,6 +80,16 @@ class PlayerRegistry{
   if(!good(actor,100)||!validDate(completedOn)||expiresOn!==null&&(!validDate(expiresOn)||expiresOn<completedOn)||evidenceRef!==null&&!good(evidenceRef,250)||!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Invalid training record');
   return this.tx(()=>{const completionId=uuid();this.db.prepare('INSERT INTO player_training_completions VALUES(?,?,?,?,?,?,?,?,?)').run(completionId,playerId,requirementId,completedOn,expiresOn,evidenceRef,actor,new Date().toISOString(),null);this.audit('TRAINING_VERIFIED',playerId,{requirementId,completionId},actor);return {completionId};});
  }
+ revokeTraining(completionId,reason,actor){
+  if(!good(actor,100)||!good(reason,300))throw Error('Training revocation reason required');
+  return this.tx(()=>{
+   const row=this.db.prepare('SELECT player_id FROM player_training_completions WHERE id=? AND revoked_at IS NULL').get(completionId);
+   if(!row)throw Error('Training completion not found or already revoked');
+   this.db.prepare('UPDATE player_training_completions SET revoked_at=? WHERE id=?').run(new Date().toISOString(),completionId);
+   this.audit('TRAINING_REVOKED',row.player_id,{completionId,reason},actor);
+   return {completionId,revoked:true};
+  });
+ }
  trainingStatus(playerId,teamId,date){return trainingStatus(this.db,playerId,teamId,date);}
  enroll(playerId,teamId,{jersey,position,reason='SEASON_ENROLLMENT'},actor){
   if(!good(actor,100)||!good(playerId,100)||!Number.isInteger(jersey)||jersey<0||jersey>99||!['F','D','G','C','LW','RW','LD','RD'].includes(position)||!good(reason,150))throw Error('Invalid enrollment');
