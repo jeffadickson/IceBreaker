@@ -40,8 +40,8 @@ function setup(workspace){
 function openWorkspace(workspace){
  const p=paths(workspace);
  if(!fs.existsSync(p.db)||!fs.existsSync(p.mail))throw Error('Run setup first');
- const mail=JSON.parse(fs.readFileSync(p.mail,'utf8'));
  if(fs.statSync(p.mail).size>2000000)throw Error('Mock email too large');
+ const mail=JSON.parse(fs.readFileSync(p.mail,'utf8'));
  const identity=JSON.parse(fs.readFileSync(p.identity,'utf8'));
  const {DatabaseSync}=require('node:sqlite');
  const db=new DatabaseSync(p.db);db.exec('PRAGMA foreign_keys=ON');
