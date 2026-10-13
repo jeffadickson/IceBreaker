@@ -20,6 +20,9 @@ public sealed class DesktopAnnouncementTests
         Assert.Contains("number 22", penalty);
         Assert.Contains("2 minutes", penalty);
         Assert.Contains("Tripping", penalty);
+        var privatePenalty = AnnouncementQueue.ScriptFor(new RinkEvent("p2", "PENALTY_ASSESSED", "home",
+            """{"player":"22","infraction":"Private Child Name","duration":120}"""));
+        Assert.DoesNotContain("Private Child Name", privatePenalty);
         Assert.Null(AnnouncementQueue.ScriptFor(new RinkEvent("x", "SHOT_RECORDED", "home", "{}")));
     }
 
