@@ -71,7 +71,7 @@ class RegistrationPortal{
   }
   return this.registry.linkPerson(playerId,input,u.id);
  }
- linkExisting(u,clubId,playerId){const c=this.club(clubId);this.requireLeague(u,c.league_id);if(!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Unknown player');return this.tx(()=>{this.db.prepare('INSERT INTO registration_player_clubs VALUES(?,?,?)').run(clubId,playerId,new Date().toISOString());this.audit('CLUB_PLAYER_LINKED',playerId,u.id,{clubId});return {clubId,playerId};});}
+ linkExisting(u,clubId,playerId){const c=this.club(clubId);this.requireLeague(u,c.league_id);if(!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Unknown player');const leagueMember=this.db.prepare('SELECT 1 FROM roster_memberships r JOIN teams t ON t.id=r.team_id JOIN divisions d ON d.id=t.division_id JOIN league_seasons ls ON ls.season_id=d.season_id WHERE r.player_id=? AND ls.league_id=? LIMIT 1').get(playerId,c.league_id);const leagueClub=this.db.prepare('SELECT 1 FROM registration_player_clubs pc JOIN registration_clubs rc ON rc.id=pc.club_id WHERE pc.player_id=? AND rc.league_id=? LIMIT 1').get(playerId,c.league_id);if(!leagueMember&&!leagueClub)throw Error('Player identity requires verified cross-league transfer review');return this.tx(()=>{this.db.prepare('INSERT INTO registration_player_clubs VALUES(?,?,?)').run(clubId,playerId,new Date().toISOString());this.audit('CLUB_PLAYER_LINKED',playerId,u.id,{clubId});return {clubId,playerId};});}
  unlinkExisting(u,clubId,playerId,reason){
   const c=this.club(clubId);this.requireLeague(u,c.league_id);
   if(!good(reason,300))throw Error('Reason required');
