@@ -52,7 +52,7 @@ test('calendar-year and rolling renewal periods are evaluated on game date',t=>{
  assert.equal(status('2027-01-01').find(r=>r.code==='CPR').eligible,true);
  assert.equal(status('2027-01-02').find(r=>r.code==='CPR').eligible,false);
 });
-test('policy revisions are append-only and can change next year's training without schema changes',t=>{
+test("policy revisions are append-only and can change next year\'s training without schema changes",t=>{
  const x=setup(t),c=training.createTraining(x.db,{code:'CLUB_ORIENTATION',title:'Club orientation'},'admin');
  const base={trainingId:c.trainingId,scopeType:'LEAGUE',scopeId:'demo-league',role:'MANAGER',renewalMode:'ONCE'};
  const a=training.addPolicy(x.db,{...base,effectiveFrom:'2026-01-01',required:true},'admin');
