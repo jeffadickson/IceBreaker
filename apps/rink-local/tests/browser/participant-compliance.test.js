@@ -63,5 +63,7 @@ test('tournament policy explicitly waives league training but never suspension',
  C.recordCourse(x.db,{subjectType:'PLAYER',subjectId:player.id,code:'TOURNEY_BRIEFING',completedOn:day},'admin');
  C.recordCourse(x.db,{subjectType:'PLAYER',subjectId:other.id,code:'TOURNEY_BRIEFING',completedOn:day},'admin');
  assert.equal(pregameSnapshot(x.team.db,game.id).ready,true);
- // League suspension rules remain independently enforced by the pregame gate.
+ x.db.prepare('INSERT INTO player_suspensions(id,player_id,league_id,start_date,end_date,reason,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)').run(crypto.randomUUID(),player.id,'demo-league',day,day,'Test suspension','league-admin',new Date().toISOString());
+ assert.equal(pregameSnapshot(x.team.db,game.id).ready,false);
+ // A tournament policy never overrides a league suspension.
 });
