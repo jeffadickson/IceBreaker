@@ -34,16 +34,16 @@ public sealed class AnnouncementSpeech(HttpClient http)
             return stream.ToArray();
         }
 
-        // The key stays on the laptop and is never sent to the rink backend.
-        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException("Set OPENAI_API_KEY to enable the optional AI voice.");
-
         if (!new[] { "alloy", "ash", "ballad", "coral", "echo", "fable", "onyx",
                      "nova", "sage", "shimmer", "verse", "marin", "cedar" }.Contains(voice))
             throw new ArgumentException("Unsupported AI voice", nameof(voice));
         if (instructions is { Length: > 300 } || instructions?.Any(char.IsControl) == true)
             throw new ArgumentException("Voice instructions must be printable and at most 300 characters", nameof(instructions));
+
+        // The key stays on the laptop and is never sent to the rink backend.
+        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new InvalidOperationException("Set OPENAI_API_KEY to enable the optional AI voice.");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/audio/speech")
         {
