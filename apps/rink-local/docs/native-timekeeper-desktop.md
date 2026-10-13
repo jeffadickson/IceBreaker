@@ -38,4 +38,10 @@ All command requests carry a unique idempotency key and an operator identity. Th
 
 .NET tests exercise snapshot reads, start/stop, correction validation, unique command keys, and disconnected authority. GitHub CI compiles the Avalonia desktop and publishes a Windows artifact. **Windows physical-machine smoke testing, forced desktop process termination while the authority runs, independent authority crash recovery, signed installers, OS service registration, external scoreboard drivers, and end-to-end full-game timekeeper acceptance are not yet complete.** Do not treat a successful compile as those tests passing.
 
-The current native timekeeper covers clock/phase operations, basic penalty entry and team timeouts, but not the complete goal/assist workflow, advanced penalty classifications, or referee review UI. These can be added as native screens or separate operator stations; no duplicate clock authority should be introduced.
+The redesigned native console has a fixed scoreboard/clock header and tabs for clock/periods, scoring, event history and PA. Basic goal/assist entry and goalie substitutions are now present, in addition to clock/phase operations, basic penalties and team timeouts. Goal and goalie forms currently use typed jersey numbers rather than a confirmed-roster picker; the backend enforces roster validation. Advanced penalty classifications, amendments and referee review remain separate or incomplete. These can be added as native screens or separate operator stations; no duplicate clock authority should be introduced.
+
+## UI iteration 1
+
+The official clock and score remain visible while changing tabs; the desktop still has no local authoritative countdown. The scoring tab can submit GOAL_RECORDED with scorer and up to two assists (NONE permitted), basic PENALTY_ASSESSED, and GOALIE_CHANGED including EMPTY. Goal entry requires explicit verification. Events are shown only after being committed to the backend. Referee mobile signing is a separate page; see [iterative UI and signing requirements](../../../requirements/operator-ui-and-mobile-signing.md).
+
+Next: roster-backed jersey picker, more complete penalty operations, amendment workflow, laptop/touchscreen field usability tests and signed desktop installer.
