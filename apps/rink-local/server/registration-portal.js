@@ -55,6 +55,17 @@ class RegistrationPortal{
  players(u){return u.role==='CLUB_REGISTRAR'?this.db.prepare('SELECT p.id,p.display_name displayName FROM registration_player_clubs pc JOIN players p ON p.id=pc.player_id WHERE pc.club_id=? ORDER BY p.display_name').all(u.scopeId):this.db.prepare('SELECT DISTINCT p.id,p.display_name displayName FROM registration_player_clubs pc JOIN registration_clubs c ON c.id=pc.club_id JOIN players p ON p.id=pc.player_id WHERE c.league_id=? ORDER BY p.display_name').all(u.scopeId);}
  createPlayer(u,input){this.requireClub(u,u.scopeId);return this.tx(()=>{const r=this.registry.createPlayer(input,u.id,{withinTransaction:true});this.db.prepare('INSERT INTO registration_player_clubs VALUES(?,?,?)').run(u.scopeId,r.playerId,new Date().toISOString());this.audit('CLUB_PLAYER_CREATED',r.playerId,u.id,{clubId:u.scopeId});return r;});}
  profile(u,playerId){if(!this.canRead(u,playerId))throw Error('Player outside authorized scope');return {profile:this.registry.privateProfile(playerId),relatedPeople:this.registry.relatedPeople(playerId),history:this.registry.history(playerId)};}
+ updateProfile(u,playerId,input){
+  this.requireClub(u,u.scopeId);
+  if(!this.owns(u.scopeId,playerId))throw Error('Player outside club scope');
+  return this.registry.updatePrivateProfile(playerId,input,u.id);
+ }
+ addRelatedPerson(u,playerId,input){
+  this.requireClub(u,u.scopeId);
+  if(!this.owns(u.scopeId,playerId))throw Error('Player outside club scope');
+  if(input?.personId!=null)throw Error('Existing contact linking requires registrar identity review');
+  return this.registry.linkPerson(playerId,input,u.id);
+ }
  linkExisting(u,clubId,playerId){const c=this.club(clubId);this.requireLeague(u,c.league_id);if(!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Unknown player');return this.tx(()=>{this.db.prepare('INSERT INTO registration_player_clubs VALUES(?,?,?)').run(clubId,playerId,new Date().toISOString());this.audit('CLUB_PLAYER_LINKED',playerId,u.id,{clubId});return {clubId,playerId};});}
  submit(u,{playerId,teamId,jersey,position},{withinTransaction=false}={}){
   this.requireClub(u,u.scopeId);
