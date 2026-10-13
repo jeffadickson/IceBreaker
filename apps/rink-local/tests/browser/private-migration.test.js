@@ -32,7 +32,8 @@ test('offline migration encrypts legacy PII transactionally and strict mode reje
  assert.equal(migration(registry.db,{apply:true,backupVerified:true}).fieldsToEncrypt,0);
  process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION='1';
  assert.equal(registry.privateProfile(playerId).birthDate,'2016-03-01');
- assert.throws(()=>registry.createPlayer({displayName:'X',legalName:'Y',birthDate:'2016-01-01'},'registrar'),/Invalid private player profile|encryption/); // Missing address is valid; key still present, so create may succeed.
+ const encryptedNew=registry.createPlayer({displayName:'X',legalName:'Y',birthDate:'2016-01-01'},'registrar');
+ assert.match(registry.db.prepare('SELECT birth_date FROM player_private_profiles WHERE player_id=?').get(encryptedNew.playerId).birth_date,/^enc:v1:/);
 });
 test('strict mode without encryption key fails closed on private writes',t=>{
  const oldKey=process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64,oldStrict=process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION;
