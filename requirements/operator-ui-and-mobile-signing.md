@@ -5,7 +5,7 @@ Status: **development increment 1**. This document is a living UI specification;
 ## Native timekeeper design
 
 - UI-001 P0: A fixed, high-contrast scoreboard and authoritative game clock SHALL remain visible while switching workflows. The UI SHALL never advance official time locally.
-- UI-002 P0: Provide distinct, touch-friendly tabs for clock/periods, scoring, committed event history and PA announcements. Each tab SHALL remain usable on typical laptop resolutions without hiding the game clock.
+- UI-002 P0: Provide a single, touch-friendly main scoreboard with quick actions for clock, goal, penalty, and goalie changes. Secondary workflows SHALL open as dismissible overlays without hiding the official clock or requiring tab navigation.
 - UI-003 P0: Native scoring SHALL support a goal with scorer and up to two assists, basic penalty entry, and goalie substitutions including an empty net. Server-side roster and event validation remain authoritative.
 - UI-004 P0: Every scoring mutation SHALL use the existing audited, idempotent local authority API; draft controls SHALL NOT alter the game until explicitly committed.
 - UI-005 P0: Loss of backend connection SHALL disable mutations, display an unambiguous warning, and recover from the authoritative snapshot on reconnect.
