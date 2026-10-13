@@ -1,13 +1,13 @@
 'use strict';
 // Local-first development backend, not a public internet service.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const {URL}=require('node:url');const {AuxiliaryClock}=require('./auxiliary-clock');const {dailyBoard}=require('./daily-scoreboard');const {CertifiedDelivery}=require('./certified-delivery');const {ScoresheetCertification}=require('./scoresheet-certification');const {snapshotForGame,assertGameRosterEligible}=require('./game-roster-policy');const {reportFromState,renderReport,topPenalties}=require('./game-report');const {createParentAuth}=require('./parent-auth');const {Authority}=require('./authority-sqlite');const {LeagueStore}=require('./league-store');const {TeamAccounts}=require('./team-accounts');
+const {URL}=require('node:url');const {LoginThrottle}=require('./login-throttle');const {AuxiliaryClock}=require('./auxiliary-clock');const {dailyBoard}=require('./daily-scoreboard');const {CertifiedDelivery}=require('./certified-delivery');const {ScoresheetCertification}=require('./scoresheet-certification');const {snapshotForGame,assertGameRosterEligible}=require('./game-roster-policy');const {reportFromState,renderReport,topPenalties}=require('./game-report');const {createParentAuth}=require('./parent-auth');const {Authority}=require('./authority-sqlite');const {LeagueStore}=require('./league-store');const {TeamAccounts}=require('./team-accounts');
 function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='127.0.0.1',port=8090,operatorKey=process.env.ICEBREAKER_OPERATOR_KEY||'local-development-key',leagueGameId=process.env.ICEBREAKER_LEAGUE_GAME_ID||null}={}){
  const parentAuth=createParentAuth({dbPath});const leagueStore=new LeagueStore(dbPath,{seedDemo:true});
  const binding=leagueGameId?leagueStore.db.prepare('SELECT division_id FROM games WHERE id=?').get(leagueGameId):null;
  if(leagueGameId&&!binding)throw Error('Bound league game not found');
  const timing=binding?leagueStore.timingForDivision(binding.division_id):null;
- const authority=new Authority({dbPath,timingRules:timing?Object.fromEntries(Object.entries(timing).filter(([k])=>!['divisionId','version'].includes(k))):null,timingVersion:timing?.version||'DEFAULT'});const teamAccounts=new TeamAccounts(dbPath);const certification=new ScoresheetCertification(authority.db,authority,{leagueGameId});const delivery=new CertifiedDelivery({db:authority.db,workflow:certification.workflow,certification,leagueStore,leagueGameId});const auxiliaryClock=new AuxiliaryClock(authority.db,authority.gameId,authority.timingRules,{audit:(action,details)=>authority.audit(action,details)});const clients=new Set();const root=path.resolve(__dirname,'../web');
+ const authority=new Authority({dbPath,timingRules:timing?Object.fromEntries(Object.entries(timing).filter(([k])=>!['divisionId','version'].includes(k))):null,timingVersion:timing?.version||'DEFAULT'});const teamAccounts=new TeamAccounts(dbPath);const certification=new ScoresheetCertification(authority.db,authority,{leagueGameId});const delivery=new CertifiedDelivery({db:authority.db,workflow:certification.workflow,certification,leagueStore,leagueGameId});const auxiliaryClock=new AuxiliaryClock(authority.db,authority.gameId,authority.timingRules,{audit:(action,details)=>authority.audit(action,details)});const clients=new Set();const loginThrottle=new LoginThrottle();const root=path.resolve(__dirname,'../web');
  const send=(res,code,obj)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(obj));};
  const broadcast=()=>{const msg=`id: ${authority.state.revision}\nevent: snapshot\ndata: ${JSON.stringify(authority.spectator())}\n\n`;for(const r of clients){try{r.write(msg);}catch{clients.delete(r);}}};
  const auth=req=>{const k=req.headers['x-operator-key'];return typeof k==='string'&&k.length===operatorKey.length&&crypto.timingSafeEqual(Buffer.from(k),Buffer.from(operatorKey));};
@@ -39,7 +39,19 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
    try{return send(res,201,certification.provisionReferee(await readBody(req)));}catch(e){return send(res,400,{error:e.message});}
   }
   if(pathname==='/api/scoresheet/v1/referee/login'&&req.method==='POST'){
-   try{const b=await readBody(req);return send(res,200,certification.login(b.refereeId,b.password));}catch(e){return send(res,401,{error:e.message});}
+   let principal='';
+   const ip=req.socket?.remoteAddress||'unknown';
+   try{
+    const b=await readBody(req);principal=b.refereeId;
+    if(!loginThrottle.allowed('referee',ip,principal))
+     return send(res,429,{error:'Too many login attempts; try again later'});
+    const result=certification.login(b.refereeId,b.password);
+    loginThrottle.success('referee',ip,principal);
+    return send(res,200,result);
+   }catch(e){
+    loginThrottle.failure('referee',ip,principal);
+    return send(res,401,{error:'Invalid referee credentials'});
+   }
   }
   if(pathname==='/api/scoresheet/v1/submit'&&req.method==='POST'){
    if(!auth(req))return send(res,403,{error:'Operator credential required'});
