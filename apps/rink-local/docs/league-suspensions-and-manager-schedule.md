@@ -2,7 +2,7 @@
 
 ## Team manager workflow
 
-An authenticated team manager opens `/manager-game.html` or `/team.html`. The app retrieves the league schedule via `GET /api/team/v1/teams/:teamId/schedule`, scoped to the authenticated team. Only scheduled/live games are shown. Choosing a game loads its approved season-roster players and any previously confirmed game-day lineup. The manager can deselect absent players, select additional eligible players, and reconfirm while the game is scheduled. A lineup confirmation is audited and optimistic-concurrency checked. Live-game amendments still require a separate authorized process; the normal manager endpoint refuses edits to an already confirmed live lineup.
+Team login returns only authorized team memberships, allowing the manager to select a team without entering an internal team ID. An authenticated team manager opens `/manager-game.html` or `/team.html`. The app retrieves the league schedule via `GET /api/team/v1/teams/:teamId/schedule`, scoped to the authenticated team. Only scheduled/live games are shown. Choosing a game loads its approved season-roster players and any previously confirmed game-day lineup. The manager can deselect absent players, select additional eligible players, and reconfirm while the game is scheduled. A lineup confirmation is audited and optimistic-concurrency checked. Live-game amendments still require a separate authorized process; the normal manager endpoint refuses edits to an already confirmed live lineup.
 
 ## League-owned suspension records
 
