@@ -5,7 +5,7 @@ const crypto=require('node:crypto');
 const PREFIX='enc:v1:';
 function fieldKey(){
  const raw=process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64;
- if(!raw)return null;
+ if(!raw){if(process.env.ICEBREAKER_REQUIRE_PRIVATE_FIELD_ENCRYPTION==='1')throw Error('Private-field encryption is mandatory but no key is configured');return null;}
  const key=Buffer.from(raw,'base64');
  if(key.length!==32||key.toString('base64')!==raw)throw Error('Invalid private-field encryption key');
  return key;
