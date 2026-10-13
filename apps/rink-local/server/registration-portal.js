@@ -240,6 +240,25 @@ class RegistrationPortal{
   const row=this.db.prepare('SELECT ls.league_id leagueId FROM games g JOIN divisions d ON d.id=g.division_id JOIN league_seasons ls ON ls.season_id=d.season_id WHERE g.id=?').get(gameId);
   if(!row)throw Error('Unknown game');return row.leagueId;
  }
+ addTournamentGuest(user,{gameId,teamId,displayName,jersey,position}){
+  this.requireLeague(user,this.gameLeague(gameId));
+  if(participant.competitionForGame(this.db,gameId).type!=='TOURNAMENT')throw Error('Tournament policy required');
+  if(!good(displayName,120)||!Number.isInteger(jersey)||jersey<0||jersey>99||!['F','D','G','C','LW','RW','LD','RD'].includes(position))throw Error('Invalid guest entry');
+  const g=this.db.prepare('SELECT home_team_id home,away_team_id away,status FROM games WHERE id=?').get(gameId);
+  if(!g||g.status!=='scheduled'||![g.home,g.away].includes(teamId))throw Error('Invalid tournament game team');
+  if(this.db.prepare("SELECT 1 FROM sqlite_master WHERE name='game_roster_confirmations'").get()&&
+     this.db.prepare('SELECT 1 FROM game_roster_confirmations WHERE game_id=? AND team_id=?').get(gameId,teamId))
+     throw Error('Confirmed lineup requires amendment');
+  return this.tx(()=>{
+   const team=this.team(teamId),playerId=uid(),now=new Date().toISOString();
+   if(this.db.prepare('SELECT 1 FROM roster_memberships WHERE team_id=? AND jersey=?').get(teamId,jersey))throw Error('Jersey in use');
+   this.db.prepare("INSERT INTO players(id,display_name,privacy_status) VALUES(?,?,'PRIVATE')").run(playerId,displayName.trim());
+   this.db.prepare('INSERT INTO roster_memberships VALUES(?,?,?,?,?)').run(team.seasonId,teamId,playerId,jersey,position);
+   this.db.prepare('INSERT INTO player_membership_history VALUES(?,?,?,?,?,?,?,?)').run(uid(),playerId,team.seasonId,teamId,now,null,'TOURNAMENT_GUEST',user.id);
+   this.audit('TOURNAMENT_GUEST_ADDED',playerId,user.id,{gameId,teamId,jersey});
+   return {playerId,gameId,teamId,guest:true};
+  });
+ }
  setGamePolicy(user,{gameId,type,requireLegacyPlayerTraining=null,note}){
   this.requireLeague(user,this.gameLeague(gameId));
   return participant.setCompetition(this.db,{gameId,type,requireLegacyPlayerTraining,note},user.id);
