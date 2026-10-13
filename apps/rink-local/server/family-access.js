@@ -18,6 +18,7 @@ class FamilyAccess{
   this.db=db;
   db.exec("CREATE TABLE IF NOT EXISTS family_accounts(id TEXT PRIMARY KEY,person_id TEXT NOT NULL UNIQUE REFERENCES player_related_people(id),email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,created_at TEXT NOT NULL)");
   db.exec("CREATE TABLE IF NOT EXISTS family_sessions(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL REFERENCES family_accounts(id),expires_ms INTEGER NOT NULL)");
+  db.exec("CREATE TABLE IF NOT EXISTS family_person_details(person_id TEXT PRIMARY KEY REFERENCES player_related_people(id),private_json TEXT NOT NULL,updated_at TEXT NOT NULL)");
   db.exec("CREATE TABLE IF NOT EXISTS family_grants(person_id TEXT NOT NULL REFERENCES player_related_people(id),player_id TEXT NOT NULL REFERENCES players(id),can_view_documents INTEGER NOT NULL DEFAULT 0,can_upload_documents INTEGER NOT NULL DEFAULT 0,verified_at TEXT NOT NULL,verified_by TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(person_id,player_id))");
  }
  audit(action,entity,actor,details={}){
@@ -70,7 +71,14 @@ class FamilyAccess{
  ownContact(user){
   const p=this.db.prepare('SELECT id personId,full_name fullName,email,phone FROM player_related_people WHERE id=?').get(user.personId);
   if(!p)throw Error('Contact not found');
-  this.audit('FAMILY_CONTACT_READ',user.personId,user.accountId);return {...p,fullName:decryptField(p.fullName,user.personId,'fullName'),email:p.email===null?null:decryptField(p.email,user.personId,'email'),phone:p.phone===null?null:decryptField(p.phone,user.personId,'phone')};
+  const details=this.db.prepare('SELECT private_json FROM family_person_details WHERE person_id=?').get(user.personId);this.audit('FAMILY_CONTACT_READ',user.personId,user.accountId);return {...p,fullName:decryptField(p.fullName,user.personId,'fullName'),email:p.email===null?null:decryptField(p.email,user.personId,'email'),phone:p.phone===null?null:decryptField(p.phone,user.personId,'phone'),details:details?JSON.parse(decryptField(details.private_json,user.personId,'contactDetails')):{}};
+ }
+ updateDetails(user,{preferredName='',address={},contactByEmail=true,contactBySms=false}={}){
+  if(typeof preferredName!=='string'||preferredName.length>160||!address||typeof address!=='object'||Array.isArray(address)||!Object.keys(address).every(k=>['street','city','region','postalCode','country'].includes(k))||!Object.values(address).every(v=>typeof v==='string'&&v.length<=200)||typeof contactByEmail!=='boolean'||typeof contactBySms!=='boolean')throw Error('Invalid family contact preferences');
+  const data=JSON.stringify({preferredName,address,contactByEmail,contactBySms});
+  this.db.prepare('INSERT INTO family_person_details VALUES(?,?,?) ON CONFLICT(person_id) DO UPDATE SET private_json=excluded.private_json,updated_at=excluded.updated_at').run(user.personId,encryptField(data,user.personId,'contactDetails'),new Date().toISOString());
+  this.audit('FAMILY_DETAILS_UPDATED',user.personId,user.accountId);
+  return {updated:true};
  }
  updateContact(user,{phone,email}){
   if(phone!==undefined&&phone!==null&&!valid(phone,50)||email!==undefined&&email!==null&&(!valid(email,254)||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)))throw Error('Invalid contact details');
