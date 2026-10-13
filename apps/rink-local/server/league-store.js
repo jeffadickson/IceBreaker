@@ -5,6 +5,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const demo=require('./league-data');
+const {initSuspensions,validDate}=require('./player-suspensions');
 class LeagueStore {
  constructor(file,{seedDemo=false}={}){
   fs.mkdirSync(path.dirname(file),{recursive:true});this.db=new DatabaseSync(file);
@@ -24,6 +25,7 @@ class LeagueStore {
    CREATE INDEX IF NOT EXISTS ix_games_division_date ON games(division_id,date);
    CREATE INDEX IF NOT EXISTS ix_goals_game ON goal_attributions(game_id);
   `);
+  initSuspensions(this.db);
   if(seedDemo&&this.db.prepare('SELECT count(*) n FROM seasons').get().n===0)this.seedDemo();
   // Backward-compatible mapping for existing single-league prototype databases.
   this.db.prepare("INSERT OR IGNORE INTO leagues(id,name,public_scoreboard_enabled,timezone) VALUES('demo-league','Demonstration League',1,'America/Los_Angeles')").run();
@@ -93,6 +95,17 @@ class LeagueStore {
  }
  timingForDivision(divisionId){const row=this.db.prepare('SELECT d.rules_version AS version,r.rules_json AS rules FROM divisions d JOIN division_timing_rules r ON r.division_id=d.id AND r.version=d.rules_version WHERE d.id=?').get(divisionId);if(!row)throw Error('Division timing rules unavailable');const {validateTiming}=require('./game-timing-rules');return {divisionId,version:row.version,...validateTiming(JSON.parse(row.rules))};}
  configureDivisionTiming(divisionId,version,rules,{actor='league-admin'}={}){if(!/^[A-Za-z0-9_.-]{1,80}$/.test(version))throw Error('Invalid rules version');const {validateTiming}=require('./game-timing-rules');const checked=validateTiming(rules);return this.tx(()=>{const d=this.db.prepare('SELECT rules_version FROM divisions WHERE id=?').get(divisionId);if(!d)throw Error('Unknown division');const hasActive=this.db.prepare("SELECT 1 FROM games WHERE division_id=? AND status IN ('live','final') LIMIT 1").get(divisionId);if(hasActive)throw Error('Cannot change division timing policy after games have started; create a new division/ruleset revision through an authorized migration');this.db.prepare('INSERT INTO division_timing_rules VALUES(?,?,?)').run(divisionId,version,JSON.stringify(checked));this.db.prepare('UPDATE divisions SET rules_version=? WHERE id=?').run(version,divisionId);this.audit('DIVISION_TIMING_UPDATED',divisionId,{version,...checked},actor);return {divisionId,version,...checked};});}
+ addSuspension({playerId,startDate,endDate,reason,actor='league-admin'}={}){
+  if(!validDate(startDate)||!validDate(endDate)||startDate>endDate||typeof reason!=='string'||!reason.trim()||reason.length>500)throw Error('Invalid suspension dates or reason');
+  if(typeof playerId!=='string'||!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Unknown player');
+  const id=crypto.randomUUID(),at=new Date().toISOString();
+  return this.tx(()=>{this.db.prepare('INSERT INTO player_suspensions(id,player_id,start_date,end_date,reason,created_by,created_at) VALUES(?,?,?,?,?,?,?)').run(id,playerId,startDate,endDate,reason.trim(),actor,at);this.audit('PLAYER_SUSPENDED',playerId,{id,startDate,endDate,reason:reason.trim()},actor);return {id,playerId,startDate,endDate,reason:reason.trim(),revoked:false};});
+ }
+ revokeSuspension(id,{actor='league-admin',reason}={}){
+  if(typeof reason!=='string'||!reason.trim()||reason.length>500)throw Error('Revocation reason required');
+  return this.tx(()=>{const row=this.db.prepare('SELECT * FROM player_suspensions WHERE id=?').get(id);if(!row)throw Error('Unknown suspension');if(row.revoked_at)throw Error('Suspension already revoked');const at=new Date().toISOString();this.db.prepare('UPDATE player_suspensions SET revoked_at=?,revoked_by=?,revocation_reason=? WHERE id=? AND revoked_at IS NULL').run(at,actor,reason.trim(),id);this.audit('PLAYER_SUSPENSION_REVOKED',row.player_id,{id,reason:reason.trim()},actor);return {id,revoked:true,revokedAt:at};});
+ }
+ suspensions({playerId,includeRevoked=false}={}){const rows=this.db.prepare('SELECT id,player_id playerId,start_date startDate,end_date endDate,reason,created_by createdBy,created_at createdAt,revoked_at revokedAt,revoked_by revokedBy,revocation_reason revocationReason FROM player_suspensions ORDER BY start_date DESC,id').all();return rows.filter(r=>(!playerId||r.playerId===playerId)&&(includeRevoked||!r.revokedAt));}
  close(){this.db.close();}
 }
 module.exports={LeagueStore};
