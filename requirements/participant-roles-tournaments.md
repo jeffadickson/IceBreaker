@@ -13,7 +13,7 @@
 - TOUR-101: An independent tournament can explicitly disable **league-specific training requirements** for its games. Absence of USA Hockey or league number is not automatically an eligibility failure.
 - TOUR-102: Tournament organizers can add their own explicit training rules. Tournament exemptions must not erase training records or automatically waive suspensions, safety rules, age eligibility or other restrictions.
 - TOUR-103: An ordinary league game continues to enforce its league requirements by default; an exemption must be explicitly configured and audited by a league administrator.
-- TOUR-104: Tournament guest participants may use internal IDs without external numbers. Dedicated guest roster imports and tournament-wide policy administration are future milestones.
+- TOUR-104: Tournament guest participants may use internal IDs without external numbers. Single-event guest entry is implemented for league administrators; bulk imports and tournament-wide policy administration are future milestones.
 
 ## Implemented development model
 
