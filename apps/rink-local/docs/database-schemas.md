@@ -574,3 +574,62 @@ CREATE TABLE IF NOT EXISTS game_policy (
                 );
 ```
 
+### services/elsa-workflows/bridge-outbox.js (optional legacy integration)
+
+**`elsa_bridge_outbox`**
+
+```sql
+CREATE TABLE IF NOT EXISTS elsa_bridge_outbox(
+  event_id TEXT PRIMARY KEY, game_id TEXT NOT NULL, action TEXT NOT NULL,
+  revision INTEGER NOT NULL, definition_digest TEXT NOT NULL, state TEXT,
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','DELIVERED')),
+  attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, delivered_at TEXT
+);
+```
+
+## Exact installed schema, including migrations and indexes
+
+The source excerpts above are a reviewable catalog, not a migration mechanism. The authoritative installed schema is obtained by **read-only introspection** of the actual SQLite file. This captures `ALTER TABLE` columns (for example registration MFA fields), composite primary keys, indexes, unique constraints, and foreign keys.
+
+To regenerate a comprehensive reference from **three fresh fictional databases** (rink/league, central ingest, encrypted email archive):
+
+```bash
+node apps/rink-local/tools/generate-schema-reference.js \
+  --out apps/rink-local/docs/database-schema-generated.md
+```
+
+To inspect an existing SQLite database without modifying it:
+
+```bash
+node apps/rink-local/tools/schema-catalog.js \
+  --db /path/to/league.sqlite "League / rink" \
+  --db /path/to/central.sqlite "Central ingest" \
+  --db /path/to/evidence.sqlite "Encrypted evidence" \
+  --out schema-reference.md
+```
+
+**Do not commit database files or encryption keys.** The generated report includes DDL only, not user records. The generator uses fictional fixtures, never the production database. C#-only SQLite tables are listed above because the Node fixture generator does not instantiate .NET classes.
+
+## Data classification and ownership
+
+| Classification | Examples | Access policy |
+|---|---|---|
+| Public or pseudonymous game data | Team aliases, scores, goal/assist attribution, standings | Public scoreboard policy |
+| Internal game operations | `game_events`, `sync_outbox`, `scoresheet_signatures`, timing rules | Timekeeper/referee and central sync roles |
+| Sensitive personal information | `player_private_profiles`, `player_related_people`, `family_person_details` | Verified guardian/registrar scope only |
+| Credentials and sessions | `registration_users`, `team_users`, `parent_sessions`, `family_sessions` | Authentication services only |
+| Training/eligibility | `training_completions_v2`, `training_intake`, `player_suspensions` | Authorized league and compliance officers |
+| Highly sensitive documents | `private_documents`, `archived_evidence` | Encrypted vault, malware quarantine, audited verification |
+
+The current prototype places several domains in one SQLite file. This is **not a production trust boundary**. The planned central registration service must separate private records from rink laptops.
+
+## Schema-change and compatibility checklist
+
+1. Preserve permanent person IDs across seasons, transfers, and tournaments. Federation registration numbers are optional encrypted alternate identifiers.
+2. Version training policy rows instead of altering schema each season. Keep the older training tables readable until migration.
+3. Enforce foreign keys, transactional writes, unique event IDs, idempotency keys, and immutable certified revisions.
+4. Ensure published league statistics derive only from certified results. Pending games must never contribute.
+5. Validate multi-division and multi-season isolation, including roster, standings, and goalie statistics.
+6. Keep encrypted document blobs outside public game/event databases. Never put certificates in Git.
+7. Run `node --test apps/rink-local/tests/browser/schema-reference.test.js`, the 56-game season simulation, and full CI after every schema change.
+
