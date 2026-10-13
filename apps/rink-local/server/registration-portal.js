@@ -71,6 +71,18 @@ class RegistrationPortal{
   return this.registry.linkPerson(playerId,input,u.id);
  }
  linkExisting(u,clubId,playerId){const c=this.club(clubId);this.requireLeague(u,c.league_id);if(!this.db.prepare('SELECT 1 FROM players WHERE id=?').get(playerId))throw Error('Unknown player');return this.tx(()=>{this.db.prepare('INSERT INTO registration_player_clubs VALUES(?,?,?)').run(clubId,playerId,new Date().toISOString());this.audit('CLUB_PLAYER_LINKED',playerId,u.id,{clubId});return {clubId,playerId};});}
+ unlinkExisting(u,clubId,playerId,reason){
+  const c=this.club(clubId);this.requireLeague(u,c.league_id);
+  if(!good(reason,300))throw Error('Reason required');
+  return this.tx(()=>{
+   const active=this.db.prepare('SELECT 1 FROM roster_memberships r JOIN registration_club_teams ct ON ct.team_id=r.team_id WHERE ct.club_id=? AND r.player_id=? LIMIT 1').get(clubId,playerId);
+   if(active)throw Error('Player still has active roster membership with club');
+   const changed=this.db.prepare('DELETE FROM registration_player_clubs WHERE club_id=? AND player_id=?').run(clubId,playerId);
+   if(changed.changes!==1)throw Error('Player not linked to club');
+   this.audit('CLUB_PLAYER_UNLINKED',playerId,u.id,{clubId,reason:reason.trim()});
+   return {clubId,playerId,unlinked:true};
+  });
+ }
  submit(u,{playerId,teamId,jersey,position},{withinTransaction=false}={}){
   this.requireClub(u,u.scopeId);
   if(!this.owns(u.scopeId,playerId))throw Error('Player outside club scope');
