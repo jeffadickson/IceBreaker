@@ -450,3 +450,127 @@ CREATE TABLE IF NOT EXISTS family_grants(person_id TEXT NOT NULL REFERENCES play
 CREATE TABLE IF NOT EXISTS private_documents(id TEXT PRIMARY KEY,player_id TEXT NOT NULL REFERENCES players(id),document_type TEXT NOT NULL,mime TEXT NOT NULL,bytes INTEGER NOT NULL,digest_sha256 TEXT NOT NULL,wrapped_key BLOB NOT NULL,key_nonce TEXT NOT NULL,key_tag TEXT NOT NULL,data_nonce TEXT NOT NULL,data_tag TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('QUARANTINED','PENDING','VERIFIED','REJECTED','REVOKED')),uploaded_by TEXT NOT NULL,uploaded_at TEXT NOT NULL,verified_by TEXT,verified_at TEXT,decision_note TEXT);
 ```
 
+### apps/rink-local/server/email-evidence-archive.js
+
+**`archived_evidence`**
+
+```sql
+CREATE TABLE IF NOT EXISTS archived_evidence(id TEXT PRIMARY KEY,source_digest TEXT NOT NULL UNIQUE,subject_type TEXT NOT NULL,subject_id TEXT NOT NULL,training_id TEXT NOT NULL,mime TEXT NOT NULL,bytes INTEGER NOT NULL,sha256 TEXT NOT NULL,encrypted_data BLOB NOT NULL,data_nonce TEXT NOT NULL,data_tag TEXT NOT NULL,wrapped_key BLOB NOT NULL,key_nonce TEXT NOT NULL,key_tag TEXT NOT NULL,created_at TEXT NOT NULL);
+```
+
+**`evidence_audit`**
+
+```sql
+CREATE TABLE IF NOT EXISTS evidence_audit(id TEXT PRIMARY KEY,at TEXT NOT NULL,action TEXT NOT NULL,evidence_id TEXT NOT NULL,actor TEXT NOT NULL,details TEXT NOT NULL);
+```
+
+### apps/rink-local/server/player-suspensions.js
+
+**`player_suspensions`**
+
+```sql
+CREATE TABLE IF NOT EXISTS player_suspensions(
+ id TEXT PRIMARY KEY,player_id TEXT NOT NULL REFERENCES players(id),league_id TEXT NOT NULL REFERENCES leagues(id),
+ start_date TEXT NOT NULL,end_date TEXT NOT NULL,reason TEXT NOT NULL,
+ created_by TEXT NOT NULL,created_at TEXT NOT NULL,
+ revoked_by TEXT,revoked_at TEXT,revocation_reason TEXT,
+ CHECK(start_date<=end_date));
+```
+
+### apps/rink-local/server/auxiliary-clock.js
+
+**`auxiliary_clock_state`**
+
+```sql
+CREATE TABLE IF NOT EXISTS auxiliary_clock_state(game_id TEXT PRIMARY KEY,phase TEXT NOT NULL,remaining INTEGER NOT NULL,running INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 0);
+```
+
+**`auxiliary_clock_history`**
+
+```sql
+CREATE TABLE IF NOT EXISTS auxiliary_clock_history(game_id TEXT NOT NULL,seq INTEGER NOT NULL,event_id TEXT NOT NULL UNIQUE,action TEXT NOT NULL,phase TEXT NOT NULL,remaining INTEGER NOT NULL,actor TEXT NOT NULL,at TEXT NOT NULL,PRIMARY KEY(game_id,seq));
+```
+
+### services/ingest/central-server.js
+
+**`stations`**
+
+```sql
+CREATE TABLE IF NOT EXISTS stations(id TEXT PRIMARY KEY, public_key TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1);
+```
+
+**`assignments`**
+
+```sql
+CREATE TABLE IF NOT EXISTS assignments(game_id TEXT NOT NULL, station_id TEXT NOT NULL REFERENCES stations(id), PRIMARY KEY(game_id,station_id));
+```
+
+**`game_owners`**
+
+```sql
+CREATE TABLE IF NOT EXISTS game_owners(game_id TEXT PRIMARY KEY, station_id TEXT NOT NULL REFERENCES stations(id), epoch INTEGER NOT NULL DEFAULT 1);
+```
+
+**`game_events`**
+
+```sql
+CREATE TABLE IF NOT EXISTS game_events(game_id TEXT NOT NULL, seq INTEGER NOT NULL, event_id TEXT NOT NULL, station_id TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL, digest TEXT NOT NULL, received_at TEXT NOT NULL, PRIMARY KEY(game_id,seq), UNIQUE(game_id,event_id));
+```
+
+**`ingestion_audit`**
+
+```sql
+CREATE TABLE IF NOT EXISTS ingestion_audit(id INTEGER PRIMARY KEY AUTOINCREMENT, happened_at TEXT NOT NULL, action TEXT NOT NULL, game_id TEXT, station_id TEXT, detail TEXT);
+```
+
+### apps/rink-local/src/Icebreaker.Core/GameStore.cs
+
+**`game_events`**
+
+```sql
+CREATE TABLE IF NOT EXISTS game_events (
+              game_id TEXT NOT NULL, seq INTEGER NOT NULL, event_id TEXT NOT NULL UNIQUE,
+              idempotency_key TEXT NOT NULL, event_type TEXT NOT NULL,
+              occurred_at_utc TEXT NOT NULL, actor_id TEXT NOT NULL,
+              period INTEGER NOT NULL, clock_seconds INTEGER NOT NULL,
+              payload_json TEXT NOT NULL,
+              PRIMARY KEY(game_id, seq), UNIQUE(game_id, idempotency_key)
+            );
+```
+
+**`sync_outbox`**
+
+```sql
+CREATE TABLE IF NOT EXISTS sync_outbox (
+              event_id TEXT PRIMARY KEY NOT NULL REFERENCES game_events(event_id),
+              game_id TEXT NOT NULL, seq INTEGER NOT NULL, delivered INTEGER NOT NULL DEFAULT 0
+            );
+```
+
+### apps/rink-local/src/Icebreaker.Core/Integration/AnnouncementOutbox.cs
+
+**`announcement_outbox`**
+
+```sql
+CREATE TABLE IF NOT EXISTS announcement_outbox (
+              announcement_id TEXT PRIMARY KEY,
+              game_id TEXT NOT NULL,
+              source_seq INTEGER NULL,
+              kind TEXT NOT NULL,
+              script TEXT NOT NULL,
+              requires_approval INTEGER NOT NULL,
+              state TEXT NOT NULL,
+              created_at_utc TEXT NOT NULL
+            );
+```
+
+### apps/rink-local/src/Icebreaker.Core/Integration/GamePolicyPin.cs
+
+**`game_policy`**
+
+```sql
+CREATE TABLE IF NOT EXISTS game_policy (
+                  game_id TEXT PRIMARY KEY, policy_json TEXT NOT NULL
+                );
+```
+
