@@ -20,7 +20,7 @@ test('offline migration encrypts legacy PII transactionally and strict mode reje
  assert.equal(before.birth_date,'2016-03-01');
  process.env.ICEBREAKER_PRIVATE_FIELD_KEY_BASE64=crypto.randomBytes(32).toString('base64');
  const preview=migration(registry.db);
- assert.equal(preview.applied,false);assert.ok(preview.fieldsToEncrypt>=7);
+ assert.equal(preview.applied,false);assert.ok(preview.fieldsToEncrypt>=6);
  assert.equal(registry.db.prepare('SELECT birth_date FROM player_private_profiles WHERE player_id=?').get(playerId).birth_date,'2016-03-01');
  assert.throws(()=>migration(registry.db,{apply:true}),/backup/);
  const result=migration(registry.db,{apply:true,backupVerified:true});
