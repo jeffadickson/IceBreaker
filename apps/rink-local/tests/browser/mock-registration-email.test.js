@@ -71,6 +71,20 @@ test('ClamAV clean scan permits human approval, rejected scan never permits appr
   assert.equal(approval.state,'VERIFIED');assert.ok(approval.completionId);
  }finally{db.close();}
 });
+test('backend scanner processes quarantined images and leaves errors quarantined',async t=>{
+ const x=fixture(t);
+ const result=await demo.run('import',x.root,{askName:async()=> 'Alex Example'});
+ const {scanArchive}=require('../../server/scan-email-evidence');
+ const unavailable=await scanArchive(x.paths.archive,{scanner:async()=>{throw Error('offline');}});
+ assert.equal(unavailable.errors,1);
+ const archive=new EvidenceArchive(x.paths.archive);
+ assert.equal(archive.scanStatus(result.evidenceId),'QUARANTINED');
+ archive.close();
+ const clean=await scanArchive(x.paths.archive,{scanner:async()=>({engine:'clamav',clean:true})});
+ assert.equal(clean.clean,1);
+ const again=await scanArchive(x.paths.archive,{scanner:async()=>({engine:'clamav',clean:true})});
+ assert.equal(again.clean,0);
+});
 test('mismatched email participant name fails closed even if operator types selected name',async t=>{
  const x=fixture(t),mail=JSON.parse(fs.readFileSync(x.paths.mail,'utf8'));
  mail.body=mail.body.replace('Alex Example','Another Person');
