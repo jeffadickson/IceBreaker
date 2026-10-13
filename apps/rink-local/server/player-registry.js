@@ -4,6 +4,7 @@
 const crypto=require('node:crypto');
 const {DatabaseSync}=require('node:sqlite');
 const {validDate}=require('./player-suspensions');
+const {encryptField,decryptField}=require('./private-fields');
 const uuid=()=>crypto.randomUUID();
 const good=(x,n=160)=>typeof x==='string'&&x.trim().length>0&&x.length<=n;
 const validAddress=a=>a&&typeof a==='object'&&!Array.isArray(a)&&Object.keys(a).every(k=>['street','city','region','postalCode','country'].includes(k))&&Object.values(a).every(v=>typeof v==='string'&&v.length<=200);
@@ -42,12 +43,12 @@ class PlayerRegistry{
  audit(action,entity,payload,actor){this.db.prepare("INSERT INTO league_audit VALUES(?,?,?,?,?,?)").run(uuid(),new Date().toISOString(),actor,action,entity,JSON.stringify(payload));}
  createPlayer({displayName,legalName,birthDate,address={}},actor,{withinTransaction=false}={}){
   if(!good(actor,100)||!good(displayName,120)||!good(legalName)||!validDate(birthDate)||!validAddress(address))throw Error('Invalid private player profile');
-  const apply=()=>{const playerId=uuid();this.db.prepare("INSERT INTO players(id,display_name,privacy_status) VALUES(?,?,'PRIVATE')").run(playerId,displayName.trim());this.db.prepare("INSERT INTO player_private_profiles VALUES(?,?,?,?,?,?)").run(playerId,legalName.trim(),birthDate,JSON.stringify(address),new Date().toISOString(),actor);this.audit('PLAYER_CREATED',playerId,{privateProfile:true},actor);return {playerId};};return withinTransaction?apply():this.tx(apply);
+  const apply=()=>{const playerId=uuid();this.db.prepare("INSERT INTO players(id,display_name,privacy_status) VALUES(?,?,'PRIVATE')").run(playerId,displayName.trim());this.db.prepare("INSERT INTO player_private_profiles VALUES(?,?,?,?,?,?)").run(playerId,encryptField(legalName.trim(),playerId,'legalName'),encryptField(birthDate,playerId,'birthDate'),encryptField(JSON.stringify(address),playerId,'address'),new Date().toISOString(),actor);this.audit('PLAYER_CREATED',playerId,{privateProfile:true},actor);return {playerId};};return withinTransaction?apply():this.tx(apply);
  }
  privateProfile(playerId){
   const p=this.db.prepare("SELECT player_id playerId,legal_name legalName,birth_date birthDate,address_json addressJson FROM player_private_profiles WHERE player_id=?").get(playerId);
   if(!p)throw Error('Private player profile not found');
-  return {playerId:p.playerId,legalName:p.legalName,birthDate:p.birthDate,address:JSON.parse(p.addressJson)};
+  return {playerId:p.playerId,legalName:decryptField(p.legalName,p.playerId,'legalName'),birthDate:decryptField(p.birthDate,p.playerId,'birthDate'),address:JSON.parse(decryptField(p.addressJson,p.playerId,'address'))};
  }
  ageAt(playerId,cutoffDate){
   if(!validDate(cutoffDate))throw Error('Invalid eligibility cutoff date');
@@ -58,7 +59,7 @@ class PlayerRegistry{
   if(!good(actor,100)||!good(legalName)||!validDate(birthDate)||!validAddress(address))throw Error('Invalid private player profile');
   return this.tx(()=>{
    const result=this.db.prepare('UPDATE player_private_profiles SET legal_name=?,birth_date=?,address_json=?,updated_at=?,updated_by=? WHERE player_id=?')
-    .run(legalName.trim(),birthDate,JSON.stringify(address),new Date().toISOString(),actor,playerId);
+    .run(encryptField(legalName.trim(),playerId,'legalName'),encryptField(birthDate,playerId,'birthDate'),encryptField(JSON.stringify(address),playerId,'address'),new Date().toISOString(),actor,playerId);
    if(result.changes!==1)throw Error('Private player profile not found');
    this.audit('PRIVATE_PROFILE_UPDATED',playerId,{privateFieldsChanged:true},actor);
    return {playerId,updated:true};
