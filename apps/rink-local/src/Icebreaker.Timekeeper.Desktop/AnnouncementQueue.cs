@@ -56,7 +56,7 @@ public sealed class AnnouncementQueue : IDisposable
                $" for {infraction}.";
     }
 
-    public void Stage(RinkEvent e)
+    public void Stage(RinkEvent e, bool recovered = false)
     {
         if (string.IsNullOrWhiteSpace(e.Id)) return;
         var script = ScriptFor(e);
@@ -64,11 +64,12 @@ public sealed class AnnouncementQueue : IDisposable
         using var cmd = _db.CreateCommand();
         cmd.CommandText = """
             INSERT OR IGNORE INTO desktop_pa_queue(event_id,kind,script,state,created_utc)
-            VALUES($id,$kind,$script,'PENDING',$at)
+            VALUES($id,$kind,$script,$state,$at)
             """;
         cmd.Parameters.AddWithValue("$id", e.Id);
         cmd.Parameters.AddWithValue("$kind", e.Type);
         cmd.Parameters.AddWithValue("$script", script);
+        cmd.Parameters.AddWithValue("$state", recovered ? "NEEDS_REVIEW" : "PENDING");
         cmd.Parameters.AddWithValue("$at", DateTimeOffset.UtcNow.ToString("O"));
         cmd.ExecuteNonQuery();
     }
