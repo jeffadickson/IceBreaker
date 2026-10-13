@@ -55,8 +55,8 @@ function createRegistrationHttp(dbPath,{readBody,send,bootstrapAuth}){
    if(documents&&req.method==='POST'){const b=await documentBody();reply(201,portal.uploadDocument(user,{...b,playerId:documents[1]}));return true;}
    const document=route.match(/^documents\/([-\w]+)$/);
    if(document&&req.method==='GET'){const d=portal.readDocument(user,document[1]);reply(200,{mime:d.mime,base64:d.data.toString('base64')});return true;}
-   const decision=route.match(/^documents\/([-\w]+)\/decision$/);
-   if(decision&&req.method==='POST'){const b=await body();reply(200,portal.documentDecision(user,decision[1],b.decision,b.note));return true;}
+   const documentDecisionRoute=route.match(/^documents\/([-\w]+)\/decision$/);
+   if(documentDecisionRoute&&req.method==='POST'){const b=await body();reply(200,portal.documentDecision(user,documentDecisionRoute[1],b.decision,b.note));return true;}
    if(route==='context'&&req.method==='GET'){reply(200,{role:user.role,scopeId:user.scopeId,teams:portal.teams(user)});return true;}
    if(route==='players'&&req.method==='GET'){reply(200,{players:portal.players(user)});return true;}
    if(route==='players'&&req.method==='POST'){reply(201,portal.createPlayer(user,await body()));return true;}
