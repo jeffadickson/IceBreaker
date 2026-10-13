@@ -6,7 +6,7 @@ The Windows timekeeper has a **manual-approval** announcement queue. The rink au
 
 1. Start `START_ICEBREAKER_DESKTOP_WINDOWS.cmd`; use the **PUBLIC ADDRESS** section.
 2. After a committed goal or penalty, select the generated script. Scorer/assists, jersey number, penalty duration and infraction come from the authoritative journal. Unknown scorers are announced as to-be-announced.
-3. Choose **Offline Windows voice** (default, no internet) or **AI arena announcer (cloud)**, then choose an AI voice (onyx, marin, cedar, echo, alloy or nova).
+3. Choose **Offline Windows voice** (default, no internet) or **AI arena announcer (cloud)**, then choose an AI voice (onyx, marin, cedar, echo, alloy or nova) and a delivery style (classic arena PA, high-energy, or calm and precise).
 4. Select **PREVIEW / PLAY SELECTED** to generate and play the selected announcement on the Windows default audio output, or **SKIP SELECTED**. Route the laptop's output to the rink PA mixer and sound-check levels before use. Preview and Play are the same operation in this development UI; **do not press it with arena speakers live unless you intend to broadcast**.
 5. On restart, previously interrupted playback is marked **NEEDS_REVIEW** rather than replayed automatically. The queue stores committed event IDs and ignores duplicates.
 
