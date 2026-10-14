@@ -71,3 +71,24 @@ PYTHONPATH=apps/frappe/icebreaker_league python -m unittest discover -s apps/fra
 ```
 
 These verify the offline schema and fictional-data contract, **not** Frappe Bench installation, DocType migrations, permissions in a running site, or distributed sync.
+
+## M2 schedule pilot — fictional data only
+
+Run this **after** M1 administrative DocTypes are installed and the fictional snapshot is imported. The existing Node/SQLite system remains authoritative. Never point the exporter at a real league database.
+
+```bash
+node apps/rink-local/tools/export-frappe-schedule.js --db /absolute/path/to/fictional-demo.db > /tmp/icebreaker-schedule-demo.json
+```
+
+In a disposable Frappe Bench with an authenticated **System Manager** account, use `/api/method/icebreaker_league.schedule_importer.preview_schedule_snapshot` and then `/api/method/icebreaker_league.schedule_importer.import_schedule_snapshot` (POST). Supply `league_id=demo-league` and `payload` as the JSON contents of the exported file. Avoid placing snapshots, authentication secrets or private data in URL query strings or logs. Import is idempotent; conflicting stable IDs are rejected without overwriting an existing schedule. A read-only administrative projection is exposed as `icebreaker_league.schedule_importer.league_schedule`.
+
+The M2 contract stores **three time representations**: the source ISO-8601 timestamp with offset, a canonical UTC `Z` timestamp, and a UTC-naive datetime for Frappe's Datetime field. The original source offset must match the league's configured IANA timezone at the instant of play. The importer rejects an invalid offset, DST mismatch, wrong division or team, and any scores, rosters or private fields in the payload. Historical game states are informational; scores and certifications are not migrated.
+
+Verify locally without Frappe:
+
+```bash
+node --test apps/rink-local/tests/browser/frappe-schedule-m2.test.js
+PYTHONPATH=apps/frappe/icebreaker_league python -m unittest discover -s apps/frappe/icebreaker_league/tests
+```
+
+**Not yet validated:** installing and migrating these DocTypes in a live v16 Bench, tenant-scoped league admin permissions, venue-local timezones outside the league timezone, and end-to-end synchronization with a rink laptop. Do not cut over.
