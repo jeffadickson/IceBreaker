@@ -1,13 +1,14 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {DatabaseSync}=require('node:sqlite');
-const crypto=require('node:crypto');
+const crypto=require('node:crypto'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {run}=require('../../server/compare-frappe-training');
 const {canonical}=require('../../server/frappe-schedule-verifier');
 const {init,stageSignedTraining}=require('../../server/frappe-training-staging');
 const {compareStagedTraining}=require('../../server/frappe-training-parity');
 const now=Date.parse('2026-10-14T13:00:00Z');
-function setup(){
- const stage=new DatabaseSync(':memory:'),local=new DatabaseSync(':memory:');
+function setup(stageFile=':memory:',localFile=':memory:'){
+ const stage=new DatabaseSync(stageFile),local=new DatabaseSync(localFile);
  init(stage);
  local.exec("CREATE TABLE league_seasons(league_id TEXT,season_id TEXT);CREATE TABLE training_catalog(id TEXT PRIMARY KEY,code TEXT);CREATE TABLE training_policy_versions(training_id TEXT,scope_type TEXT,scope_id TEXT,season_id TEXT,role TEXT,renewal_mode TEXT,validity_days INTEGER,required INTEGER,effective_from TEXT,effective_to TEXT,revision INTEGER)");
  local.prepare('INSERT INTO league_seasons VALUES(?,?)').run('demo-league','demo-2026');
@@ -48,4 +49,18 @@ test('M4 parity detects renewal differences, missing mapping and unrecognized lo
   assert.throws(()=>compareStagedTraining(stage,local,'wrong-league','demo-2026','2026-10-14',mapping),/No staged/);
   assert.throws(()=>compareStagedTraining(stage,local,'demo-league','demo-2026','2026-10-20',mapping),/expired/);
  }finally{stage.close();local.close();}
+});
+
+test('M4 parity CLI reads both databases without changing either file',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-frappe-parity-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const stageFile=path.join(dir,'stage.db'),localFile=path.join(dir,'rink.db'),mapFile=path.join(dir,'mapping.json');
+ const x=setup(stageFile,localFile);
+ x.stage.close();x.local.close();
+ fs.writeFileSync(mapFile,JSON.stringify({'central-safesport':'local-safesport'}));
+ const args=['--staging-db',stageFile,'--local-db',localFile,'--course-map',mapFile,
+  '--league','demo-league','--season','demo-2026','--date','2026-10-14'];
+ assert.equal(run(args).status,'match');
+ assert.throws(()=>run([...args.slice(0,2),'--local-db',stageFile,...args.slice(4)]),/must differ/);
+ assert.throws(()=>run(args.slice(0,-2)),/Missing --date/);
 });
