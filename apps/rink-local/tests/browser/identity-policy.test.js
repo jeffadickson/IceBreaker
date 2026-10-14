@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const {can,initialParentGrant}=require('../../server/identity-policy');
 test('new parent can only access own account actions',()=>{
  const id='u1',principal={id,grants:[initialParentGrant(id)]};
- assert.equal(can(principal,'account:read',{scopeType:'PLATFORM',scopeId:'*'}),true);
+ assert.equal(can(principal,'account:read',{scopeType:'USER',scopeId:id}),true);
  assert.equal(can(principal,'game:score',{scopeType:'GAME',scopeId:'g1'}),false);
  assert.equal(can(principal,'registration:read',{scopeType:'LEAGUE',scopeId:'l1'}),false);
 });
@@ -27,4 +27,13 @@ test('platform superuser needs a verified MFA context and cannot be impersonated
  assert.equal(can({id:'root',grants:[grant]},'platform:admin',{}),false);
  assert.equal(can({id:'root',mfaVerified:true,grants:[grant]},'platform:admin',{}),true);
  assert.equal(can({id:'root',mfaVerified:true,grants:[initialParentGrant('root')]},'platform:admin',{}),false);
+});
+
+test('parent cannot read another user account',()=>{
+ const principal={id:'parent1',grants:[initialParentGrant('parent1')]};
+ assert.equal(can(principal,'account:read',{scopeType:'USER',scopeId:'parent2'}),false);
+});
+test('malformed grant expiry fails closed',()=>{
+ const principal={id:'u',grants:[{userId:'u',role:'SCOREKEEPER',scopeType:'GAME',scopeId:'g',expiresAt:'not-a-date'}]};
+ assert.equal(can(principal,'game:score',{scopeType:'GAME',scopeId:'g'}),false);
 });
