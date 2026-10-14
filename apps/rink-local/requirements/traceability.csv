@@ -36,8 +36,8 @@ FRAPPE-003,../frappe/icebreaker_league/icebreaker_league/model_rules.py,tests/br
 FRAPPE-004,../frappe/icebreaker_league/icebreaker_league/icebreaker_league/doctype/icebreaker_game/icebreaker_game.json,tests/browser/frappe-migration-contract.test.js,development-schemas
 FRAPPE-005,,,not-implemented-cross-league-rbac
 FRAPPE-006,../frappe/icebreaker_league/icebreaker_league/snapshot_contract.py,tests/browser/frappe-migration-contract.test.js,partial-fictional-only
-FRAPPE-007,,,planned
-FRAPPE-008,../frappe/icebreaker_league/icebreaker_league/importer.py;tools/export-frappe-admin.js,tests/browser/frappe-migration-contract.test.js,partial-demo-pilot
+FRAPPE-007,../frappe/icebreaker_league/icebreaker_league/schedule_contract.py;../frappe/icebreaker_league/icebreaker_league/schedule_importer.py,tests/browser/frappe-schedule-m2.test.js,partial-M2-fictional-schedule-contract-no-certified-results-Bench-parity-pending
+FRAPPE-008,../frappe/icebreaker_league/icebreaker_league/importer.py;../frappe/icebreaker_league/icebreaker_league/schedule_importer.py;tools/export-frappe-admin.js;tools/export-frappe-schedule.js,tests/browser/frappe-migration-contract.test.js;tests/browser/frappe-schedule-m2.test.js,partial-demo-only-dry-run-idempotency-live-Bench-pending
 FRAPPE-009,,,planned
 FRAPPE-010,,,planned
 FRAPPE-011,../frappe/icebreaker_league/icebreaker_league/observability.py;../frappe/icebreaker_league/icebreaker_league/otel_bootstrap.py,,partial-collector-test-pending
