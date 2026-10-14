@@ -42,6 +42,8 @@ class TestSignedResults(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_envelope(original, {})
         with self.assertRaises(ValueError):
+            verify_envelope(original, {"rink-dev-1": {**self.trust["rink-dev-1"], "leagues": ["other-league"]}})
+        with self.assertRaises(ValueError):
             verify_envelope({**original, "birth_date": "2016-01-01"}, self.trust)
 
     def test_rejects_invalid_timestamps_scores_and_pilot_flag(self):
