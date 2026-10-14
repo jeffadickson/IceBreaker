@@ -35,3 +35,7 @@ See [ADR-001](../../../docs/architecture/adr-001-frappe-league-administration.md
 A strict fictional-only schedule exporter (`apps/rink-local/tools/export-frappe-schedule.js`) and Frappe importer (`icebreaker_league.schedule_importer`) are now present. The importer offers `preview_schedule_snapshot`, POST-only `import_schedule_snapshot`, and `league_schedule`. Only authenticated System Managers may invoke these pilot APIs. It validates source ISO-8601 offset, UTC conversion, DST parity against the league timezone, division/team references and immutable stable IDs. Legacy Final/Live/Scheduled state is carried for display but certified scores and event records are deliberately excluded.
 
 The next gates are a **running Frappe Bench installation**, real permission integration tests, league-scoped administrator roles and dual-read schedule reconciliation. The migration is not yet production-ready; see the [runbook](../../../docs/architecture/frappe-migration-runbook.md).
+
+## Initial league-scoped reader
+
+The restricted `IceBreaker League Access` DocType links a Frappe user to a league. The `IceBreaker League Admin` role has no generic DocType grants; only the read-only `league_schedule` API permits access when an enabled membership matches the requested league. System Managers manage memberships and remain the only users authorized to import schedules. This is an initial fail-closed access boundary, not a completed multi-tenant RBAC implementation; verify it against a running Bench before inviting users.
