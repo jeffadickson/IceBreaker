@@ -51,8 +51,14 @@ function openStagingDatabase(filename){
  const full=path.resolve(filename);
  if(!fs.existsSync(path.dirname(full)))throw Error('Staging directory does not exist');
  const db=new DatabaseSync(full);
- db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;');
- init(db);
- return db;
+ try{
+  // Refuse an accidental --staging-db pointing to the authoritative rink
+  // database. The stage cache must never share the game's SQLite file.
+  const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('games','game_events','event_journal','league_audit')").all();
+  if(tables.length)throw Error('Refusing authoritative game database as schedule staging cache');
+  db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;');
+  init(db);
+  return db;
+ }catch(error){db.close();throw error;}
 }
 module.exports={init,stageSignedSchedule,latestStaged,openStagingDatabase};
