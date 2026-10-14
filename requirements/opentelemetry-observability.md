@@ -42,7 +42,7 @@ Native Windows UI -- W3C traceparent --> Rink-local Node authority
 - `apps/rink-local/server/telemetry.js`: explicitly allowlisted request and game-command spans, counters and request duration metrics.
 - `apps/rink-local/server/otel-bootstrap.js`: optional Node SDK, OTLP HTTP exporters, local endpoint checks, disabled auto-instrumentation.
 - `apps/rink-local/server/rink-server.js`: HTTP request boundaries and committed/rejected game commands instrumented.
-- `Icebreaker.Core/Integration/RinkClockClient.cs`: .NET ActivitySource for snapshots and commands and W3C traceparent propagation. **An .NET OTel SDK/exporter still needs to be configured to record these ActivitySource spans.**
+- `Icebreaker.Core/Integration/RinkClockClient.cs`: .NET ActivitySource for snapshots and commands and W3C traceparent propagation. The native desktop now configures an opt-in OpenTelemetry .NET SDK OTLP HTTP exporter to the local Collector.
 - `apps/rink-local/tests/browser/otel-observability.test.js`: route/event privacy tests, no-op behavior and HTTP regression.
 
 ## Start Node with telemetry
@@ -57,8 +57,10 @@ Default endpoints are `http://127.0.0.1:4318/v1/traces` and `http://127.0.0.1:43
 
 Use a development Collector debug exporter first. To use Logfire, configure the Collector's remote OTLP exporter with Logfire's **current** project-specific endpoint and secret token, TLS and filtering. Do not put the token in source control or browser JavaScript. See https://pydantic.dev/docs/logfire/get-started/first-trace/ and https://opentelemetry.io/docs/collector/.
 
+The native Windows desktop uses the same `ICEBREAKER_OTEL_ENABLED=1` opt-in flag and defaults to `http://127.0.0.1:4318` for its OTLP/HTTP exporter; `ICEBREAKER_OTEL_DOTNET_ENDPOINT` may override this only to a local Collector. The .NET client emits allowlisted ActivitySource spans for snapshot and command operations, with W3C traceparent propagation. These spans are not yet end-to-end tested against a running Collector.
+
 ## Remaining work
 
-The first implementation instruments the Node rink backend and emits .NET ActivitySource hooks. We still need to configure .NET OTel SDK/export, production Collector deployment, bounded buffering and sampling, sync/backup trace propagation, explicit child spans for SQLite transactions, full integration tests with an actual OTLP receiver, and security review of Collector configuration.
+The first implementation instruments the Node rink backend and emits .NET ActivitySource hooks. We still need production Collector deployment, bounded buffering and sampling, sync/backup trace propagation, explicit child spans for SQLite transactions, full integration tests with an actual OTLP receiver, and security review of Collector configuration.
 
 The existing STRIDE risk register remains applicable; adding telemetry does not resolve shared operator identity, KMS, consent, or other production security gates.
