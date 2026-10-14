@@ -45,6 +45,7 @@ public sealed class TimekeeperWindow : Window
     private readonly TextBox _correctAssist1 = new() { Watermark = "Assist 1 or NONE", Text = "NONE", Width = 160 };
     private readonly TextBox _correctAssist2 = new() { Watermark = "Assist 2 or NONE", Text = "NONE", Width = 160 };
     private readonly TextBox _correctReason = new() { Watermark = "Why is this correction necessary?", Width = 360 };
+    private readonly Dictionary<TextBox, ComboBox> _rosterSelectors = new();
     private Window? _activeDialog;
     private readonly TextBox _penaltyTeam = new() { Watermark = "home / away", Width = 130 };
     private readonly TextBox _penaltyPlayer = new() { Watermark = "Jersey #", Width = 95 };
@@ -121,7 +122,7 @@ public sealed class TimekeeperWindow : Window
             Text = "Use jersey numbers from the approved game lineup. NONE means no assist. The server validates the event before committing it.",
             TextWrapping = TextWrapping.Wrap
         });
-        goalBody.Children.Add(Buttons(_goalTeam, _goalScorer, _goalAssist1, _goalAssist2));
+        goalBody.Children.Add(Buttons(_goalTeam, PlayerPicker(_goalScorer, "Scorer"), PlayerPicker(_goalAssist1, "Assist 1", true), PlayerPicker(_goalAssist2, "Assist 2", true)));
         goalBody.Children.Add(_goalConfirm);
         goalBody.Children.Add(ActionButton("RECORD GOAL", async () =>
         {
@@ -143,7 +144,7 @@ public sealed class TimekeeperWindow : Window
         }, closeOnSuccess: true));
         var penaltyBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
         penaltyBody.Children.Add(Label("PENALTY ENTRY", 18));
-        penaltyBody.Children.Add(Buttons(_penaltyTeam, _penaltyPlayer, _penaltyInfraction, _penaltyClass, _penaltyCoincidental, _penaltySeconds,
+        penaltyBody.Children.Add(Buttons(_penaltyTeam, PlayerPicker(_penaltyPlayer, "Penalty player"), _penaltyInfraction, _penaltyClass, _penaltyCoincidental, _penaltySeconds,
             ActionButton("ASSESS PENALTY", async () =>
             {
                 if (!int.TryParse(_penaltySeconds.Text, out var seconds) || seconds < 1 || seconds > 3600)
@@ -172,7 +173,7 @@ public sealed class TimekeeperWindow : Window
             Text = "Record a goalie substitution or enter EMPTY for a pulled goalie. This does not modify the approved roster.",
             TextWrapping = TextWrapping.Wrap
         });
-        goalieBody.Children.Add(Buttons(_goalieTeam, _goalieNumber, _goalieReason,
+        goalieBody.Children.Add(Buttons(_goalieTeam, PlayerPicker(_goalieNumber, "Goalie", false, true), _goalieReason,
             ActionButton("RECORD GOALIE CHANGE", async () =>
             {
                 var jersey = (_goalieNumber.Text ?? "").Trim().ToUpperInvariant();
@@ -203,7 +204,7 @@ public sealed class TimekeeperWindow : Window
             _correctAssist2.Text = selected.Assist2;
         };
         correctionBody.Children.Add(_correctionGoal);
-        correctionBody.Children.Add(Buttons(_correctScorer, _correctAssist1, _correctAssist2));
+        correctionBody.Children.Add(Buttons(PlayerPicker(_correctScorer, "Correct scorer"), PlayerPicker(_correctAssist1, "Correct assist 1", true), PlayerPicker(_correctAssist2, "Correct assist 2", true)));
         correctionBody.Children.Add(_correctReason);
         correctionBody.Children.Add(ActionButton("SUBMIT AUDITED CORRECTION", async () =>
         {
@@ -380,6 +381,55 @@ public sealed class TimekeeperWindow : Window
         _correctionGoal.SelectedIndex = choices.Length > 0 ? 0 : -1;
     }
 
+    private Control PlayerPicker(TextBox target, string title, bool allowNone = false, bool allowEmpty = false)
+    {
+        var choices = new ComboBox { Width = 190, MinHeight = 42 };
+        choices.SelectionChanged += (_, _) =>
+        {
+            if (choices.SelectedItem is RosterChoice selected)
+                target.Text = selected.Jersey;
+        };
+        _rosterSelectors[target] = choices;
+        return new StackPanel
+        {
+            Spacing = 3,
+            Children =
+            {
+                new TextBlock { Text = title, FontSize = 13 },
+                choices,
+                target,
+                new TextBlock { Text = "Choose a confirmed player or type a jersey", FontSize = 11 }
+            }
+        };
+    }
+
+    private sealed record RosterChoice(string Jersey, string Display)
+    {
+        public override string ToString() => Display;
+    }
+
+    private void ApplyRosterChoices(string side, System.Text.Json.JsonElement players)
+    {
+        var choices = players.EnumerateArray()
+            .Select(p => new RosterChoice(p.GetProperty("jersey").ToString(),
+                "#" + p.GetProperty("jersey").ToString() + " · " +
+                (p.TryGetProperty("name", out var name) ? name.GetString() : "Player")))
+            .ToArray();
+        var targets = side == "home"
+            ? new[] { _goalScorer, _goalAssist1, _goalAssist2, _goalieNumber, _penaltyPlayer, _correctScorer, _correctAssist1, _correctAssist2 }
+            : new[] { _goalScorer, _goalAssist1, _goalAssist2, _goalieNumber, _penaltyPlayer, _correctScorer, _correctAssist1, _correctAssist2 };
+        foreach (var target in targets)
+        {
+            if (!_rosterSelectors.TryGetValue(target, out var selector)) continue;
+            var special = target == _goalieNumber ? new[] { new RosterChoice("EMPTY", "EMPTY · pulled goalie") }
+                : target == _goalAssist1 || target == _goalAssist2 || target == _correctAssist1 || target == _correctAssist2
+                    ? new[] { new RosterChoice("NONE", "NONE · unassisted") }
+                    : Array.Empty<RosterChoice>();
+            selector.ItemsSource = special.Concat(choices).ToArray();
+            selector.SelectedIndex = -1;
+        }
+    }
+
     // Populate selector suggestions from the confirmed, eligible game-day roster.
     // Text remains editable for rapid keyboard entry; authority validates every command.
     private async Task LoadRosterSuggestionsAsync(string side)
@@ -396,7 +446,7 @@ public sealed class TimekeeperWindow : Window
             var team = root.GetProperty("teams").GetProperty(side);
             if (!team.GetProperty("confirmed").GetBoolean() || !team.GetProperty("eligible").GetBoolean())
                 throw new InvalidOperationException("Selected team's lineup is not eligible");
-            var jerseys = team.GetProperty("players").EnumerateArray()
+            ApplyRosterChoices(side, team.GetProperty("players"));\n            var jerseys = team.GetProperty("players").EnumerateArray()
                 .Select(p => p.GetProperty("jersey").ToString()).Distinct().ToArray();
             _status.Text = side.ToUpperInvariant() + " approved jerseys: " + string.Join(", ", jerseys);
         }
