@@ -512,6 +512,9 @@ public sealed class TimekeeperWindow : Window
         }
         finally
         {
+            // Release the command lock before reconciling the authoritative
+            // snapshot. RefreshAsync intentionally skips while _busy is true;
+            // keeping the lock here stranded every mutation button disabled.
             _busy = false;
             await RefreshAsync();
         }
@@ -519,7 +522,7 @@ public sealed class TimekeeperWindow : Window
 
     private async void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Space || e.Source is TextBox || e.Source is Button || e.Source is CheckBox) return;
+        if (_activeDialog is not null || e.Key != Key.Space || e.Source is TextBox || e.Source is Button || e.Source is CheckBox) return;
         e.Handled = true;
         await ExecuteAsync(() => _client.ToggleAsync());
     }
