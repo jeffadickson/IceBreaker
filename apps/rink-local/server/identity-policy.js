@@ -31,6 +31,8 @@ function can(principal, action, resource, at = Date.now()) {
     if (g.revokedAt || (g.expiresAt && (!Number.isFinite(Date.parse(g.expiresAt)) || Date.parse(g.expiresAt) <= at))) return false;
     if (g.userId !== principal.id || !PERMISSIONS[g.role].includes(action)) return false;
     if (g.role === 'PLATFORM_SUPERUSER')
+      // Only trusted server code may set the bootstrap/MFA context. This
+      // helper is not a token verifier or a replacement for endpoint guards.
       return g.scopeType === 'PLATFORM' && g.scopeId === '*' &&
         principal.mfaVerified === true && principal.superuserBootstrapped === true;
     if (g.scopeType === 'PLATFORM') return g.role === 'PARENT' && g.scopeId === '*' && action.startsWith('account:') && resource.scopeType === 'USER' && resource.scopeId === principal.id;
