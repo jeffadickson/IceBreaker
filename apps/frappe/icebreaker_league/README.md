@@ -81,3 +81,9 @@ preview bundle to change game-day eligibility. See
 ## M4.2 offline training-policy staging (development)
 
 The Node rink-side `frappe-training-staging.js` and `stage-frappe-training.js` now accept **only fictional, Ed25519-signed policy bundles** into an independent SQLite staging cache. This is not the official rink database. They persist a per-league high-water revision and reject older or conflicting releases, but do not modify game rules, player evidence, rosters, or eligibility. The Frappe training preview endpoint remains **unsigned** and cannot be staged as an authoritative release. See [M4 design](../../../docs/architecture/frappe-m4-training-policies.md) for the offline command and outstanding controlled publisher/live Bench requirements.
+
+## M4.4 offline signed training publisher (fictional development only)
+
+The separate `icebreaker_league.training_publisher` module and `icebreaker_league.publish_training_cli` command turn a recently generated **unsigned Frappe preview** into a signed, versioned Ed25519 training-policy release. They do **not** run in the Frappe web process and do not receive any participant records. A standalone SQLite release ledger allocates a monotonically increasing revision per league and stores each signed envelope for repeatable delivery. The CLI requires an operator-supplied review name and ticket, a permission-restricted private seed file, and a distinct ledger database; it refuses production mode.
+
+This enables the existing Node `stage-frappe-training.js` and `compare-frappe-training.js` tools to consume an offline fictional release, but **does not activate** the policy. See [M4.4 documentation](../../../docs/architecture/frappe-m4-training-policies.md). A live Frappe v16 Bench installation, authenticated approval workflow, KMS/HSM, protected delivery and release-state rollback resistance are still required.
