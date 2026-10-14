@@ -17,7 +17,7 @@ The current app is `apps/frappe/icebreaker_league` and targets **Frappe v16**. S
 | Admin metadata migration | `snapshot_contract.py`, `importer.py`, Node exporter | MariaDB-backed idempotency/rollback, tenant conflict tests |
 | Schedule migration | `schedule_contract.py`, `schedule_importer.py`, Node exporter | Live DST/timezone parity, schedule change workflow |
 | Scoped schedule reader | `access.py`, `access_rules.py`, `IceBreaker League Access` | Real Frappe role/permission query tests with two tenants |
-| Certified scores/results | Excluded from game DocType and import contract | Signed, idempotent result projection (M3) |
+| Certified scores/results | M3 Ed25519 result envelope, separate immutable projection DocType and receiver source/tests | Live Bench, source signer, delivery/replay and concurrency tests (M3) |
 | Roster/training/suspensions | Existing Node domain models only | Frappe policy models and signed offline snapshots (M3) |
 | Parent/private registration | Separate development registry/vault | Dedicated secure service, KMS, consent, migration (M4) |
 | OpenTelemetry | `observability.py`, `otel_bootstrap.py` | Real collector, request correlation, retention and privacy review |
@@ -86,9 +86,9 @@ The Frappe document `name` currently equals the stable IceBreaker ID via `autona
 
 **Security rule:** Frappe `@frappe.whitelist` exposes a method but does **not** imply per-record authorization. Every custom API must check scope and use permission-aware access; `frappe.get_all` bypasses normal permissions, so it is allowed only after explicit tenant scoping. The current schedule API uses explicit membership and league/division filters. Do not grant broad generic DocType rights to league administrators before list and document permission hooks are tested.
 
-### Planned M3 integration contracts
+### M3 integration contracts (signed result projection partially implemented)
 - `rules_snapshot`: game UUID, policy version, roster/eligibility version, expiry, issuer/key ID, signature, generated UTC; no addresses, DOB, certificates or contact details.
-- `certified_result`: game UUID, monotonic revision, journal digest, certification digest, signer identifiers (internal IDs), issued UTC, idempotency key, signature.
+- `certified_result`: implemented **fictional-only** Ed25519 v3 envelope with game/league UUID, sequential revision, scores, journal and certification digests, issued UTC, issuer/key ID, idempotency key and signature. Signer identities remain in the source certification service; they are **not** sent to Frappe. See [M3 signed-result design](frappe-m3-signed-results.md).
 - Validate signature, authorization, schema version, freshness and idempotency before applying. Repeated same envelope is a no-op; same game/revision with different digest is a conflict requiring review. No central write may modify the rink clock or event journal.
 - Signed snapshots must remain usable when Frappe or the network is unavailable. Define revocation/expiry policy for already-started games.
 
@@ -116,7 +116,7 @@ The Frappe document `name` currently equals the stable IceBreaker ID via `autona
 |---|---|---|
 | M0/M1 | App skeleton, admin DocTypes, fictional import | Live Bench install, schema/CRUD validation, repeat-import/conflict rollback |
 | M2 | Schedule DocType, timezone contract, scoped read-only API | Two-tenant permission tests, DST/venue tests, old/new schedule parity |
-| M3 | Rules/roster/training snapshots and certified-result projection | Signed envelopes, offline replay, duplicate/conflict/revision tests, no clock dependency |
+| M3 | Rules/roster/training snapshots and certified-result projection | Result receiver source/tests now exist; signed roster export, offline replay, Bench integration and service authentication remain |
 | M4 | Secure registration and guardian workflows | KMS, consent/identity proofing, encrypted document handling, audit/retention |
 | M5 | Mobile manager/referee/public projections, OTel operations | Device and permission tests, privacy-safe trace correlation, accessibility |
 | M6 | Controlled cutover | Reconciliation, backups and restore drill, rollback rehearsed, two-laptop full-game acceptance |
@@ -127,7 +127,7 @@ The Frappe document `name` currently equals the stable IceBreaker ID via `autona
 
 1. Install the app on a disposable Frappe v16 Bench and execute real migration, CRUD and two-tenant authorization tests.
 2. Add venue timezone to schedule contracts and verify away-tournament DST behavior.
-3. Define signed M3 roster/rules and certified-result JSON schemas before adding mutable Frappe workflows.
+3. Continue signed M3 roster/rules/eligibility snapshot contracts; the fictional signed-result envelope and read-only receiver are implemented but require a live Bench and source-side signer.
 4. Implement explicit permission hooks and league-scoped administrative forms; keep System Manager-only fallback until tested.
 5. Add end-to-end OTel collector smoke tests, plus database backup/restore and migration rollback.
 
