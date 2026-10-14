@@ -54,3 +54,14 @@ The earlier FRAPPE-005 entry above predates the scoped-reader implementation and
 | FRAPPE-011 | Allowlisted `league.rink_bundle_preview` span | **Partial**: local Collector smoke and privacy acceptance pending |
 
 The authoritative requirement tracker is `apps/rink-local/requirements/traceability.csv`. Passing source-level tests does not establish production readiness.
+
+## Frappe M3 revisioned schedule staging — development evidence
+
+The prior M3 table reflects the original v1 signed schedule-only preview. The following **supersedes its anti-rollback statement only**, without closing FRAPPE-009:
+
+| Requirement | New implementation and verification | Remaining acceptance |
+|---|---|---|
+| FRAPPE-009 | `rink_schedule_bundle.py` v2 signed `release_revision`; `frappe-schedule-verifier.js` v1/v2; isolated `frappe-schedule-staging.js` persistent high-water mark; `stage-frappe-schedule.js` offline CLI; `test_rink_schedule_bundle.py`, `frappe-schedule-antirollback.test.js` | **Partial, source-level only**: no signed roster/rules, KMS release service, tamper-resistant rollback state, approved activation, live Frappe Bench, two-laptop field acceptance |
+| FRAPPE-002/012 | Staging cache rejects official rink database files and does not mutate clock/game state | Dual-laptop offline outage and failover tests outstanding |
+
+No production requirement is marked complete based on these tests. The StrictDoc/CSV tracker remains the authoritative register.
