@@ -1,0 +1,44 @@
+name: Generate dependency locks (bootstrap)
+on:
+  push:
+    paths:
+      - .github/workflows/generate-locks.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  locks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.9.26'
+      - name: Generate npm lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit
+      - name: Generate Python lockfiles
+        run: |
+          uv lock --project apps/frappe/icebreaker_league
+          uv lock --project tools/scoreboard-camera
+      - name: Generate NuGet lockfiles
+        run: |
+          dotnet restore apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj --use-lock-file
+          dotnet restore apps/rink-local/src/Icebreaker.SpectatorGateway/Icebreaker.SpectatorGateway.csproj --use-lock-file
+      - uses: actions/upload-artifact@v4
+        with:
+          name: icebreaker-dependency-locks
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            package-lock.json
+            apps/frappe/icebreaker_league/uv.lock
+            tools/scoreboard-camera/uv.lock
+            apps/rink-local/**/packages.lock.json
