@@ -37,3 +37,18 @@ test('command completion releases busy guard before authoritative refresh',()=>{
 test('space shortcut cannot change clock while an entry dialog is open',()=>{
  assert.match(code,/if \(_activeDialog is not null \|\| e\.Key != Key\.Space/);
 });
+
+test('native roster lookup uses authenticated authority and preserves server validation',()=>{
+ const client=fs.readFileSync(path.resolve(__dirname,'../../src/Icebreaker.Core/Integration/RinkClockClient.cs'),'utf8');
+ assert.match(client,/GameRostersAsync\(/);
+ assert.match(client,/\/api\/operator\/game-rosters/);
+ assert.match(client,/X-Operator-Key/);
+ assert.match(code,/LoadRosterSuggestionsAsync\("home"\)/);
+ assert.match(code,/LoadRosterSuggestionsAsync\("away"\)/);
+ assert.match(code,/GetProperty\("eligible"\)/);
+});
+test('native penalty dialog exposes authority-supported classifications and coincidental flag',()=>{
+ assert.match(code,/"DOUBLE_MINOR", "MAJOR", "MISCONDUCT", "GAME_MISCONDUCT", "MATCH", "OTHER"/);
+ assert.match(code,/coincidental = _penaltyCoincidental.IsChecked == true/);
+ assert.match(code,/classification = _penaltyClass.SelectedItem/);
+});
