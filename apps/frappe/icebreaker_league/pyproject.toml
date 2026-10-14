@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "icebreaker_league"
 version = "0.1.0"
 description = "IceBreaker central hockey league administration for Frappe Framework"
-requires-python = ">=3.14"
+requires-python = ">=3.14,<3.15"
 dependencies = ["cryptography>=44,<49"]
 
 [tool.bench.frappe-dependencies]
