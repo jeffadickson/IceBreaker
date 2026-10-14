@@ -135,3 +135,15 @@ The development publisher now exists. Follow the step-by-step procedure in [M4 t
 After publication, use `stage-frappe-training.js` to verify the signed envelope and `compare-frappe-training.js` to inspect central/local policy parity. Both remain read-only relative to official game and training authority. Test duplicate publication, revised policy release, expired release renewal, staging antirollback, and restart of the release ledger.
 
 **Do not cut over.** A real Frappe Bench installation and two-tenant permission audit, authenticated approval, KMS-backed signing, tamper-resistant release state, secure delivery, mapping review and explicit activation/rollback remain required. Do not process actual player or family records.
+
+## Live Bench read-only preflight (beta milestone)
+
+A new **read-only** metadata preflight can run inside a disposable Frappe v16 Bench after `bench migrate`:
+
+```bash
+bench --site icebreaker-dev.local execute icebreaker_league.bench_preflight.run
+```
+
+It checks that the app is installed, ten expected DocTypes and critical fields are present, the narrow League Admin role exists, and none of the IceBreaker DocTypes has generic non-System-Manager read/write/create/delete/report/export grants. It does not read player or family records, create test leagues, or modify any database row. Output is `PREFLIGHT_PASSED` or `PREFLIGHT_FAILED` with per-check reasons. Record the output, Bench version, migration log and tested commit as non-sensitive evidence for FRAPPE-01.
+
+**Important:** This preflight is necessary but insufficient. It cannot prove tenant-specific Desk/REST/link/report/export isolation, concurrent import correctness, schedule timezone parity or signed round trips. Those remain separate FRAPPE-02 through FRAPPE-06 acceptance gates in [beta acceptance runbook](beta-acceptance-runbook.md). It has only been unit-tested with a fake Frappe runtime until a real Bench is available.
