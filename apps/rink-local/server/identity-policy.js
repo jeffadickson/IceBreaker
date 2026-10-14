@@ -19,11 +19,11 @@ function can(principal, action, resource, at = Date.now()) {
   const grants = Array.isArray(principal.grants) ? principal.grants : [];
   return grants.some(g => {
     if (!g || !ROLES.has(g.role) || !SCOPES.has(g.scopeType)) return false;
-    if (g.revokedAt || (g.expiresAt && Date.parse(g.expiresAt) <= at)) return false;
+    if (g.revokedAt || (g.expiresAt && (!Number.isFinite(Date.parse(g.expiresAt)) || Date.parse(g.expiresAt) <= at))) return false;
     if (g.userId !== principal.id || !PERMISSIONS[g.role].includes(action)) return false;
     if (g.role === 'PLATFORM_SUPERUSER')
       return g.scopeType === 'PLATFORM' && g.scopeId === '*' && principal.mfaVerified === true;
-    if (g.scopeType === 'PLATFORM') return g.role === 'PARENT' && g.scopeId === '*' && action.startsWith('account:');
+    if (g.scopeType === 'PLATFORM') return g.role === 'PARENT' && g.scopeId === '*' && action.startsWith('account:') && resource.scopeType === 'USER' && resource.scopeId === principal.id;
     if (!resource.scopeType || !resource.scopeId) return false;
     return g.scopeType === resource.scopeType && g.scopeId === resource.scopeId;
   });
