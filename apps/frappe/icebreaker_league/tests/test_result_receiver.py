@@ -76,8 +76,7 @@ class TestResultReceiver(unittest.TestCase):
         self.frappe.get_doc = get_doc
         self.modules = patch.dict(sys.modules, {"frappe": self.frappe})
         self.modules.start()
-        from icebreaker_league import result_receiver
-        self.receiver = importlib.reload(result_receiver)
+        self.receiver = importlib.import_module('icebreaker_league.result_receiver')
         self.addCleanup(self.modules.stop)
         self.base = dict(schema_version=3, fictional=True, league_id="demo-league",
                          game_id="game-001", revision=1, home_score=3, away_score=2,
