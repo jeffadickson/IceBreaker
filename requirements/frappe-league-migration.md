@@ -31,3 +31,7 @@ The Frappe `IceBreaker Game` DocType now carries the original offset-aware start
 The fictional-data-only `export-frappe-schedule.js` emits a version-2 schedule snapshot. `schedule_importer.py` provides authenticated System Manager dry-run, idempotent import and read-only league schedule methods, rejecting cross-league divisions, mismatched teams and conflicting stable IDs. Frappe must be installed in a disposable Bench and permission-tested before any non-demo migration or change of system authority.
 
 Remaining M2 gates: running Frappe Bench installation, schedule reconciliation with original Node league service, tenant-scoped administrator roles, venue timezone support for out-of-area games, conflict/rollback testing against a real MariaDB/PostgreSQL backend, and deployment monitoring.
+
+## Initial tenant-scoped API access
+
+The development app now includes a System-Manager-controlled `IceBreaker League Access` membership DocType, a narrowly provisioned `IceBreaker League Admin` role, and a read-only `league_schedule` API that requires both the role and an enabled membership for the exact league. Generic DocType access remains restricted to System Managers; no cross-league list/read/write rights have been granted. The pure access-rule unit tests cover guest, wrong-league, role-only and membership-only denial. **Live Frappe permission integration tests are still mandatory before FRAPPE-005 can be considered complete.**
