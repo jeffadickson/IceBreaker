@@ -92,3 +92,9 @@ PYTHONPATH=apps/frappe/icebreaker_league python -m unittest discover -s apps/fra
 ```
 
 **Not yet validated:** installing and migrating these DocTypes in a live v16 Bench, tenant-scoped league admin permissions, venue-local timezones outside the league timezone, and end-to-end synchronization with a rink laptop. Do not cut over.
+
+## Pilot league-scoped read-only access (M2)
+
+The app now includes a restricted `IceBreaker League Access` DocType. Only System Managers can create or revoke these grants. The install hook creates the `IceBreaker League Admin` role with **no generic DocType permissions**. A System Manager must assign that role to a real authenticated Frappe user and create an enabled access record linking that exact user to the exact league. The `league_schedule` API checks **both** the role and an enabled membership before querying the requested league's seasons, divisions and games. No other league's schedule is returned. The admin import endpoints remain **System Manager only**.
+
+If upgrading an already-installed development app, run `bench --site icebreaker-dev.local migrate` and `bench --site icebreaker-dev.local execute icebreaker_league.setup.ensure_roles` before assigning memberships. Test two fictional leagues and verify that the league-scoped user can only read their own schedule. Do **not** grant general DocType access to this role; doing so could bypass the carefully scoped API. This permission path has pure policy unit tests but **has not yet been validated against a running Frappe Bench**. No non-demo data migration is authorized.
