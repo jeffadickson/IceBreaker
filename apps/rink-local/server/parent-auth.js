@@ -17,6 +17,14 @@ function normalizeEmail(v){const e=String(v||'').trim().toLowerCase();if(e.lengt
 function makePassword(p){if(typeof p!=='string'||p.length<12||p.length>256)throw Error('Password must contain 12 to 256 characters');const salt=crypto.randomBytes(16);return salt.toString('hex')+':'+crypto.scryptSync(p,salt,64).toString('hex');}
 function checkPassword(p,stored){try{const [salt,expected]=stored.split(':');return eq(crypto.scryptSync(p,Buffer.from(salt,'hex'),64).toString('hex'),expected);}catch{return false;}}
 async function getBody(req){let s='';for await(const c of req){s+=c;if(s.length>16384)throw Error('Request too large');}try{return JSON.parse(s);}catch{throw Error('Invalid JSON');}}
+/**
+ * Build the development parent authentication service and its SQLite state.
+ * Owns sessions, verification tokens and Google OIDC flow; caller must route
+ * requests only to this service's explicit /api/parent endpoints.
+ * @param {object} options Database path, public origin, OIDC credentials and mail hook.
+ * @returns {{handle:Function,close:Function,_db:object}} Route handler and lifecycle.
+ * @remarks This is not yet a production-approved identity provider.
+ */
 function createParentAuth({dbPath,baseUrl=process.env.ICEBREAKER_PUBLIC_URL||'http://127.0.0.1:8090',googleClientId=process.env.GOOGLE_CLIENT_ID||'',googleClientSecret=process.env.GOOGLE_CLIENT_SECRET||'',onEmail}={}){
  const db=new DatabaseSync(dbPath);db.exec(`PRAGMA journal_mode=WAL;
  CREATE TABLE IF NOT EXISTS parent_users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password_hash TEXT,email_verified INTEGER NOT NULL DEFAULT 0,display_name TEXT NOT NULL DEFAULT '',created_ms INTEGER NOT NULL);
@@ -33,6 +41,11 @@ function createParentAuth({dbPath,baseUrl=process.env.ICEBREAKER_PUBLIC_URL||'ht
  const secure=base.protocol==='https:';
  const userById=db.prepare('SELECT id,email,email_verified,display_name FROM parent_users WHERE id=?');
  function session(req){const t=parseCookies(req).icebreaker_parent;if(!t||t.length>128)return null;const r=db.prepare('SELECT user_id FROM parent_sessions WHERE token_hash=? AND expires_ms>?').get(hash(t),now());return r?userById.get(r.user_id):null;}
+ /**
+  * Idempotently provision the minimum PARENT grant for an existing account.
+  * This is not guardian verification and confers no child-record access.
+  * @param {string} userId Stable internal user identifier.
+  */
  function ensureParentGrant(userId){
   db.prepare("INSERT OR IGNORE INTO identity_role_grants(user_id,role,scope_type,scope_id,created_ms) VALUES(?,'PARENT','PLATFORM','*',?)").run(userId,now());
  }
@@ -42,7 +55,19 @@ function createParentAuth({dbPath,baseUrl=process.env.ICEBREAKER_PUBLIC_URL||'ht
  function sendVerification(userId,email){const token=rand();db.prepare('INSERT INTO parent_tokens VALUES(?,?,?,?,NULL)').run(hash(token),userId,'verify',now()+24*3600000);dispatchEmail(email,'Verify your IceBreaker account',`Verify your email by opening: ${new URL('/parent.html?verify='+encodeURIComponent(token),base)}`);}
  function safeUser(u){return {id:u.id,email:u.email,emailVerified:!!u.email_verified,displayName:u.display_name};}
  function redirect(res,pathOrUrl,cookie){res.writeHead(302,{'Location':pathOrUrl,'Cache-Control':'no-store',...(cookie?{'Set-Cookie':cookie}:{})});res.end();}
+ /**
+  * Verify the Google ID token's signature and OIDC identity claims.
+  * @param {string} jwt Compact signed ID token returned from code exchange.
+  * @param {string} nonce Original single-use browser login nonce.
+  * @returns {Promise<object>} Verified claims; never trust unsigned payloads.
+  */
  async function googleVerify(jwt,nonce){const parts=jwt.split('.');if(parts.length!==3)throw Error('Malformed Google ID token');const header=JSON.parse(Buffer.from(parts[0],'base64url').toString());const payload=JSON.parse(Buffer.from(parts[1],'base64url').toString());if(header.alg!=='RS256'||typeof header.kid!=='string')throw Error('Unsupported ID token algorithm');const keys=await (await fetch('https://www.googleapis.com/oauth2/v3/certs',{signal:AbortSignal.timeout(8000)})).json();const jwk=keys.keys.find(k=>k.kid===header.kid&&k.kty==='RSA');if(!jwk||!crypto.verify('RSA-SHA256',Buffer.from(parts[0]+'.'+parts[1]),crypto.createPublicKey({key:jwk,format:'jwk'}),Buffer.from(parts[2],'base64url')))throw Error('Invalid Google ID token signature');if(!['https://accounts.google.com','accounts.google.com'].includes(payload.iss)||payload.aud!==googleClientId||payload.nonce!==nonce||!Number.isFinite(payload.exp)||payload.exp*1000<=now()||!payload.sub)throw Error('Invalid Google ID token claims');return payload;}
+ /**
+  * Dispatch parent authentication and account routes.
+  * Authentication is required for every non-public route; errors do not
+  * disclose passwords or OAuth tokens. Production CSRF hardening is pending.
+  * @returns {Promise<boolean|undefined>} False for unrelated routes.
+  */
  async function handle(req,res,pathname,url){
   try{
    if(!['GET','HEAD','OPTIONS'].includes(req.method)){const origin=req.headers.origin;if(origin&&origin!==base.origin)return json(res,403,{error:'Cross-origin request rejected'});}
