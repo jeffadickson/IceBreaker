@@ -123,3 +123,40 @@ node apps/rink-local/server/compare-frappe-training.js \
 ```
 
 The CLI opens both databases read-only. It returns `match` (exit 0), `mismatch` (exit 2), or an invalid/unsafe request error (exit 1). This is an operator-visible **comparison report**, not automatic migration or proof of live Bench equivalence. Course mappings are never guessed from similar titles.
+
+
+## M4.4 offline training-policy publisher (2026-10-14)
+
+The **fictional-only** release publisher is implemented in `icebreaker_league/training_publisher.py` with an offline command-line wrapper `icebreaker_league/publish_training_cli.py`. This closes the *development* gap between an unsigned Frappe training preview and a signed bundle that the existing Node verifier and staging cache can consume.
+
+The publisher operates **outside Frappe web workers**, with an Ed25519 seed in a separately permission-restricted local file. It accepts only the exact `preview_unsigned_training_bundle` response for `demo-league`; it validates the preview SHA-256, schema, fictional flag, release placeholder, policy count, freshness (within one hour), and expiration. The caller must provide a named reviewer and change ticket. These are development attestations, **not authenticated approval or KMS authorization**.
+
+A separate SQLite release ledger allocates per-league revisions under `BEGIN IMMEDIATE`, records the signed envelope and change ticket, and returns the identical envelope for an unchanged unexpired release. A changed policy or an expired release receives the next revision. The CLI writes the signed output using an atomic file replacement; a crash after database commit can be recovered by retrying the same preview before expiration. The ledger never stores people, evidence, birth dates, scores, or the signing seed.
+
+### Fictional release demonstration
+
+1. Obtain a recent unsigned JSON response from Frappe's **read-only** `preview_unsigned_training_bundle` API in a disposable Bench. Save it to `/tmp/training-preview.json`. The preview is untrusted input until reviewed.
+2. Generate a random Ed25519 private seed **outside the repo** and store 64 hexadecimal characters in a file readable only by the publishing service account (`chmod 600` on Unix). Pin the matching public key in the existing Node training trust configuration. Never pass the seed in command arguments or commit it.
+3. With `PYTHONPATH=apps/frappe/icebreaker_league`, run:
+
+```bash
+python -m icebreaker_league.publish_training_cli \
+  --preview /tmp/training-preview.json \
+  --state-db /tmp/icebreaker-release-ledger.sqlite \
+  --key-file /secure/dev-ed25519-seed.hex \
+  --output /tmp/fictional-signed-training.json \
+  --approved-by fictional-reviewer --approval-ticket DEV-123
+```
+
+4. Stage the output using `node apps/rink-local/server/stage-frappe-training.js` and compare against local policy using `compare-frappe-training.js`. Neither command activates a policy or touches the game clock.
+5. Re-run publication with the same preview; expect `duplicate` and the same signed envelope. Change the approved policy in Frappe, generate a new preview and publish again; expect a higher release revision. Verify that staging rejects older releases.
+
+### Security boundaries and outstanding work
+
+- The CLI refuses `ICEBREAKER_PRODUCTION_MODE=1`, insecure key-file permissions, symlink input, and using a rink/private database as its ledger.
+- The release ledger is local and **not tamper-resistant**; a stolen/rolled-back ledger could reuse a revision. Production needs durable protected release state and an independent high-water/antirollback authority.
+- Reviewer name and ticket are **unverified assertions**. Production requires authenticated dual-control approval, issuer-specific KMS/HSM signing, key rotation/revocation, protected artifact delivery and external audit retention.
+- No running Frappe v16 Bench or real MariaDB permissions/concurrency acceptance is claimed. No real minors' data or live eligibility activation is authorized.
+- The release publisher is for **training policies only**; roster/rules and certified-result production signers remain separate milestones.
+
+Tests: `PYTHONPATH=apps/frappe/icebreaker_league python -m unittest apps.fr... ` is not a supported dotted test path in every environment; use `python -m unittest discover -s apps/frappe/icebreaker_league/tests` with the above PYTHONPATH instead.
