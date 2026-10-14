@@ -44,3 +44,13 @@ The earlier FRAPPE-005 entry above predates the scoped-reader implementation and
 | FRAPPE-015 | `docs/architecture/frappe-migration-runbook.md` | Runbook drafted; no verified Frappe backup/restore or rollback rehearsal |
 
 **Canonical design:** `docs/architecture/frappe-central-league-design.md`. Continue to use the existing StrictDoc/CSV requirement tracker as the source of record; documentation status does not automatically close verification gates.
+
+## Frappe M3 outbound schedule pilot — development evidence
+
+| Requirement | Code and tests | State |
+|---|---|---|
+| FRAPPE-009 | `rink_schedule_bundle.py`; `rink_schedule_export.py`; `frappe-schedule-verifier.js`; Python `test_rink_schedule_bundle.py`, `test_rink_schedule_export.py`; Node `frappe-signed-schedule.test.js` | **Partial**: fictional signed schedule-only contract and read-only verification. No rules/rosters, release signing service, anti-rollback revision, Bench integration or rink-side apply |
+| FRAPPE-005 | Scoped unsigned preview reuses `require_league_reader`; fake Frappe negative tests | **Partial**: live two-tenant Frappe permissions and direct REST/link/export tests still required |
+| FRAPPE-011 | Allowlisted `league.rink_bundle_preview` span | **Partial**: local Collector smoke and privacy acceptance pending |
+
+The authoritative requirement tracker is `apps/rink-local/requirements/traceability.csv`. Passing source-level tests does not establish production readiness.
