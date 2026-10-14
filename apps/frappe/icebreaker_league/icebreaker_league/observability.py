@@ -9,6 +9,7 @@ ALLOWED_OPERATIONS = frozenset({
     "league.import_commit",
     "league.result_receive",
     "league.rink_bundle_preview",
+    "league.training_policy_read",
 })
 ALLOWED_OUTCOMES = frozenset({"ok", "rejected", "error"})
 
