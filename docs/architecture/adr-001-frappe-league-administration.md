@@ -67,3 +67,14 @@ Frappe permission query coverage, cross-tenant link validation, v16 deployment a
 The fictional-data-only M2 exporter and Frappe schedule importer now preserve stable game IDs, original offset-aware timestamps, canonical UTC and legacy game status, without importing goals, scores or certified results. The `IceBreaker League Access` DocType and narrowly provisioned `IceBreaker League Admin` role support an explicitly membership-scoped **read-only schedule API**. The administrative importer remains System-Manager-only. The existing rink authority and OpenTelemetry integration are unchanged.
 
 This is **not** a production cutover: Frappe v16 Bench installation, real DocType permission behavior, DST/venue scenarios outside the league timezone, certified-result envelopes and offline rink synchronization require separate integration tests. The current Node league database remains authoritative until an approved migration milestone.
+
+## Architecture review and decision clarification — M2 baseline
+
+The canonical, detailed design is now [Frappe central-league technical design](frappe-central-league-design.md). This ADR remains the **decision record**, not a claim that Frappe is deployed.
+
+- **Implemented:** seven DocTypes (including restricted League Access), fictional M1/M2 importers, explicit UTC/source-offset schedule fields, a narrowly scoped read-only league schedule endpoint, optional privacy-filtered OTel spans, and source-level regression tests.
+- **Not implemented/validated:** live Frappe v16 Bench installation, general league-admin Desk write access, real MariaDB permission and rollback tests, signed roster/rules snapshots, certified-result ingestion, private registration migration and production telemetry operations.
+- **Decision:** keep generic DocType rights System-Manager-only until permission query conditions and per-document permissions are both proven in a two-league Bench integration test. An API membership check does not secure generic DocType REST access if broad grants are added later.
+- **Decision:** keep league administration data separate from youth PII and preserve the independent rink clock/event journal; Frappe may store a certified projection only after authenticated M3 envelope verification.
+- **Decision:** the league-timezone M2 contract is a limited pilot. Before production, distinguish venue timezone from league timezone and prove DST parity for away games.
+- **Decision:** no real-player data migration or production cutover without explicit M0–M6 acceptance and rehearsed rollback.
