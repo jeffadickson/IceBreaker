@@ -20,7 +20,7 @@ def select_policies(rows, season_id, at_date):
     selected = {}
     for row in rows:
         if row.get("season") not in (None, "", season_id):
-            raise ValueError("Training policy outside requested season")
+            continue
         key = (row["training_course"], row["role"])
         selected.setdefault(key, []).append({
             **row, "effective_from": str(row["effective_from"]),
@@ -52,7 +52,10 @@ def league_training_policies(league_id, season_id=None, at_date=None):
     if season_id:
         if frappe.db.get_value("IceBreaker Season", season_id, "league") != league_id:
             frappe.throw("Season outside requested league", frappe.PermissionError)
-    day = iso_day(at_date) if at_date else date.today().isoformat()
+    try:
+        day = iso_day(at_date) if at_date else date.today().isoformat()
+    except ValueError:
+        frappe.throw("Invalid training policy date")
     with league_span("league.training_policy_read") as span:
         filters = {"league": league_id}
         rows = frappe.get_all(
