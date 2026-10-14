@@ -148,13 +148,22 @@ public sealed class TimekeeperWindow : Window
             {
                 if (!int.TryParse(_penaltySeconds.Text, out var seconds) || seconds < 1 || seconds > 3600)
                     throw new InvalidOperationException("Penalty duration must be 1–3600 seconds");
+                var team = (_penaltyTeam.Text ?? "").Trim().ToLowerInvariant();
+                if (team is not ("home" or "away"))
+                    throw new InvalidOperationException("Select HOME or AWAY for the penalty");
+                var player = RequiredJersey(_penaltyPlayer.Text);
+                var infraction = (_penaltyInfraction.Text ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(infraction))
+                    throw new InvalidOperationException("Select or enter a penalty infraction");
                 await _client.CommandAsync(new
                 {
-                    type = "PENALTY_ASSESSED", team = (_penaltyTeam.Text ?? "").Trim().ToLowerInvariant(),
-                    player = (_penaltyPlayer.Text ?? "").Trim(),
-                    infraction = (_penaltyInfraction.Text ?? "").Trim(), duration = seconds,
+                    type = "PENALTY_ASSESSED", team,
+                    player, infraction, duration = seconds,
                     classification = "MINOR"
                 });
+                _penaltyPlayer.Text = "";
+                _penaltyInfraction.Text = "";
+                _penaltySeconds.Text = "120";
             }, closeOnSuccess: true)));
         var goalieBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
         goalieBody.Children.Add(Label("GOALIE CHANGE", 18));
