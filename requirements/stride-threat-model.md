@@ -84,3 +84,18 @@ Critical: exploitable path to widespread youth PII or unauthorized certified gam
 ## Change control
 
 Every new public endpoint, role, device flow, document field, signing action or external integration must update this register, its trust boundaries, test coverage, and release gates. A CI pass demonstrates the included tests ran; it does not constitute a penetration test. **Do not upload real minors' records or expose the development service to the Internet.**
+
+## Frappe central-league boundary — M2 review
+
+The central Frappe app is a **new trust boundary** and requires independent STRIDE validation before cutover:
+
+| STRIDE | New Frappe attack path | Required verification |
+|---|---|---|
+| Spoofing | Stolen League Admin session or forged sync client | MFA, device/service authentication and token rotation |
+| Tampering | Cross-league schedule edits, forged roster snapshots or certified results | Explicit tenant permission checks, signed envelopes, revision and digest checks |
+| Repudiation | Admin denies schedule/policy change | Individual actor audit, append-only change history, reliable timestamps |
+| Information disclosure | Generic DocType REST, link search, reports, exports or file attachments leak another league or youth PII | Two-tenant negative tests across every access path; no private documents in Frappe |
+| Denial of service | Frappe, database or OTel Collector outage interrupts game | Offline rink authority; cached signed snapshots; exporter failure injection |
+| Elevation of privilege | Whitelisted method or `get_all` bypasses Frappe DocType permissions | Explicit league membership scope, `has_permission` and query condition integration tests |
+
+Existing source-level tests do **not** establish these release gates. See `docs/architecture/frappe-central-league-design.md`. No real minors' data in Frappe during the development pilot.
