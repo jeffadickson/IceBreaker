@@ -48,7 +48,7 @@ class TestResultReceiver(unittest.TestCase):
         self.frappe.request = types.SimpleNamespace(method="POST")
         self.frappe.flags = types.SimpleNamespace()
         self.frappe.conf = {"icebreaker_result_public_keys": {
-            "rink-dev-1": {"issuer": "rink-certification", "public_key_base64": base64.b64encode(pub).decode()}}}
+            "rink-dev-1": {"issuer": "rink-certification", "leagues": ["demo-league"], "public_key_base64": base64.b64encode(pub).decode()}}}
         self.frappe.db = self.db
         self.frappe.get_roles = lambda: ["System Manager"]
         self.frappe.whitelist = lambda **kwargs: (lambda fn: fn)
