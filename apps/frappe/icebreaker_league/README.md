@@ -39,3 +39,11 @@ The next gates are a **running Frappe Bench installation**, real permission inte
 ## Initial league-scoped reader
 
 The restricted `IceBreaker League Access` DocType links a Frappe user to a league. The `IceBreaker League Admin` role has no generic DocType grants; only the read-only `league_schedule` API permits access when an enabled membership matches the requested league. System Managers manage memberships and remain the only users authorized to import schedules. This is an initial fail-closed access boundary, not a completed multi-tenant RBAC implementation; verify it against a running Bench before inviting users.
+
+## Architecture and verification status (M2)
+
+Read the [canonical central-league technical design](../../../docs/architecture/frappe-central-league-design.md) before extending this app. It documents all seven implemented DocTypes, API authorization boundaries, schedule timezone representation, planned M3 signed envelopes, protected family-data boundary and OpenTelemetry policy.
+
+**Current status:** source-controlled Frappe app and unit/contract tests pass; **no live Frappe v16 Bench integration, Desk permission audit, or production migration has been verified**. The IceBreaker League Admin role currently receives a **scoped read-only schedule API**, not general DocType rights. Rink-local scoring and certification remain authoritative.
+
+Next development milestone: disposable Bench install; two-tenant permission tests (including generic REST, link queries, reports and exports); venue timezone/DST parity; and signed M3 contract specification. Do not migrate real minors' data.
