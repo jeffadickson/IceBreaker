@@ -4,7 +4,6 @@
 // cache. No API endpoint, clock commands, roster changes or game DB writes.
 const fs=require('node:fs'),path=require('node:path');
 const {openStagingDatabase,stageSignedSchedule,latestStaged}=require('./frappe-schedule-staging');
-const {performance}=require('node:perf_hooks');
 function parseArgs(argv){
  const opts={};
  for(let i=0;i<argv.length;i+=2){
