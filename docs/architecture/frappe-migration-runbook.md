@@ -1,6 +1,6 @@
 # IceBreaker Frappe v16 — Development migration runbook
 
-**Scope:** M0/M1 only. This is **not** production deployment guidance. Do not use real player/family data.
+**Scope:** M0–M2 fictional-data development and acceptance testing. This is **not** production deployment guidance. Do not use real player/family data.
 
 ## Prerequisites
 
@@ -61,7 +61,7 @@ Run an OpenTelemetry Collector on the Frappe host or trusted local namespace. Fr
 
 The old rink and league SQLite services remain intact. To abandon this pilot, disable the Frappe app in the disposable development Bench and discard the test site. No scoring cutover has occurred.
 
-**M2:** Implement game schedule/timezone parity and league-scoped RBAC before importing non-demo leagues. **M3:** signed roster/rules snapshots and idempotent certified-result ingestion. **M4:** separate private registration/vault service and production security acceptance.
+**M2 remaining:** Validate schedule/timezone parity and league-scoped RBAC in a running Bench before importing non-demo leagues. **M3:** signed roster/rules snapshots and idempotent certified-result ingestion. **M4:** separate private registration/vault service and production security acceptance.
 
 ## Verification
 
