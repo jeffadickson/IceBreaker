@@ -11,7 +11,7 @@ class TestSignedResults(unittest.TestCase):
         self.key = Ed25519PrivateKey.generate()
         pub = self.key.public_key().public_bytes(
             serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-        self.trust = {"rink-dev-1": {"issuer": "rink-certification",
+        self.trust = {"rink-dev-1": {"issuer": "rink-certification", "leagues": ["demo-league"],
                                       "public_key_base64": base64.b64encode(pub).decode()}}
         self.payload = dict(
             schema_version=3, fictional=True, league_id="demo-league", game_id="game-001",
