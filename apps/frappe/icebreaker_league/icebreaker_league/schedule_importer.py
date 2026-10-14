@@ -2,6 +2,7 @@
 import frappe
 from .schedule_contract import GAME_FIELDS, validate_schedule_snapshot
 from .observability import league_span, mark_outcome
+from .access import require_league_reader
 
 DOCTYPE = "IceBreaker Game"
 
@@ -80,7 +81,7 @@ def import_schedule_snapshot(league_id, payload):
 @frappe.whitelist()
 def league_schedule(league_id, limit=100):
     """System-Manager-only schedule projection. No player or result fields."""
-    _require_admin()
+    require_league_reader(league_id)
     with league_span("league.schedule_read") as span:
         if not isinstance(league_id, str) or len(league_id) > 100:
             frappe.throw("Invalid league ID")
@@ -92,14 +93,16 @@ def league_schedule(league_id, limit=100):
             frappe.throw("Invalid schedule limit")
         if not 1 <= limit <= 500:
             frappe.throw("Schedule limit must be between 1 and 500")
-        seasons = frappe.get_list("IceBreaker Season", filters={"league": league_id},
+        seasons = frappe.get_all("IceBreaker Season", filters={"league": league_id},
                                   pluck="name", limit_page_length=500)
-        divisions = frappe.get_list("IceBreaker Division",
+        divisions = frappe.get_all("IceBreaker Division",
                                     filters={"season": ["in", seasons]},
                                     pluck="name", limit_page_length=500) if seasons else []
         if not divisions:
             return {"games": [], "timezone": frappe.db.get_value("IceBreaker League", league_id, "timezone")}
-        games = frappe.get_list(DOCTYPE,
+        # Explicitly authorized to one league above; all subsequent lookups are
+        # narrowed to its seasons/divisions. Do not expose arbitrary get_all.
+        games = frappe.get_all(DOCTYPE,
                                 filters={"division": ["in", divisions]},
                                 fields=["icebreaker_id", "division", "home_team", "away_team",
                                         "scheduled_source_iso", "scheduled_utc", "venue", "rink",
