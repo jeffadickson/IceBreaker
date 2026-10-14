@@ -3,6 +3,7 @@
 // This module never changes the authoritative rink game, clock or roster.
 const crypto=require('node:crypto');
 const FIELD_NAMES=['schema_version','fictional','league_id','issued_at','expires_at','issuer','key_id','games'];
+const RELEASE_FIELDS=[...FIELD_NAMES,'release_revision'];
 const GAME_FIELDS=['game_id','division_id','home_team_id','away_team_id','scheduled_utc','schedule_status'];
 const ID=/^[A-Za-z0-9][A-Za-z0-9_-]{1,99}$/;
 const UTC=/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
@@ -26,9 +27,14 @@ function strictBase64(value,size){
  return bytes;
 }
 function verifyFrappeSchedule(bundle,trust,expectedLeague,{now=Date.now()}={}){
- if(!exact(bundle,[...FIELD_NAMES,'signature']))throw Error('Unexpected signed schedule fields');
- const unsigned=Object.fromEntries(FIELD_NAMES.map(k=>[k,bundle[k]]));
- if(unsigned.schema_version!==1||unsigned.fictional!==true)throw Error('Unsupported schedule bundle');
+ const version=bundle?.schema_version;
+ if(version!==1&&version!==2)throw Error('Unsupported schedule bundle version');
+ const fields=version===2?RELEASE_FIELDS:FIELD_NAMES;
+ if(!exact(bundle,[...fields,'signature']))throw Error('Unexpected signed schedule fields');
+ const unsigned=Object.fromEntries(fields.map(k=>[k,bundle[k]]));
+ if(unsigned.fictional!==true)throw Error('Unsupported schedule bundle');
+ if(version===2&&(!Number.isInteger(unsigned.release_revision)||unsigned.release_revision<1||unsigned.release_revision>2147483647))
+  throw Error('Invalid monotonic release revision');
  for(const field of ['league_id','issuer','key_id'])
   if(typeof unsigned[field]!=='string'||!ID.test(unsigned[field]))throw Error('Invalid bundle identity');
  if(unsigned.league_id!==expectedLeague)throw Error('Wrong league');
@@ -53,6 +59,7 @@ function verifyFrappeSchedule(bundle,trust,expectedLeague,{now=Date.now()}={}){
   crypto.createPublicKey({key:Buffer.concat([SPKI_ED25519,pub]),format:'der',type:'spki'}),signature);
  if(!verified)throw Error('Schedule signature invalid');
  return {leagueId:expectedLeague,gameCount:unsigned.games.length,
+  releaseRevision:version===2?unsigned.release_revision:null,
   bundleSha256:crypto.createHash('sha256').update(canonical(unsigned),'ascii').digest('hex'),
   expiresAt:unsigned.expires_at};
 }
