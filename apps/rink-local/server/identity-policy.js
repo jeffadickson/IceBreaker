@@ -31,7 +31,8 @@ function can(principal, action, resource, at = Date.now()) {
     if (g.revokedAt || (g.expiresAt && (!Number.isFinite(Date.parse(g.expiresAt)) || Date.parse(g.expiresAt) <= at))) return false;
     if (g.userId !== principal.id || !PERMISSIONS[g.role].includes(action)) return false;
     if (g.role === 'PLATFORM_SUPERUSER')
-      return g.scopeType === 'PLATFORM' && g.scopeId === '*' && principal.mfaVerified === true;
+      return g.scopeType === 'PLATFORM' && g.scopeId === '*' &&
+        principal.mfaVerified === true && principal.superuserBootstrapped === true;
     if (g.scopeType === 'PLATFORM') return g.role === 'PARENT' && g.scopeId === '*' && action.startsWith('account:') && resource.scopeType === 'USER' && resource.scopeId === principal.id;
     if (!resource.scopeType || !resource.scopeId) return false;
     return g.scopeType === resource.scopeType && g.scopeId === resource.scopeId;
