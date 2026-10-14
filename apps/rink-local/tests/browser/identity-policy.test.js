@@ -25,7 +25,7 @@ test('revoked, expired, disabled, and mismatched user grants fail closed',()=>{
 test('platform superuser needs a verified MFA context and cannot be impersonated by parent',()=>{
  const grant={userId:'root',role:'PLATFORM_SUPERUSER',scopeType:'PLATFORM',scopeId:'*'};
  assert.equal(can({id:'root',grants:[grant]},'platform:admin',{}),false);
- assert.equal(can({id:'root',mfaVerified:true,grants:[grant]},'platform:admin',{}),true);
+ assert.equal(can({id:'root',mfaVerified:true,grants:[grant]},'platform:admin',{}),false);\n assert.equal(can({id:'root',mfaVerified:true,superuserBootstrapped:true,grants:[grant]},'platform:admin',{}),true);
  assert.equal(can({id:'root',mfaVerified:true,grants:[initialParentGrant('root')]},'platform:admin',{}),false);
 });
 
