@@ -1,0 +1,93 @@
+{
+  "doctype": "DocType",
+  "name": "IceBreaker Game",
+  "module": "IceBreaker League",
+  "custom": 0,
+  "istable": 0,
+  "autoname": "field:icebreaker_id",
+  "title_field": "icebreaker_id",
+  "track_changes": 1,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "field_order": [
+    "icebreaker_id",
+    "division",
+    "home_team",
+    "away_team",
+    "scheduled_at",
+    "venue",
+    "rink",
+    "schedule_status"
+  ],
+  "fields": [
+    {
+      "fieldname": "icebreaker_id",
+      "label": "IceBreaker ID",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "division",
+      "label": "Division",
+      "fieldtype": "Link",
+      "options": "IceBreaker Division",
+      "reqd": 1
+    },
+    {
+      "fieldname": "home_team",
+      "label": "Home Team",
+      "fieldtype": "Link",
+      "options": "IceBreaker Team",
+      "reqd": 1
+    },
+    {
+      "fieldname": "away_team",
+      "label": "Away Team",
+      "fieldtype": "Link",
+      "options": "IceBreaker Team",
+      "reqd": 1
+    },
+    {
+      "fieldname": "scheduled_at",
+      "label": "Scheduled At",
+      "fieldtype": "Datetime",
+      "reqd": 1
+    },
+    {
+      "fieldname": "venue",
+      "label": "Venue",
+      "fieldtype": "Data",
+      "reqd": 0
+    },
+    {
+      "fieldname": "rink",
+      "label": "Rink",
+      "fieldtype": "Data",
+      "reqd": 0
+    },
+    {
+      "fieldname": "schedule_status",
+      "label": "Schedule Status",
+      "fieldtype": "Select",
+      "options": "Scheduled\nPostponed\nCancelled",
+      "reqd": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "share": 0
+    }
+  ],
+  "links": [],
+  "actions": []
+}
