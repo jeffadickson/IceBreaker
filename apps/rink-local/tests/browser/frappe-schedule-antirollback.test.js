@@ -60,3 +60,25 @@ test('signed payload tampering and wrong signing key cannot change highwater',t=
  assert.throws(()=>stageSignedSchedule(db,other.bundle(3),trust,'demo-league',{now}),/signature/);
  assert.equal(latestStaged(db,'demo-league').releaseRevision,2);
 });
+
+test('offline CLI stages fictional release using public-key trust file and blocks production mode',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-frappe-cli-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const {trust,bundle}=signer(),bundlePath=path.join(dir,'signed.json'),trustPath=path.join(dir,'trust.json');
+ fs.writeFileSync(bundlePath,JSON.stringify(bundle(8)));
+ fs.writeFileSync(trustPath,JSON.stringify(trust));
+ const cli=require('../../server/stage-frappe-schedule');
+ const args=['--staging-db',path.join(dir,'stage.db'),'--bundle',bundlePath,
+  '--trust',trustPath,'--league','demo-league'];
+ // The CLI uses real current time, so use a freshly signed short-lived fixture.
+ const clock=new Date(),issued=new Date(clock.getTime()-60_000).toISOString().replace(/\.\d{3}Z$/,'Z'),
+  expires=new Date(clock.getTime()+3600_000).toISOString().replace(/\.\d{3}Z$/,'Z');
+ fs.writeFileSync(bundlePath,JSON.stringify(bundle(8,{issued_at:issued,expires_at:expires})));
+ assert.equal(cli.run(args).status,'staged');
+ assert.equal(cli.run(args).status,'duplicate');
+ assert.equal(cli.run(args).latest,8);
+ const previous=process.env.ICEBREAKER_PRODUCTION_MODE;
+ process.env.ICEBREAKER_PRODUCTION_MODE='1';
+ try{assert.throws(()=>cli.run(args),/not production-authorized/);}
+ finally{if(previous===undefined)delete process.env.ICEBREAKER_PRODUCTION_MODE;else process.env.ICEBREAKER_PRODUCTION_MODE=previous;}
+});
