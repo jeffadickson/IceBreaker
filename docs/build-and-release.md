@@ -68,7 +68,7 @@ python tools/icebreaker.py camera-test
 - `tools/scoreboard-camera/pyproject.toml` and `uv.lock` isolate optional OpenCV/numpy from the rink runtime.
 - `NuGet.Config` explicitly declares nuget.org. No secrets or private package feed credentials are committed.
 
-**Updating dependencies:** change the direct version constraint in its native manifest, regenerate locks with the native tool, run all tests and review the lock diff. A dedicated manual [Generate dependency locks workflow](../.github/workflows/generate-locks.yml) is provided for GitHub-hosted regeneration; it commits regenerated lockfiles on `main` when explicitly updated/triggered. Do not manually fabricate lockfiles.
+**Updating dependencies:** change the direct version constraint in its native manifest, regenerate locks with the native tool, run all tests and review the lock diff. A dedicated manual [Generate dependency locks workflow](../.github/workflows/generate-locks.yml) is provided for GitHub-hosted regeneration; download its lockfile artifact, review the diff, and commit the updated files in a normal pull request. Do not manually fabricate lockfiles.
 
 Local equivalents:
 
