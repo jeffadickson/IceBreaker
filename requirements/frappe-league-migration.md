@@ -22,6 +22,8 @@
 | FRAPPE-016 | P0 | Maintain requirement-to-code/test mapping in existing tracker | Traceability entries |
 | FRAPPE-017 | P0 | Production Frappe deployment requires HTTPS, MFA, secrets/KMS, audit and data retention review | Release gate |
 
+**FRAPPE-013 progress (M4 pilot):** The Frappe app now has System-Manager-only Training Course and immutable Training Policy DocTypes, pure annual/rolling renewal validation, and a narrowly league-scoped read-only policy API. These contain no private person records or certificate evidence. Source-level unit and mock authorization tests are added; live v16 Bench integration, concurrent revision safety, signed policy delivery, protected evidence migration and tournament administration remain open. See [M4 training design](../docs/architecture/frappe-m4-training-policies.md).
+
 **Migration policy:** Existing Node/SQLite league system remains authoritative until M2/M3 parity tests and an explicitly approved cutover. Frappe is not yet a production replacement. See `docs/architecture/adr-001-frappe-league-administration.md`.
 
 ## M2 schedule milestone (development)
