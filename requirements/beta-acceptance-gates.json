@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "description": "Controlled IceBreaker beta acceptance. Passing unit tests is necessary but insufficient; require version-bound operator evidence.",
+  "profiles": {
+    "rink-simulation": {
+      "label": "Fictional-data two-laptop rink simulation",
+      "gates": [
+        "SIM-01",
+        "SIM-02",
+        "SIM-03",
+        "SIM-04",
+        "SIM-05",
+        "SIM-06"
+      ]
+    },
+    "supervised-beta": {
+      "label": "Supervised live rink beta with approved fallback",
+      "extends": "rink-simulation",
+      "gates": [
+        "BETA-01",
+        "BETA-02",
+        "BETA-03",
+        "BETA-04",
+        "BETA-05"
+      ]
+    },
+    "frappe-beta": {
+      "label": "Frappe central league beta with fictional data",
+      "gates": [
+        "FRAPPE-01",
+        "FRAPPE-02",
+        "FRAPPE-03",
+        "FRAPPE-04",
+        "FRAPPE-05",
+        "FRAPPE-06"
+      ]
+    },
+    "production": {
+      "label": "Production registration and official operations",
+      "extends": "supervised-beta",
+      "gates": [
+        "PROD-01",
+        "PROD-02",
+        "PROD-03",
+        "PROD-04",
+        "PROD-05",
+        "PROD-06"
+      ]
+    }
+  },
+  "gates": [
+    {
+      "id": "SIM-01",
+      "title": "Windows x64 desktop artifact installs and launches on both test laptops",
+      "owner": "desktop",
+      "kind": "physical"
+    },
+    {
+      "id": "SIM-02",
+      "title": "Complete multi-period fictional game with goals, assists, penalties, goalie swaps and corrected events",
+      "owner": "scorekeeper",
+      "kind": "scenario"
+    },
+    {
+      "id": "SIM-03",
+      "title": "Clock stop/start, period boundaries, overtime and division timing checked against a stopwatch",
+      "owner": "timekeeper",
+      "kind": "scenario"
+    },
+    {
+      "id": "SIM-04",
+      "title": "Primary laptop crash and backup takeover with no double-counted game events",
+      "owner": "operations",
+      "kind": "fault-injection"
+    },
+    {
+      "id": "SIM-05",
+      "title": "Two-official review, correction/resubmission and final scoresheet export exercised",
+      "owner": "referee",
+      "kind": "scenario"
+    },
+    {
+      "id": "SIM-06",
+      "title": "Full-game event journal, official clock and stats reconciled to independent paper log",
+      "owner": "QA",
+      "kind": "reconciliation"
+    },
+    {
+      "id": "BETA-01",
+      "title": "League authorizes supervised beta and determines whether electronic scoresheet is acceptable",
+      "owner": "league",
+      "kind": "approval"
+    },
+    {
+      "id": "BETA-02",
+      "title": "Documented paper scoring fallback, trained operator and recovery instructions at rink",
+      "owner": "operations",
+      "kind": "drill"
+    },
+    {
+      "id": "BETA-03",
+      "title": "Actual scoreboard, rink networking and PA tested without disturbing official game",
+      "owner": "rink",
+      "kind": "hardware"
+    },
+    {
+      "id": "BETA-04",
+      "title": "No real minors' DOB, addresses or birth certificates in rink laptop; privacy inspection passed",
+      "owner": "security",
+      "kind": "privacy"
+    },
+    {
+      "id": "BETA-05",
+      "title": "On-site rollback decision and named accountable supervisor recorded",
+      "owner": "operations",
+      "kind": "approval"
+    },
+    {
+      "id": "FRAPPE-01",
+      "title": "Pinned Frappe v16 Bench installed and migrated on disposable site",
+      "owner": "frappe",
+      "kind": "integration"
+    },
+    {
+      "id": "FRAPPE-02",
+      "title": "Two-tenant Desk/REST/list/link/report/export RBAC negative tests passed",
+      "owner": "security",
+      "kind": "integration"
+    },
+    {
+      "id": "FRAPPE-03",
+      "title": "Schedule timezone and DST parity, including out-of-area venue timezone, reconciled",
+      "owner": "frappe",
+      "kind": "integration"
+    },
+    {
+      "id": "FRAPPE-04",
+      "title": "Signed schedule and certified-result round trip tested against running Bench",
+      "owner": "integration",
+      "kind": "integration"
+    },
+    {
+      "id": "FRAPPE-05",
+      "title": "Training policy mapping, revision and rollback tested with rink local evaluator",
+      "owner": "training",
+      "kind": "reconciliation"
+    },
+    {
+      "id": "FRAPPE-06",
+      "title": "OTel outage and central service outage do not affect official rink clock",
+      "owner": "operations",
+      "kind": "fault-injection"
+    },
+    {
+      "id": "PROD-01",
+      "title": "Production KMS/HSM, key rotation, encrypted database migration and restore drill accepted",
+      "owner": "security",
+      "kind": "security"
+    },
+    {
+      "id": "PROD-02",
+      "title": "Verified guardian consent and identity, role MFA and secure account recovery accepted",
+      "owner": "privacy",
+      "kind": "security"
+    },
+    {
+      "id": "PROD-03",
+      "title": "Malware scanner and encrypted document vault independently validated",
+      "owner": "security",
+      "kind": "security"
+    },
+    {
+      "id": "PROD-04",
+      "title": "Production service identities, audit integrity and operator attribution accepted",
+      "owner": "security",
+      "kind": "security"
+    },
+    {
+      "id": "PROD-05",
+      "title": "Independent penetration test and privacy/legal retention review approved",
+      "owner": "security",
+      "kind": "approval"
+    },
+    {
+      "id": "PROD-06",
+      "title": "Official signing policy, backups, monitoring and incident response signed off",
+      "owner": "operations",
+      "kind": "approval"
+    }
+  ]
+}
