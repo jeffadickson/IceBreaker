@@ -4,6 +4,8 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import shutil
+import subprocess
 import stat
 import tempfile
 import unittest
@@ -116,6 +118,34 @@ class TrainingPublisherTests(unittest.TestCase):
                 self.release()
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM training_release").fetchone()[0], 0)
         self.assertEqual(self.release()["release_revision"], 1)
+
+    def test_python_published_envelope_verifies_in_node(self):
+        if not shutil.which("node"):
+            self.skipTest("Node.js not available")
+        signed = self.release()["envelope"]
+        verifier = (Path(__file__).resolve().parents[4] /
+                    "apps/rink-local/server/frappe-training-verifier.js")
+        script = (
+            "const fs=require('node:fs');"
+            "const {verifyFrappeTrainingBundle}=require(process.argv[1]);"
+            "const x=JSON.parse(fs.readFileSync(0,'utf8'));"
+            "try {const r=verifyFrappeTrainingBundle(x.signed,x.trust,"
+            "'demo-league',{now:Date.parse(x.signed.issued_at)+1000});"
+            "console.log(JSON.stringify(r));}catch(e){console.error(e.message);process.exit(1)}"
+        )
+        payload = {"signed": signed, "trust": self.trust}
+        process = subprocess.run(
+            ["node", "-e", script, str(verifier)], input=json.dumps(payload),
+            capture_output=True, text=True, timeout=10, check=False)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(json.loads(process.stdout)["releaseRevision"], 1)
+        tampered = json.loads(json.dumps(signed))
+        tampered["policies"][0]["required"] = False
+        process = subprocess.run(
+            ["node", "-e", script, str(verifier)],
+            input=json.dumps({"signed": tampered, "trust": self.trust}),
+            capture_output=True, text=True, timeout=10, check=False)
+        self.assertNotEqual(process.returncode, 0)
 
     def test_cli_rejects_production_and_unsafe_database(self):
         root = Path(self.tmp.name)
