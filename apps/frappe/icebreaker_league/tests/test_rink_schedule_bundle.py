@@ -43,6 +43,21 @@ class TestSignedScheduleBundle(unittest.TestCase):
     def verify(self, bundle, **kwargs):
         return verify_bundle(bundle, self.trusted, "demo-league", now=NOW, **kwargs)
 
+    def test_monotonic_revision_v2_roundtrip_and_validation(self):
+        value = make_unsigned("demo-league", [game()], ISSUED, EXPIRES,
+                              release_revision=4)
+        self.assertEqual(value["schema_version"], 2)
+        self.assertEqual(self.verify(sign_bundle(value, self.seed))["release_revision"], 4)
+        for invalid in (0, -1, True, 1.5, 2147483648):
+            with self.subTest(revision=invalid):
+                with self.assertRaisesRegex(ValueError, "revision"):
+                    make_unsigned("demo-league", [game()], ISSUED, EXPIRES,
+                                  release_revision=invalid)
+        signed = sign_bundle(value, self.seed)
+        signed["release_revision"] = 5
+        with self.assertRaisesRegex(ValueError, "signature"):
+            self.verify(signed)
+
     def test_roundtrip_and_deterministic_canonicalization(self):
         result = self.verify(self.signed())
         self.assertEqual(result["league_id"], "demo-league")
