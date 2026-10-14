@@ -35,3 +35,19 @@ Remaining M2 gates: running Frappe Bench installation, schedule reconciliation w
 ## Initial tenant-scoped API access
 
 The development app now includes a System-Manager-controlled `IceBreaker League Access` membership DocType, a narrowly provisioned `IceBreaker League Admin` role, and a read-only `league_schedule` API that requires both the role and an enabled membership for the exact league. Generic DocType access remains restricted to System Managers; no cross-league list/read/write rights have been granted. The pure access-rule unit tests cover guest, wrong-league, role-only and membership-only denial. **Live Frappe permission integration tests are still mandatory before FRAPPE-005 can be considered complete.**
+
+## Design baseline review — current acceptance status
+
+See [canonical technical design](../docs/architecture/frappe-central-league-design.md) for the component diagram, DocType field map, trust boundaries, APIs and cutover sequence. The table at the top lists **requirements**, not a blanket claim of implementation.
+
+| Group | Implementation status | Release gate |
+|---|---|---|
+| FRAPPE-001/003/004/008 | Development scaffold, six administrative/game DocTypes and M1/M2 import contracts | Real v16 Bench install, schema migration, conflict and rollback tests |
+| FRAPPE-005 | Partial: League Access role/membership and read-only API; generic DocTypes System-Manager-only | Two-league integration tests for list/read/write/link/export/report permissions |
+| FRAPPE-007 | Partial: source offset, UTC and UTC-naive schedule fields, DST validation | Venue timezone model and old/new schedule parity |
+| FRAPPE-009/010/012 | Planned M3 integration | Signed roster/rules envelopes, certified-result idempotency, offline failure injection |
+| FRAPPE-011 | Partial: opt-in allowlisted spans | Collector smoke, privacy scan, exporter outage and retention tests |
+| FRAPPE-013/014 | Planned Frappe workflows; existing Node domain implementations retained | Role workflow and annual training parity |
+| FRAPPE-015/017 | Development runbook and restricted access only | Encrypted backup/restore, MFA/KMS, consent, audit and approved cutover |
+
+**Requirement-tracker rule:** mark source-level implementation and CI tests separately from live Frappe integration and production acceptance. Never close a requirement based only on a JSON schema or mock policy test.
