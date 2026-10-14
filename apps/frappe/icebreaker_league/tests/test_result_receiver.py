@@ -104,6 +104,9 @@ class TestResultReceiver(unittest.TestCase):
         self.assertEqual(len(self.db.records), 2)
 
     def test_wrong_league_and_unauthorized_actor(self):
+        # Even a key authorized for multiple leagues cannot project a result
+        # onto a game whose schedule belongs to a different league.
+        self.frappe.conf["icebreaker_result_public_keys"]["rink-dev-1"]["leagues"].append("other-league")
         with self.assertRaises(PermissionError):
             self.receiver.receive_certified_result(self.signed(league_id="other-league"))
         self.frappe.get_roles = lambda: ["IceBreaker League Admin"]
