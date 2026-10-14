@@ -29,3 +29,9 @@ Authenticated System Managers can call `/api/method/icebreaker_league.api.league
 ## Migration strategy
 
 See [ADR-001](../../../docs/architecture/adr-001-frappe-league-administration.md) and [migration requirements](../../../requirements/frappe-league-migration.md). No production cutover has occurred. The existing rink-local code remains unchanged and authoritative for scoring.
+
+## M2 schedule redevelopment
+
+A strict fictional-only schedule exporter (`apps/rink-local/tools/export-frappe-schedule.js`) and Frappe importer (`icebreaker_league.schedule_importer`) are now present. The importer offers `preview_schedule_snapshot`, POST-only `import_schedule_snapshot`, and `league_schedule`. Only authenticated System Managers may invoke these pilot APIs. It validates source ISO-8601 offset, UTC conversion, DST parity against the league timezone, division/team references and immutable stable IDs. Legacy Final/Live/Scheduled state is carried for display but certified scores and event records are deliberately excluded.
+
+The next gates are a **running Frappe Bench installation**, real permission integration tests, league-scoped administrator roles and dual-read schedule reconciliation. The migration is not yet production-ready; see the [runbook](../../../docs/architecture/frappe-migration-runbook.md).
