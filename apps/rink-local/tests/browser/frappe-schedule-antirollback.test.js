@@ -82,3 +82,17 @@ test('offline CLI stages fictional release using public-key trust file and block
  try{assert.throws(()=>cli.run(args),/not production-authorized/);}
  finally{if(previous===undefined)delete process.env.ICEBREAKER_PRODUCTION_MODE;else process.env.ICEBREAKER_PRODUCTION_MODE=previous;}
 });
+
+test('staging refuses an existing authoritative rink database',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-frappe-authority-')),file=path.join(dir,'rink.db');
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const {DatabaseSync}=require('node:sqlite');
+ const db=new DatabaseSync(file);
+ db.exec('CREATE TABLE games (id TEXT PRIMARY KEY)');
+ db.close();
+ assert.throws(()=>openStagingDatabase(file),/Refusing authoritative game database/);
+ const check=new DatabaseSync(file);
+ try{
+  assert.equal(check.prepare("SELECT 1 FROM sqlite_master WHERE name='frappe_schedule_staged'").get(),undefined);
+ }finally{check.close();}
+});
