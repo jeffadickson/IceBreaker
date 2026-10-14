@@ -65,3 +65,7 @@ The prior M3 table reflects the original v1 signed schedule-only preview. The fo
 | FRAPPE-002/012 | Staging cache rejects official rink database files and does not mutate clock/game state | Dual-laptop offline outage and failover tests outstanding |
 
 No production requirement is marked complete based on these tests. The StrictDoc/CSV tracker remains the authoritative register.
+
+## Build and release infrastructure (2026-10-14)
+
+The canonical tracked requirements are [BLD-001–BLD-018](build-infrastructure.md). Implemented verification includes `tools/check_build.py`, `.github/workflows/ci.yml`, committed npm/uv/NuGet locks, Windows RID-specific publish locks, and the manual beta packaging workflow. **Not yet accepted:** fresh-machine Windows validation, production signing/SBOM, live Frappe Bench integration, and a planned .NET support-lifecycle migration.
