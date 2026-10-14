@@ -29,3 +29,11 @@ test('post-commit goal correction is reasoned and references original journal ev
  assert.match(code,/EventDetail\(latest, "scorer"\)/);
  assert.match(code,/PopupButton\("CORRECT GOAL"/);
 });
+
+test('command completion releases busy guard before authoritative refresh',()=>{
+ const execute=code.slice(code.indexOf('private async Task<bool> ExecuteAsync'),code.indexOf('private async void OnKeyDown'));
+ assert.match(execute,/finally\s*\{\s*\/\/[^\n]*\n(?:[^\n]*\n)*?\s*_busy = false;\s*await RefreshAsync\(\);/);
+});
+test('space shortcut cannot change clock while an entry dialog is open',()=>{
+ assert.match(code,/if \(_activeDialog is not null \|\| e\.Key != Key\.Space/);
+});
