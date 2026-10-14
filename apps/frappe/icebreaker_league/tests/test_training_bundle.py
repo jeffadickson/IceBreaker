@@ -68,6 +68,9 @@ class TrainingBundleTests(unittest.TestCase):
         signed = sign_bundle(self.unsigned, seed)
         verified = verify_bundle(signed, trust, "demo-league", now=self.now)
         self.assertEqual(verified["release_revision"], 4)
+        with self.assertRaises(ValueError):
+            verify_bundle(signed, trust, "demo-league", now=self.now,
+                          minimum_revision=4)
         tampered = copy.deepcopy(signed)
         tampered["policies"][0]["required"] = False
         with self.assertRaises(ValueError):
