@@ -31,3 +31,16 @@ Requirements in existing `.sdoc`/`.csv` registers remain authoritative where acc
 | FRAPPE-009/010/012/013/014/015/017 | Migration requirements and ADR-001 | Planned; not production-ready |
 
 The source-of-truth tracker remains StrictDoc/CSV. This section does not substitute for requirement verification evidence.
+
+## Frappe M2 review addendum — 2026-10-13
+
+The earlier FRAPPE-005 entry above predates the scoped-reader implementation and is superseded **for the read-only API only**. Current evidence:
+
+| Requirement | Implementation evidence | Verification state |
+|---|---|---|
+| FRAPPE-005 | `access_rules.py`, `access.py`, League Access DocType, `schedule_importer.league_schedule`; `test_access_rules.py`, `frappe-schedule-security.test.js` | Partial: scoped read-only policy tested; real Bench two-tenant RBAC, direct resource/link/export checks outstanding |
+| FRAPPE-007 | `schedule_contract.py`, `schedule_importer.py`, `export-frappe-schedule.js`; `frappe-schedule-m2.test.js` | Partial: fictional schedule/DST contract tested; venue timezone and live reconciliation outstanding |
+| FRAPPE-011 | `observability.py`, `otel_bootstrap.py`, `test_observability.py` | Partial: allowlisted manual spans; real Collector and privacy acceptance outstanding |
+| FRAPPE-015 | `docs/architecture/frappe-migration-runbook.md` | Runbook drafted; no verified Frappe backup/restore or rollback rehearsal |
+
+**Canonical design:** `docs/architecture/frappe-central-league-design.md`. Continue to use the existing StrictDoc/CSV requirement tracker as the source of record; documentation status does not automatically close verification gates.
