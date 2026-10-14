@@ -103,3 +103,23 @@ The output reports `staged` or `duplicate`, league, revision and policy count. I
 `apps/rink-local/server/frappe-training-parity.js` now compares the **latest staged** central policy definitions against local `training_policy_versions` for a selected league, season and date. It requires an explicit, one-to-one mapping of central course IDs to local course IDs and reports missing courses, mismatched renewal/required/revision/effective dates, and missing local or central policies. It does not infer identities from titles or change any policy, roster, training completion or official clock.
 
 `apps/rink-local/tests/browser/frappe-training-parity.test.js` uses fictional local tables to verify exact match, mismatch, unmapped courses, duplicate mapping rejection, wrong league, expired staging and read-only behavior. This is a **library API for development reconciliation**, not an approved activation path. A production cutover still requires operator-reviewed mapping, signed publisher, live Frappe Bench parity, service authentication and an explicit policy activation mechanism with rollback.
+
+### Read-only parity CLI
+
+After staging a fictional signed policy release, create an explicitly reviewed JSON course map such as:
+
+```json
+{"central-safesport-id": "local-safesport-uuid"}
+```
+
+Compare it to a **separate fictional rink database**:
+
+```bash
+node apps/rink-local/server/compare-frappe-training.js \
+  --staging-db /tmp/icebreaker-training-cache.db \
+  --local-db /tmp/fictional-rink.db \
+  --course-map /tmp/reviewed-course-map.json \
+  --league demo-league --season demo-2026 --date 2026-10-14
+```
+
+The CLI opens both databases read-only. It returns `match` (exit 0), `mismatch` (exit 2), or an invalid/unsafe request error (exit 1). This is an operator-visible **comparison report**, not automatic migration or proof of live Bench equivalence. Course mappings are never guessed from similar titles.
