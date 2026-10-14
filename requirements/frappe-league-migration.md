@@ -55,3 +55,14 @@ See [canonical technical design](../docs/architecture/frappe-central-league-desi
 ## M3 certified-result pilot (source-level only)
 
 The new [signed-result design](../docs/architecture/frappe-m3-signed-results.md) defines Ed25519 canonical envelope v3 and a System-Manager-only Frappe pilot receiver. A separate immutable `IceBreaker Certified Result` DocType stores certified score projections without modifying the schedule DocType, game journal, clock or referee certification. Signature verification, fictional-data gate, idempotent duplicate handling, conflicts and monotonic revisions are unit-tested. **This does not complete FRAPPE-010:** live Frappe v16 Bench migration, production issuer key management, source-side signed result generation, service authentication and retry/reconciliation still need acceptance.
+
+## M3 outbound rink schedule pilot (2026-10-13)
+
+A **schedule-only**, fictional-data Ed25519 contract has been added as the first central-to-rink exchange:
+
+- `icebreaker_league.rink_schedule_bundle`: strict, sorted schedule payload, canonical JSON, Ed25519 sign/verify helpers, issuer- and league-pinned public keys, expiry and replay-window validation. No private fields, rosters, rules, scores or live clock state are included.
+- `icebreaker_league.rink_schedule_export.preview_unsigned_rink_schedule`: a league-scoped **unsigned preview** of administrative schedule data. The API is not an authoritative signed release.
+- `apps/rink-local/server/frappe-schedule-verifier.js`: read-only Ed25519 verification for future offline staging. **It does not import or apply any schedule to the rink authority.**
+- Python and Node negative tests cover signatures, cross-league keys, tampering, expiration, unexpected PII fields and duplicate games.
+
+This is **partial FRAPPE-009**, not a completed signed roster/rules snapshot system. Remaining: real Bench integration, KMS-backed signing service, monotonic published release revisions, a protected delivery channel, rink-side atomic staging/apply, offline fallback and rollback, roster and game-rule contracts, and end-to-end acceptance. Never treat an unsigned preview as a trusted snapshot.
