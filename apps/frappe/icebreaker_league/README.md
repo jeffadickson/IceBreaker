@@ -1,0 +1,31 @@
+# IceBreaker League — Frappe v16 custom app
+
+**Status: first development scaffold, not yet deployed or production-ready.**
+
+This is the central administrative component of IceBreaker, not the rink-local scoring service. Frappe owns administrative league/season/division/team/game metadata; the rink authority remains the source of official game clock, scoring events and certified results.
+
+## Layout
+
+`icebreaker_league/icebreaker_league/doctype/` contains source-controlled Frappe DocType schemas and validation controllers. `icebreaker_league/observability.py` provides privacy-safe manual OpenTelemetry spans. `icebreaker_league/api.py` contains a permission-gated, read-only API.
+
+## Local Frappe v16 setup
+
+Prerequisites: a working **Frappe v16 Bench** with Python 3.14+, Node 24+ and its supported database/Redis services. This repo does not vendor Frappe or Bench. From a development bench, install the local app package (path must resolve to this directory), then:
+
+```bash
+bench --site your-dev-site install-app icebreaker_league
+bench --site your-dev-site migrate
+bench --site your-dev-site list-apps
+```
+
+Use a disposable development site and fictional league data. Standard installation requires the app to be available in the bench `apps/` directory and its Python environment; see Frappe's `bench get-app` and `bench new-app` guidance. The package layout here is scaffolded to that convention but has **not been exercised in a live Bench installation**.
+
+The initial DocTypes are intentionally restricted to **System Manager**. League-scoped administrators, team managers, parents and public visitors must not be granted broader access until tenant permission checks and migration tests exist.
+
+## API and telemetry
+
+Authenticated System Managers can call `/api/method/icebreaker_league.api.league_overview?league_id=...`. The response contains only administrative counts and stable IDs; no player or family PII. OpenTelemetry instrumentation is opt-in, emits only allowlisted operation/status attributes, and must not block Frappe transactions.
+
+## Migration strategy
+
+See [ADR-001](../../../docs/architecture/adr-001-frappe-league-administration.md) and [migration requirements](../../../requirements/frappe-league-migration.md). No production cutover has occurred. The existing rink-local code remains unchanged and authoritative for scoring.
