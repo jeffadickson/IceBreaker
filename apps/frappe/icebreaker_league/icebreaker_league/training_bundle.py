@@ -127,12 +127,15 @@ def sign_bundle(unsigned, private_seed):
     return {**unsigned, "signature": base64.b64encode(signature).decode("ascii")}
 
 
-def verify_bundle(envelope, trusted_keys, expected_league, now=None):
+def verify_bundle(envelope, trusted_keys, expected_league, now=None, minimum_revision=0):
     if not isinstance(envelope, dict) or set(envelope) != FIELDS | {"signature"}:
         raise ValueError("Unexpected signed training fields")
     unsigned = validate_unsigned({k: envelope[k] for k in FIELDS})
     if unsigned["league_id"] != expected_league:
         raise ValueError("Wrong training league")
+    if (type(minimum_revision) is not int or minimum_revision < 0
+            or unsigned["release_revision"] <= minimum_revision):
+        raise ValueError("Stale training release")
     key = trusted_keys.get(unsigned["key_id"]) if isinstance(trusted_keys, dict) else None
     if (not isinstance(key, dict) or key.get("issuer") != unsigned["issuer"]
             or expected_league not in key.get("leagues", [])):
