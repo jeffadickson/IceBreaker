@@ -1,0 +1,112 @@
+{
+  "doctype": "DocType",
+  "name": "IceBreaker Training Policy",
+  "module": "IceBreaker League",
+  "custom": 0,
+  "istable": 0,
+  "autoname": "field:icebreaker_id",
+  "title_field": "training_course",
+  "track_changes": 1,
+  "field_order": [
+    "icebreaker_id",
+    "training_course",
+    "league",
+    "season",
+    "role",
+    "renewal_mode",
+    "validity_days",
+    "required",
+    "effective_from",
+    "effective_to",
+    "revision"
+  ],
+  "fields": [
+    {
+      "fieldname": "icebreaker_id",
+      "label": "IceBreaker ID",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "training_course",
+      "label": "Training Course",
+      "fieldtype": "Link",
+      "options": "IceBreaker Training Course",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "league",
+      "label": "League",
+      "fieldtype": "Link",
+      "options": "IceBreaker League",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "season",
+      "label": "Season",
+      "fieldtype": "Link",
+      "options": "IceBreaker Season"
+    },
+    {
+      "fieldname": "role",
+      "label": "Role",
+      "fieldtype": "Select",
+      "options": "PLAYER\nPARENT\nGUARDIAN\nCOACH\nMANAGER\nVOLUNTEER\nOFFICIAL",
+      "reqd": 1
+    },
+    {
+      "fieldname": "renewal_mode",
+      "label": "Renewal",
+      "fieldtype": "Select",
+      "options": "ONCE\nANNUAL_CALENDAR\nANNUAL_SEASON\nROLLING_DAYS",
+      "reqd": 1
+    },
+    {
+      "fieldname": "validity_days",
+      "label": "Validity Days",
+      "fieldtype": "Int"
+    },
+    {
+      "fieldname": "required",
+      "label": "Required",
+      "fieldtype": "Check",
+      "default": 1
+    },
+    {
+      "fieldname": "effective_from",
+      "label": "Effective From",
+      "fieldtype": "Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "effective_to",
+      "label": "Effective Through",
+      "fieldtype": "Date"
+    },
+    {
+      "fieldname": "revision",
+      "label": "Revision",
+      "fieldtype": "Int",
+      "reqd": 1,
+      "default": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 0,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "share": 0
+    }
+  ],
+  "links": [],
+  "actions": []
+}
