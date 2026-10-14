@@ -93,6 +93,10 @@ IceBreaker now has opt-in OpenTelemetry instrumentation for rink HTTP operations
 
 See [observability requirements and setup](requirements/opentelemetry-observability.md) and [development Collector configuration](ops/otel/collector.local.yaml). Install optional Node dependencies with `npm install`, start the Collector, and use `ICEBREAKER_OTEL_ENABLED=1 npm run start:otel`. The native Windows desktop uses the same opt-in environment flag. End-to-end Collector testing and production deployment hardening are still required.
 
+## Beta acceptance — evidence required
+
+The [beta acceptance runbook](docs/architecture/beta-acceptance-runbook.md) and [machine-readable gates](requirements/beta-acceptance-gates.json) now distinguish a fictional two-laptop rink simulation, supervised rink beta, disposable Frappe Bench beta, and production registration. Run `node apps/rink-local/tools/beta-readiness.js --profile rink-simulation --revision <tested-git-sha> --strict` to get an explicit NO-GO until version-bound field evidence is recorded. Green CI is not a rink acceptance test or Frappe Bench installation. Open tracking issues: [rink acceptance](https://github.com/jeffadickson/IceBreaker/issues/2), [Frappe Bench](https://github.com/jeffadickson/IceBreaker/issues/3), [production security](https://github.com/jeffadickson/IceBreaker/issues/4).
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
