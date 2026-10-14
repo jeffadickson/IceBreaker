@@ -14,6 +14,7 @@ FIELDS = frozenset({
     "schema_version", "fictional", "league_id", "issued_at", "expires_at",
     "issuer", "key_id", "games",
 })
+RELEASE_FIELDS = FIELDS | {"release_revision"}
 GAME_FIELDS = frozenset({
     "game_id", "division_id", "home_team_id", "away_team_id",
     "scheduled_utc", "schedule_status",
@@ -42,10 +43,16 @@ def canonical_bytes(value):
 
 
 def validate_unsigned(value):
-    if not isinstance(value, dict) or set(value) != FIELDS:
+    if not isinstance(value, dict):
         raise ValueError("Unexpected schedule bundle fields")
-    if type(value["schema_version"]) is not int or value["schema_version"] != 1:
+    version = value.get("schema_version")
+    if type(version) is not int or version not in (1, 2):
         raise ValueError("Unsupported schedule bundle version")
+    if set(value) != (RELEASE_FIELDS if version == 2 else FIELDS):
+        raise ValueError("Unexpected schedule bundle fields")
+    if version == 2 and (type(value["release_revision"]) is not int
+                         or not 1 <= value["release_revision"] <= 2147483647):
+        raise ValueError("Invalid monotonic schedule release revision")
     if value["fictional"] is not True:
         raise ValueError("Only fictional schedule bundles are accepted")
     for key in ("league_id", "issuer", "key_id"):
@@ -79,13 +86,17 @@ def validate_unsigned(value):
 
 
 def make_unsigned(league_id, games, issued_at, expires_at,
-                  issuer="icebreaker-league-dev", key_id="dev-schedule-key"):
+                  issuer="icebreaker-league-dev", key_id="dev-schedule-key",
+                  release_revision=None):
     value = {
         "schema_version": 1, "fictional": True, "league_id": league_id,
         "issued_at": issued_at, "expires_at": expires_at,
         "issuer": issuer, "key_id": key_id,
         "games": sorted(games, key=lambda game: game["game_id"]),
     }
+    if release_revision is not None:
+        value["schema_version"] = 2
+        value["release_revision"] = release_revision
     return validate_unsigned(value)
 
 
@@ -101,9 +112,13 @@ def sign_bundle(unsigned, private_key_bytes):
 
 
 def verify_bundle(envelope, trusted_keys, expected_league, now=None):
-    if not isinstance(envelope, dict) or set(envelope) != FIELDS | {"signature"}:
+    if not isinstance(envelope, dict):
         raise ValueError("Unexpected signed schedule fields")
-    unsigned = validate_unsigned({key: envelope[key] for key in FIELDS})
+    version = envelope.get("schema_version")
+    fields = RELEASE_FIELDS if version == 2 else FIELDS
+    if set(envelope) != fields | {"signature"}:
+        raise ValueError("Unexpected signed schedule fields")
+    unsigned = validate_unsigned({key: envelope[key] for key in fields})
     if unsigned["league_id"] != expected_league:
         raise ValueError("Schedule outside requested league")
     if not isinstance(trusted_keys, dict):
@@ -140,6 +155,7 @@ def verify_bundle(envelope, trusted_keys, expected_league, now=None):
     except (InvalidSignature, ValueError) as exc:
         raise ValueError("Schedule signature verification failed") from exc
     return {"league_id": unsigned["league_id"],
+            "release_revision": unsigned.get("release_revision"),
             "bundle_sha256": hashlib.sha256(canonical_bytes(unsigned)).hexdigest(),
             "games": unsigned["games"],
             "expires_at": unsigned["expires_at"]}
