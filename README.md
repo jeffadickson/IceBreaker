@@ -72,6 +72,12 @@ Run `node --test tests/integration/*.test.js`; the integration suite now runs au
 
 A [two-phase signed handoff](services/ingest/verified-handoff.js), with an [interactive development CLI](services/ingest/handoff-cli.js), now restores a complete central journal to an idle backup laptop, verifies the pinned timing rules and event sequence, requires explicit operator approval, and commits ownership only after a station-signed restore receipt. Stale or divergent histories fail closed. See [recovery protocol and limitations](services/ingest/MULTI_RINK_RECOVERY.md) and [integration tests](tests/integration/verified-handoff.test.js). Production security, operator UI and old-laptop outbox reconciliation remain open.
 
+## OpenTelemetry observability (optional)
+
+IceBreaker now has opt-in OpenTelemetry instrumentation for rink HTTP operations, authoritative game commands, scoresheet submission/corrections/referee decisions, and native Windows snapshot/command operations. W3C trace context connects the Windows client to the rink authority. Export traces and bounded metrics to a **localhost OpenTelemetry Collector**; from there, forward to [Pydantic Logfire](https://pydantic.dev/logfire/) or another OTLP backend. Raw player identities, request bodies, credentials and certificate content are excluded by design. Telemetry is disabled by default and does not replace the immutable game audit journal.
+
+See [observability requirements and setup](requirements/opentelemetry-observability.md) and [development Collector configuration](ops/otel/collector.local.yaml). Install optional Node dependencies with `npm install`, start the Collector, and use `ICEBREAKER_OTEL_ENABLED=1 npm run start:otel`. The native Windows desktop uses the same opt-in environment flag. End-to-end Collector testing and production deployment hardening are still required.
+
 ## Launch
 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
