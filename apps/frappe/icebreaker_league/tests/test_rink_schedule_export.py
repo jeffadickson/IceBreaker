@@ -46,6 +46,7 @@ class TestRinkScheduleExport(unittest.TestCase):
         self.module_patch = patch.dict(sys.modules, {"frappe": fake})
         self.module_patch.start()
         self.addCleanup(self.module_patch.stop)
+        sys.modules.pop("icebreaker_league.access", None)
         sys.modules.pop("icebreaker_league.rink_schedule_export", None)
         self.exporter = importlib.import_module("icebreaker_league.rink_schedule_export")
 
