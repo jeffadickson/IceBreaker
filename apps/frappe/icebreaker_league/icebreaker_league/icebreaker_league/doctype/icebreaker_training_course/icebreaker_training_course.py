@@ -4,7 +4,7 @@ import frappe
 from frappe.model.document import Document
 from icebreaker_league.model_rules import stable_id_ok
 
-CODE = re.compile(r"[A-Z][A-Z0-9_]{1,79}\\Z")
+CODE = re.compile(r"[A-Z][A-Z0-9_]{1,79}\Z")
 
 
 class IceBreakerTrainingCourse(Document):
