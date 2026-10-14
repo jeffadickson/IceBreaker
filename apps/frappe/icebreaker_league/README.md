@@ -53,3 +53,7 @@ Next development milestone: disposable Bench install; two-tenant permission test
 A separate, append-only `IceBreaker Certified Result` DocType and strict Ed25519 envelope validator are implemented in `result_contract.py` and `result_receiver.py`. An authenticated **System Manager** can preview or import a **fictional** signed result through `icebreaker_league.result_receiver.preview_certified_result` and `receive_certified_result` (POST). The receiver validates the pinned issuer/public key, league/game links, replay/idempotency, and sequential revisions. It never modifies the rink clock, journal, or schedule game record.
 
 See [M3 design and key configuration](../../../docs/architecture/frappe-m3-signed-results.md). This is **not** a live production interface: no running Frappe Bench verification, automatic rink-side signer, authenticated service delivery, or cross-tenant integration tests yet. Source-level tests run in CI.
+
+## M3 outbound schedule bundle pilot
+
+A read-only, league-scoped `preview_unsigned_rink_schedule` API produces a **fictional, unsigned** schedule bundle. A strict Ed25519 signing/verification contract and a Node-side read-only verifier now exist for a future offline rink delivery service. **Neither the preview nor the verifier updates the official rink clock or game schedule.** Production signing keys, anti-rollback revisions, actual delivery and approved roster/game-rule bundles are not implemented. See [M3 outbound design](../../../docs/architecture/frappe-m3-rink-schedule-bundle.md).
