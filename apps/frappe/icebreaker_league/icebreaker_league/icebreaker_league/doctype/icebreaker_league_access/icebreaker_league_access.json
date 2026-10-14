@@ -1,0 +1,66 @@
+{
+  "doctype": "DocType",
+  "name": "IceBreaker League Access",
+  "module": "IceBreaker League",
+  "custom": 0,
+  "istable": 0,
+  "autoname": "field:icebreaker_id",
+  "title_field": "icebreaker_id",
+  "track_changes": 1,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "field_order": [
+    "icebreaker_id",
+    "user",
+    "league",
+    "enabled"
+  ],
+  "fields": [
+    {
+      "fieldname": "icebreaker_id",
+      "label": "Stable Access ID",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "user",
+      "label": "Frappe User",
+      "fieldtype": "Link",
+      "options": "User",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "league",
+      "label": "League",
+      "fieldtype": "Link",
+      "options": "IceBreaker League",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "enabled",
+      "label": "Enabled",
+      "fieldtype": "Check",
+      "default": "1",
+      "reqd": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 0,
+      "print": 0,
+      "share": 0
+    }
+  ],
+  "links": [],
+  "actions": [],
+  "description": "Restricted membership mapping for scoped league read APIs. Only System Managers can manage grants."
+}
