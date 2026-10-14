@@ -45,3 +45,27 @@ PYTHONPATH=apps/frappe/icebreaker_league python -m unittest discover -s apps/fra
 `test_training_policy_rules.py` covers renewal modes, date boundaries, append-only revisions, season overrides and restricted schema fields. `test_training_api.py` uses a fake Frappe runtime for scoped access, cross-league/season denial and privacy allowlisting. Neither is a substitute for live Bench integration.
 
 The rink clock, event journal, signed schedule staging and certified result projection are unchanged by this milestone.
+
+
+## M4.1 signed policy transport — development contract (2026-10-14)
+
+A **fictional-only**, PII-free, read-only training policy bundle contract now connects Frappe policy definitions to a separate Node verifier:
+
+- `icebreaker_league/training_bundle.py`: canonical JSON, strict policy fields, UTC lifetime (up to 7 days), monotonic release revision, Ed25519 offline signer and verifier.
+- `icebreaker_league/training_bundle_export.py`: authenticated league-scoped `preview_unsigned_training_bundle` GET endpoint. Returns a preview-only unsigned bundle with a **placeholder** revision; it does not allocate a release number or sign.
+- `apps/rink-local/server/frappe-training-verifier.js`: strict signed-envelope verification, pinned issuer/key/league, expiry and minimum-revision antirollback. It is **read-only** and does not modify rink training, roster, scores, clock or the completion ledger.
+- Pure Python and Node tests cover signature tampering, unknown/private fields, wrong league, duplicate policies, invalid renewal rules, expiry, and replay.
+
+### Delivery architecture and remaining gates
+
+```text
+Frappe Desk policy administration
+       -> authenticated, scoped unsigned preview
+       -> [NOT BUILT: controlled publisher / revision ledger / KMS signing]
+       -> Ed25519 policy bundle
+       -> read-only Node verifier
+       -> [NOT BUILT: approved atomic offline staging + parity checks]
+       -> protected registration eligibility engine
+```
+
+**Do not activate this bundle as rink policy yet.** A signed policy is not evidence that a person completed training. Before cutover: implement an authenticated release publisher with a durable per-league monotonic sequence, key rotation and revocation; independently verify Python/Node canonicalization; perform live v16 Bench tenant tests; map central course IDs to existing local course IDs; stage changes atomically with rollback; validate offline/restart behavior; and obtain explicit league acceptance. The existing rink-local training ledger remains authoritative. This milestone does not close FRAPPE-009 or FRAPPE-013.
