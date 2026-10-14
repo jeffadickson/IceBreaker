@@ -78,3 +78,7 @@ The canonical, detailed design is now [Frappe central-league technical design](f
 - **Decision:** keep league administration data separate from youth PII and preserve the independent rink clock/event journal; Frappe may store a certified projection only after authenticated M3 envelope verification.
 - **Decision:** the league-timezone M2 contract is a limited pilot. Before production, distinguish venue timezone from league timezone and prove DST parity for away games.
 - **Decision:** no real-player data migration or production cutover without explicit M0–M6 acceptance and rehearsed rollback.
+
+## M4 development increment — policy administration, not private registration
+
+The Frappe app now includes System-Manager-only Training Course and append-only Training Policy DocTypes. The read-only `league_training_policies` endpoint enforces the existing League Access role/membership boundary and returns only allowlisted training requirements. Annual/season/rolling policy selection and cross-league denial have source-level tests. The existing Node training completion ledger and rink game-day eligibility checks remain authoritative; no child records, certificates or private evidence are migrated into Frappe. This is **partial FRAPPE-013**, with live Frappe v16 Bench installation, database revision concurrency, production access validation, signed rink policy snapshots and protected evidence migration still open. See [M4 design](frappe-m4-training-policies.md).
