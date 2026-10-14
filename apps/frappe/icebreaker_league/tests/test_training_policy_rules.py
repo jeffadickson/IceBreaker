@@ -2,6 +2,7 @@
 import json
 import unittest
 from pathlib import Path
+from icebreaker_league.training_projection import select_policies
 from icebreaker_league.training_policy_rules import (
     iso_day, validate_policy_values, validate_revision, choose_effective_policy
 )
@@ -57,6 +58,27 @@ class TestCentralTrainingPolicies(unittest.TestCase):
         ):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 validate_revision(first, invalid)
+
+    def test_season_specific_overrides_global_without_leaking_other_seasons(self):
+        general = dict(training_course="safe-course", role="COACH",
+                       renewal_mode="ONCE", validity_days=None, required=1,
+                       effective_from="2026-01-01", effective_to=None,
+                       revision=1, season=None)
+        fall = dict(general, renewal_mode="ANNUAL_SEASON",
+                    effective_from="2026-09-01", season="demo-2026")
+        next_year = dict(general, effective_from="2027-09-01",
+                         season="demo-2027", required=0)
+        policies = [general, fall, next_year]
+        self.assertEqual(select_policies(policies, "demo-2026", "2026-10-13")[0]["renewal_mode"],
+                         "ANNUAL_SEASON")
+        self.assertEqual(select_policies(policies, "demo-2027", "2027-10-13")[0]["required"],
+                         False)
+        self.assertEqual(select_policies(policies, None, "2027-10-13")[0]["renewal_mode"],
+                         "ONCE")
+        self.assertEqual(select_policies(policies, "demo-2026", "2026-02-01")[0]["renewal_mode"],
+                         "ONCE")
+        self.assertEqual(select_policies(policies, "another-season", "2026-10-13")[0]["renewal_mode"],
+                         "ONCE")
 
     def test_doctype_privacy_and_roles(self):
         for slug in ("icebreaker_training_course", "icebreaker_training_policy"):
