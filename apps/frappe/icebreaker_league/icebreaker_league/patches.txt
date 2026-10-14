@@ -1,0 +1,1 @@
+# Versioned Frappe schema migrations will be listed here.
