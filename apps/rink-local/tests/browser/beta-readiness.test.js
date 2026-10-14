@@ -31,6 +31,14 @@ test('evidence must be version-bound, reviewed, dated and backed by a real artif
   r=gate.assess(manifest,{profile:'rink-simulation',revision:sha,root:dir,evidence:[bad]});
   assert.equal(r.passed,0);
  }
+ // A symlinked evidence directory must not escape the checkout.
+ const outside=fs.mkdtempSync(path.join(os.tmpdir(),'ib-beta-outside-'));
+ t.after(()=>fs.rmSync(outside,{recursive:true,force:true}));
+ fs.writeFileSync(path.join(outside,'fake.txt'),'fake');
+ try{
+  fs.symlinkSync(outside,path.join(dir,'linked'),'dir');
+  assert.equal(gate.safeEvidenceFile(dir,'linked/fake.txt'),false);
+ }catch(e){if(e.code!=='EPERM'&&e.code!=='EACCES')throw e;}
  assert.throws(()=>gate.assess(manifest,{profile:'rink-simulation',revision:sha,evidence:[record,record]}),/Duplicate/);
  assert.throws(()=>gate.assess(manifest,{profile:'rink-simulation',revision:sha,evidence:[{...record,id:'UNKNOWN'}]}),/Unknown/);
 });
