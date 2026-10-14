@@ -1,6 +1,6 @@
 # IceBreaker League — Frappe v16 custom app
 
-**Status: first development scaffold, not yet deployed or production-ready.**
+**Status: M2 development scaffold and fictional schedule pilot, not yet installed in a verified live Bench or production-ready.**
 
 This is the central administrative component of IceBreaker, not the rink-local scoring service. Frappe owns administrative league/season/division/team/game metadata; the rink authority remains the source of official game clock, scoring events and certified results.
 
@@ -20,7 +20,7 @@ bench --site your-dev-site list-apps
 
 Use a disposable development site and fictional league data. Standard installation requires the app to be available in the bench `apps/` directory and its Python environment; see Frappe's `bench get-app` and `bench new-app` guidance. The package layout here is scaffolded to that convention but has **not been exercised in a live Bench installation**.
 
-The initial DocTypes are intentionally restricted to **System Manager**. League-scoped administrators, team managers, parents and public visitors must not be granted broader access until tenant permission checks and migration tests exist.
+The initial DocTypes are intentionally restricted to **System Manager**. The narrow League Admin role has a scoped **read-only schedule API**, not generic DocType access. Team managers, parents and public visitors must not be granted broader access until tenant permission checks and migration tests exist.
 
 ## API and telemetry
 
@@ -34,7 +34,7 @@ See [ADR-001](../../../docs/architecture/adr-001-frappe-league-administration.md
 
 A strict fictional-only schedule exporter (`apps/rink-local/tools/export-frappe-schedule.js`) and Frappe importer (`icebreaker_league.schedule_importer`) are now present. The importer offers `preview_schedule_snapshot`, POST-only `import_schedule_snapshot`, and `league_schedule`. Only authenticated System Managers may invoke these pilot APIs. It validates source ISO-8601 offset, UTC conversion, DST parity against the league timezone, division/team references and immutable stable IDs. Legacy Final/Live/Scheduled state is carried for display but certified scores and event records are deliberately excluded.
 
-The next gates are a **running Frappe Bench installation**, real permission integration tests, league-scoped administrator roles and dual-read schedule reconciliation. The migration is not yet production-ready; see the [runbook](../../../docs/architecture/frappe-migration-runbook.md).
+The next gates are a **running Frappe Bench installation**, real permission integration tests for the existing scoped role, venue-timezone parity and dual-read schedule reconciliation. The migration is not yet production-ready; see the [runbook](../../../docs/architecture/frappe-migration-runbook.md).
 
 ## Initial league-scoped reader
 
