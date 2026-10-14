@@ -1,5 +1,8 @@
 # IceBreaker
 
+> **Architecture transition underway (2026-10-13):** IceBreaker is adopting **Frappe Framework v16 for central league administration** and **OpenTelemetry/OTLP for observability**. The existing rink-local scoring authority and native Windows timekeeper remain unchanged. This is an incremental redevelopment, not a completed cutover. See [ADR-001](docs/architecture/adr-001-frappe-league-administration.md), [Frappe requirements](requirements/frappe-league-migration.md), and [new app scaffold](apps/frappe/icebreaker_league/README.md).
+
+
 **Hockey-first, sport-extensible scoring, rink operations, and league management.**
 
 > **Status: development prototype.** The Node.js local server and C# components are not yet one unified production authority. No public-internet deployment or game certification is supported. Sample teams/results are fictional.
