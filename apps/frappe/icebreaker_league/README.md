@@ -61,3 +61,19 @@ See [M3 design and key configuration](../../../docs/architecture/frappe-m3-signe
 ## M3 outbound schedule bundle pilot
 
 A read-only, league-scoped `preview_unsigned_rink_schedule` API produces a **fictional, unsigned** schedule bundle. A strict Ed25519 signing/verification contract and a Node-side read-only verifier now exist for a future offline rink delivery service. **Neither the preview nor the verifier updates the official rink clock or game schedule.** Production signing keys, anti-rollback revisions, actual delivery and approved roster/game-rule bundles are not implemented. See [M3 outbound design](../../../docs/architecture/frappe-m3-rink-schedule-bundle.md).
+
+
+## M4.1 signed training-policy transport (development)
+
+The Frappe app now exposes a league-scoped **unsigned preview** at
+`GET /api/method/icebreaker_league.training_bundle_export.preview_unsigned_training_bundle`
+with `league_id=demo-league` and optional `season_id` and `at_date`.
+It includes only course/role/renewal policy definitions, never personal training
+evidence or certificate scans. `training_bundle.py` defines the canonical
+Ed25519-signed envelope, and the rink-local `frappe-training-verifier.js`
+checks signatures, league/key scope, expiration and antirollback **without
+applying policies**. A separate authenticated release publisher, durable
+release sequence, KMS signing, atomic offline staging, live Bench permission
+testing and explicit league cutover approval remain required. Do not use the
+preview bundle to change game-day eligibility. See
+[the M4 design](../../../docs/architecture/frappe-m4-training-policies.md).
