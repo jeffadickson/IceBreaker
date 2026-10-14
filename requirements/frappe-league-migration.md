@@ -21,6 +21,7 @@
 | FRAPPE-015 | P0 | Provide rollback, database backups and staged cutover | Migration runbook and restore test |
 | FRAPPE-016 | P0 | Maintain requirement-to-code/test mapping in existing tracker | Traceability entries |
 | FRAPPE-017 | P0 | Production Frappe deployment requires HTTPS, MFA, secrets/KMS, audit and data retention review | Release gate |
+| FRAPPE-018 | P0 | Deliver central training requirements only via authenticated, signed, tenant-bound, versioned and replay-protected policy bundles; never include participant evidence or change live rink eligibility until explicit acceptance | Python/Node contract tests; publisher, offline staging and live Bench acceptance pending |
 
 **FRAPPE-013 progress (M4 pilot):** The Frappe app now has System-Manager-only Training Course and immutable Training Policy DocTypes, pure annual/rolling renewal validation, and a narrowly league-scoped read-only policy API. These contain no private person records or certificate evidence. Source-level unit and mock authorization tests are added; live v16 Bench integration, concurrent revision safety, signed policy delivery, protected evidence migration and tournament administration remain open. See [M4 training design](../docs/architecture/frappe-m4-training-policies.md).
 
