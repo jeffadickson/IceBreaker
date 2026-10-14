@@ -49,7 +49,7 @@ public sealed class TimekeeperWindow : Window
     private readonly TextBox _penaltyTeam = new() { Watermark = "home / away", Width = 130 };
     private readonly TextBox _penaltyPlayer = new() { Watermark = "Jersey #", Width = 95 };
     private readonly TextBox _penaltyInfraction = new() { Watermark = "Infraction", Width = 180 };
-    private readonly TextBox _penaltySeconds = new() { Watermark = "Seconds", Text = "120", Width = 100 };
+    private readonly ComboBox _penaltyClass = new() { ItemsSource = new[] { "MINOR", "DOUBLE_MINOR", "MAJOR", "MISCONDUCT", "GAME_MISCONDUCT", "MATCH", "OTHER" }, SelectedIndex = 0, Width = 185 };\n    private readonly CheckBox _penaltyCoincidental = new() { Content = "Coincidental penalty" };\n    private readonly TextBox _penaltySeconds = new() { Watermark = "Seconds", Text = "120", Width = 100 };
     private readonly TextBox _setTime = new() { Watermark = "MM:SS", Width = 110 };
     private readonly TextBox _reason = new() { Watermark = "Reason for correction", Width = 250 };
     private readonly CheckBox _confirm = new() { Content = "Confirm clock correction" };
@@ -143,7 +143,7 @@ public sealed class TimekeeperWindow : Window
         }, closeOnSuccess: true));
         var penaltyBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
         penaltyBody.Children.Add(Label("PENALTY ENTRY", 18));
-        penaltyBody.Children.Add(Buttons(_penaltyTeam, _penaltyPlayer, _penaltyInfraction, _penaltySeconds,
+        penaltyBody.Children.Add(Buttons(_penaltyTeam, _penaltyPlayer, _penaltyInfraction, _penaltyClass, _penaltyCoincidental, _penaltySeconds,
             ActionButton("ASSESS PENALTY", async () =>
             {
                 if (!int.TryParse(_penaltySeconds.Text, out var seconds) || seconds < 1 || seconds > 3600)
@@ -159,11 +159,11 @@ public sealed class TimekeeperWindow : Window
                 {
                     type = "PENALTY_ASSESSED", team,
                     player, infraction, duration = seconds,
-                    classification = "MINOR"
+                    classification = _penaltyClass.SelectedItem?.ToString() ?? "MINOR",\n                    coincidental = _penaltyCoincidental.IsChecked == true
                 });
                 _penaltyPlayer.Text = "";
                 _penaltyInfraction.Text = "";
-                _penaltySeconds.Text = "120";
+                _penaltySeconds.Text = "120";\n                _penaltyClass.SelectedIndex = 0;\n                _penaltyCoincidental.IsChecked = false;
             }, closeOnSuccess: true)));
         var goalieBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
         goalieBody.Children.Add(Label("GOALIE CHANGE", 18));
@@ -378,6 +378,32 @@ public sealed class TimekeeperWindow : Window
             }).ToArray();
         _correctionGoal.ItemsSource = choices;
         _correctionGoal.SelectedIndex = choices.Length > 0 ? 0 : -1;
+    }
+
+    // Populate selector suggestions from the confirmed, eligible game-day roster.
+    // Text remains editable for rapid keyboard entry; authority validates every command.
+    private async Task LoadRosterSuggestionsAsync(string side)
+    {
+        try
+        {
+            using var roster = await _client.GameRostersAsync();
+            var root = roster.RootElement;
+            if (!root.GetProperty("confirmed").GetBoolean())
+            {
+                _status.Text = "Game-day rosters are not fully confirmed; scoring may be rejected.";
+                return;
+            }
+            var team = root.GetProperty("teams").GetProperty(side);
+            if (!team.GetProperty("confirmed").GetBoolean() || !team.GetProperty("eligible").GetBoolean())
+                throw new InvalidOperationException("Selected team's lineup is not eligible");
+            var jerseys = team.GetProperty("players").EnumerateArray()
+                .Select(p => p.GetProperty("jersey").ToString()).Distinct().ToArray();
+            _status.Text = side.ToUpperInvariant() + " approved jerseys: " + string.Join(", ", jerseys);
+        }
+        catch (Exception ex)
+        {
+            _status.Text = "Roster unavailable: " + ex.Message;
+        }
     }
 
     private Button PopupButton(string text, string title, Control panel, Action? beforeOpen = null, int width = 0)
