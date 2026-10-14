@@ -8,6 +8,17 @@ This is the central administrative component of IceBreaker, not the rink-local s
 
 `icebreaker_league/icebreaker_league/doctype/` contains source-controlled Frappe DocType schemas and validation controllers. `icebreaker_league/observability.py` provides privacy-safe manual OpenTelemetry spans. `icebreaker_league/api.py` contains a permission-gated, read-only API.
 
+## Locked contract tests (without a Bench)
+
+The central app's standalone Python contract tests use the committed `uv.lock`, independently of the rink's Node 22 runtime. From the repository root:
+
+```bash
+python tools/icebreaker.py bootstrap
+python tools/icebreaker.py frappe-test
+```
+
+`uv` provisions a compatible Python 3.14 environment. This tests source contracts only; a **live Frappe v16 Bench** (Python 3.14, Node 24, database and Redis) is required to validate DocTypes, permissions, migrations and deployment. See the [canonical build guide](../../../docs/build-and-release.md).
+
 ## Local Frappe v16 setup
 
 Prerequisites: a working **Frappe v16 Bench** with Python 3.14+, Node 24+ and its supported database/Redis services. This repo does not vendor Frappe or Bench. From a development bench, install the local app package (path must resolve to this directory), then:
