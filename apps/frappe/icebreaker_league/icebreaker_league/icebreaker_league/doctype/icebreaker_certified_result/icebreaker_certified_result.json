@@ -1,0 +1,147 @@
+{
+  "doctype": "DocType",
+  "name": "IceBreaker Certified Result",
+  "module": "IceBreaker League",
+  "custom": 0,
+  "istable": 0,
+  "autoname": "field:icebreaker_id",
+  "title_field": "icebreaker_id",
+  "track_changes": 1,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "field_order": [
+    "icebreaker_id",
+    "game",
+    "league",
+    "revision",
+    "home_score",
+    "away_score",
+    "journal_sha256",
+    "certification_sha256",
+    "envelope_sha256",
+    "idempotency_key",
+    "issued_at",
+    "issuer",
+    "key_id",
+    "signature"
+  ],
+  "fields": [
+    {
+      "fieldname": "icebreaker_id",
+      "label": "Projection ID",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "game",
+      "label": "Game",
+      "fieldtype": "Link",
+      "options": "IceBreaker Game",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "league",
+      "label": "League",
+      "fieldtype": "Link",
+      "options": "IceBreaker League",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "revision",
+      "label": "Certification Revision",
+      "fieldtype": "Int",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "home_score",
+      "label": "Home Score",
+      "fieldtype": "Int",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "away_score",
+      "label": "Away Score",
+      "fieldtype": "Int",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "journal_sha256",
+      "label": "Journal SHA-256",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "certification_sha256",
+      "label": "Certification SHA-256",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "envelope_sha256",
+      "label": "Envelope SHA-256",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "idempotency_key",
+      "label": "Idempotency Key",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "issued_at",
+      "label": "Issued UTC",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "issuer",
+      "label": "Certification Issuer",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "key_id",
+      "label": "Signing Key ID",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "signature",
+      "label": "Ed25519 Signature",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 0,
+      "create": 0,
+      "delete": 0,
+      "report": 1,
+      "export": 0,
+      "print": 0,
+      "share": 0
+    }
+  ],
+  "links": [],
+  "actions": []
+}
