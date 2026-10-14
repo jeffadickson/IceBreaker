@@ -6,6 +6,14 @@
   "scripts": {
     "test": "node --test apps/rink-local/tests/browser/*.test.js",
     "docs:check": "python tools/check_docs.py",
-    "start": "node apps/rink-local/server/rink-server.js"
+    "start": "node apps/rink-local/server/rink-server.js",
+    "start:otel": "node --require ./apps/rink-local/server/otel-bootstrap.js apps/rink-local/server/rink-server.js"
+  },
+  "optionalDependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/sdk-node": "0.223.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.223.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.223.0",
+    "@opentelemetry/sdk-metrics": "2.12.0"
   }
 }
