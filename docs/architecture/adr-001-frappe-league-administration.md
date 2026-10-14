@@ -61,3 +61,9 @@ Frappe permission query coverage, cross-tenant link validation, v16 deployment a
 - https://docs.frappe.io/framework/user/en/api/rest
 - https://github.com/frappe/frappe/wiki/Migrating-to-version-16
 - https://opentelemetry.io/docs/languages/python/
+
+## Implementation update — M2 pilot (2026-10-13)
+
+The fictional-data-only M2 exporter and Frappe schedule importer now preserve stable game IDs, original offset-aware timestamps, canonical UTC and legacy game status, without importing goals, scores or certified results. The `IceBreaker League Access` DocType and narrowly provisioned `IceBreaker League Admin` role support an explicitly membership-scoped **read-only schedule API**. The administrative importer remains System-Manager-only. The existing rink authority and OpenTelemetry integration are unchanged.
+
+This is **not** a production cutover: Frappe v16 Bench installation, real DocType permission behavior, DST/venue scenarios outside the league timezone, certified-result envelopes and offline rink synchronization require separate integration tests. The current Node league database remains authoritative until an approved migration milestone.
