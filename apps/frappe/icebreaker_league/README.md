@@ -30,6 +30,10 @@ Authenticated System Managers can call `/api/method/icebreaker_league.api.league
 
 See [ADR-001](../../../docs/architecture/adr-001-frappe-league-administration.md) and [migration requirements](../../../requirements/frappe-league-migration.md). No production cutover has occurred. The existing rink-local code remains unchanged and authoritative for scoring.
 
+## M4 pilot — Central training policies (development)
+
+The Frappe app now includes `IceBreaker Training Course` and `IceBreaker Training Policy` DocTypes for configurable annual, season, one-time and rolling training requirements. Policy revisions are append-only; only System Managers can create/edit course definitions and publish policies. A league-scoped, read-only `icebreaker_league.training_api.league_training_policies` method exposes only policy fields to authorized League Admin members. No person, guardian or certificate evidence is stored in these DocTypes. This has source-level tests but has **not** been installed or permission-tested in a live Frappe Bench. See [M4 design](../../../docs/architecture/frappe-m4-training-policies.md).
+
 ## M2 schedule redevelopment
 
 A strict fictional-only schedule exporter (`apps/rink-local/tools/export-frappe-schedule.js`) and Frappe importer (`icebreaker_league.schedule_importer`) are now present. The importer offers `preview_schedule_snapshot`, POST-only `import_schedule_snapshot`, and `league_schedule`. Only authenticated System Managers may invoke these pilot APIs. It validates source ISO-8601 offset, UTC conversion, DST parity against the league timezone, division/team references and immutable stable IDs. Legacy Final/Live/Scheduled state is carried for display but certified scores and event records are deliberately excluded.
