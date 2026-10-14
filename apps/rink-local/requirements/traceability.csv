@@ -42,7 +42,7 @@ FRAPPE-009,../frappe/icebreaker_league/icebreaker_league/rink_schedule_bundle.py
 FRAPPE-010,../frappe/icebreaker_league/icebreaker_league/result_contract.py;../frappe/icebreaker_league/icebreaker_league/result_receiver.py;../frappe/icebreaker_league/icebreaker_league/icebreaker_league/doctype/icebreaker_certified_result/icebreaker_certified_result.json,../frappe/icebreaker_league/tests/test_result_contract.py;../frappe/icebreaker_league/tests/test_result_receiver.py,partial-signed-envelope-source-tests-no-live-Bench-or-service-delivery
 FRAPPE-011,../frappe/icebreaker_league/icebreaker_league/observability.py;../frappe/icebreaker_league/icebreaker_league/otel_bootstrap.py,../frappe/icebreaker_league/tests/test_observability.py,partial-allowlisted-preview-span-collector-test-pending
 FRAPPE-012,,,planned-failure-injection
-FRAPPE-013,,,planned
+FRAPPE-013,../frappe/icebreaker_league/icebreaker_league/training_policy_rules.py;../frappe/icebreaker_league/icebreaker_league/training_projection.py;../frappe/icebreaker_league/icebreaker_league/training_api.py;../frappe/icebreaker_league/icebreaker_league/icebreaker_league/doctype/icebreaker_training_course/icebreaker_training_course.json;../frappe/icebreaker_league/icebreaker_league/icebreaker_league/doctype/icebreaker_training_policy/icebreaker_training_policy.json,../frappe/icebreaker_league/tests/test_training_policy_rules.py;../frappe/icebreaker_league/tests/test_training_api.py,partial-Frappe-course-policy-model-no-live-Bench-no-person-completions-or-legacy-migration
 FRAPPE-014,,,planned
 FRAPPE-015,,,planned
 FRAPPE-016,../../requirements/traceability.md,tests/browser/requirements-status.test.js,development-tracked
