@@ -33,8 +33,9 @@ jobs:
         run: |
           python tools/check_docs.py
           python tools/check_build.py
+          python tools/audit_code_docs.py --output out/code-doc-audit.json
           python -m py_compile tools/icebreaker.py tools/check_build.py
-      - name: Run rink-local Node tests
+      - name: Upload code documentation inventory\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: code-doc-audit\n          path: out/code-doc-audit.json\n      - name: Run rink-local Node tests
         run: npm test
       - name: Run distributed synchronization and architecture tests
         run: node --test tests/integration/*.test.js tests/architecture/*.test.js
