@@ -45,9 +45,13 @@ See [canonical technical design](../docs/architecture/frappe-central-league-desi
 | FRAPPE-001/003/004/008 | Development scaffold, six administrative/game DocTypes and M1/M2 import contracts | Real v16 Bench install, schema migration, conflict and rollback tests |
 | FRAPPE-005 | Partial: League Access role/membership and read-only API; generic DocTypes System-Manager-only | Two-league integration tests for list/read/write/link/export/report permissions |
 | FRAPPE-007 | Partial: source offset, UTC and UTC-naive schedule fields, DST validation | Venue timezone model and old/new schedule parity |
-| FRAPPE-009/010/012 | Planned M3 integration | Signed roster/rules envelopes, certified-result idempotency, offline failure injection |
+| FRAPPE-009/010/012 | M3 partial: signed-result envelope, append-only Frappe projection and replay contract source/tests; roster/rules export and offline delivery not built | Live Bench integration, production signing service, signed snapshots, offline failure injection |
 | FRAPPE-011 | Partial: opt-in allowlisted spans | Collector smoke, privacy scan, exporter outage and retention tests |
 | FRAPPE-013/014 | Planned Frappe workflows; existing Node domain implementations retained | Role workflow and annual training parity |
 | FRAPPE-015/017 | Development runbook and restricted access only | Encrypted backup/restore, MFA/KMS, consent, audit and approved cutover |
 
 **Requirement-tracker rule:** mark source-level implementation and CI tests separately from live Frappe integration and production acceptance. Never close a requirement based only on a JSON schema or mock policy test.
+
+## M3 certified-result pilot (source-level only)
+
+The new [signed-result design](../docs/architecture/frappe-m3-signed-results.md) defines Ed25519 canonical envelope v3 and a System-Manager-only Frappe pilot receiver. A separate immutable `IceBreaker Certified Result` DocType stores certified score projections without modifying the schedule DocType, game journal, clock or referee certification. Signature verification, fictional-data gate, idempotent duplicate handling, conflicts and monotonic revisions are unit-tested. **This does not complete FRAPPE-010:** live Frappe v16 Bench migration, production issuer key management, source-side signed result generation, service authentication and retry/reconciliation still need acceptance.
