@@ -73,6 +73,9 @@ def verify_envelope(value, trusted_public_keys):
     entry = trusted_public_keys.get(unsigned["key_id"])
     if not isinstance(entry, dict) or entry.get("issuer") != unsigned["issuer"]:
         raise ValueError("Untrusted result signing issuer or key")
+    leagues = entry.get("leagues")
+    if not isinstance(leagues, list) or unsigned["league_id"] not in leagues:
+        raise ValueError("Signing key is not authorized for this league")
     key_b64 = entry.get("public_key_base64")
     if not isinstance(key_b64, str):
         raise ValueError("Invalid configured signing key")
