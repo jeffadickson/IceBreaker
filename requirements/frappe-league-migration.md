@@ -10,7 +10,7 @@
 | FRAPPE-004 | P0 | Model league, season, division, club, team, game as linked DocTypes | JSON schemas and controller validation |
 | FRAPPE-005 | P0 | Enforce league-scoped RBAC for all list/read/write/API operations | Cross-league negative tests |
 | FRAPPE-006 | P0 | Never expose private player or family data via public DocTypes or attachments | Privacy tests and security review |
-| FRAPPE-007 | P0 | Separate central schedule ownership from rink certified results | Contract tests |
+| FRAPPE-007 | P0 | Separate central schedule ownership from rink certified results; preserve original offset and canonical UTC without migrating scores | M2 export, schema and DST tests; live Bench parity still pending |
 | FRAPPE-008 | P0 | Import only idempotently, with dry-run and source ID mapping | Repeated import and conflict tests |
 | FRAPPE-009 | P0 | Export signed, versioned game rules and approved roster snapshots to rink | Offline rink tests |
 | FRAPPE-010 | P0 | Receive certified results with digest/revision/idempotency and no score overwrite | Duplicate/replay/conflict tests |
@@ -23,3 +23,11 @@
 | FRAPPE-017 | P0 | Production Frappe deployment requires HTTPS, MFA, secrets/KMS, audit and data retention review | Release gate |
 
 **Migration policy:** Existing Node/SQLite league system remains authoritative until M2/M3 parity tests and an explicitly approved cutover. Frappe is not yet a production replacement. See `docs/architecture/adr-001-frappe-league-administration.md`.
+
+## M2 schedule milestone (development)
+
+The Frappe `IceBreaker Game` DocType now carries the original offset-aware start time, canonical UTC time and UTC-naive Frappe datetime separately. This avoids silent timezone shifts, including daylight-saving transitions. A read-only legacy state (Scheduled/Live/Final) is informational only; **certified scores are not imported**.
+
+The fictional-data-only `export-frappe-schedule.js` emits a version-2 schedule snapshot. `schedule_importer.py` provides authenticated System Manager dry-run, idempotent import and read-only league schedule methods, rejecting cross-league divisions, mismatched teams and conflicting stable IDs. Frappe must be installed in a disposable Bench and permission-tested before any non-demo migration or change of system authority.
+
+Remaining M2 gates: running Frappe Bench installation, schedule reconciliation with original Node league service, tenant-scoped administrator roles, venue timezone support for out-of-area games, conflict/rollback testing against a real MariaDB/PostgreSQL backend, and deployment monitoring.
