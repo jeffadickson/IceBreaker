@@ -16,7 +16,10 @@ node_modules/
 coverage/
 __pycache__/
 .DS_Store
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
 .idea/
 
 # encrypted document objects and locally provisioned secrets
@@ -26,3 +29,12 @@ __pycache__/
 **/encrypted-email-evidence.db*
 **/fictional-email.json
 **/demo-identity.json
+
+# Build outputs and isolated Python environments
+out/
+**/.venv/
+**/.pytest_cache/
+**/.ruff_cache/
+**/*.egg-info/
+*.nupkg
+.vs/
