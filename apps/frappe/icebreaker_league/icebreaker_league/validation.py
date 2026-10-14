@@ -46,5 +46,20 @@ def validate_document(doc):
         away_division = frappe.db.get_value("IceBreaker Team", doc.away_team, "division")
         if not same_division(doc.division, home_division, away_division):
             frappe.throw("Both teams must belong to the game's division")
+        from .schedule_contract import normalize_start, ALLOWED_SOURCE_STATES
+        league = _league_of_division(doc.division)
+        timezone = frappe.db.get_value("IceBreaker League", league, "timezone")
+        try:
+            normalize_start(doc.scheduled_source_iso, doc.scheduled_utc,
+                            str(doc.scheduled_at), timezone)
+        except ValueError as error:
+            frappe.throw(str(error))
+        if doc.source_game_state not in ALLOWED_SOURCE_STATES:
+            frappe.throw("Invalid source game state")
+        if not doc.is_new():
+            old = doc.get_doc_before_save()
+            if old and any(getattr(old, key, None) != getattr(doc, key, None)
+                           for key in ("scheduled_source_iso", "scheduled_utc", "source_game_state")):
+                frappe.throw("Source schedule import metadata is immutable")
         # Scores and certification are intentionally NOT editable in this
         # scheduling DocType; rink authority owns the certified result.
