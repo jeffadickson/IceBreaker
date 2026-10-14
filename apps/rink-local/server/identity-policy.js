@@ -14,6 +14,15 @@ const PERMISSIONS = Object.freeze({
   SCOREKEEPER: ['game:read', 'game:score', 'game:clock'],
   PLATFORM_SUPERUSER: ['platform:admin']
 });
+/**
+ * Authorize an action against a trusted resource scope.
+ * @param {object} principal Authenticated user with server-loaded grants and MFA context.
+ * @param {string} action Exact permission, e.g. game:score.
+ * @param {{scopeType:string,scopeId:string}} resource Trusted target scope.
+ * @param {number} at Evaluation time in Unix milliseconds (injectable for tests).
+ * @returns {boolean} False for unknown, expired, revoked or mismatched grants.
+ * @remarks This pure helper does not verify sessions or token signatures.
+ */
 function can(principal, action, resource, at = Date.now()) {
   if (!principal || principal.disabled || !principal.id || !resource || !action) return false;
   const grants = Array.isArray(principal.grants) ? principal.grants : [];
@@ -28,6 +37,12 @@ function can(principal, action, resource, at = Date.now()) {
     return g.scopeType === resource.scopeType && g.scopeId === resource.scopeId;
   });
 }
+/**
+ * Construct the minimal self-service parent grant.
+ * A PARENT grant never establishes league membership or guardian custody.
+ * @param {string} userId Stable internal identity, not an email address.
+ * @returns {Readonly<object>} Platform-level parent grant.
+ */
 function initialParentGrant(userId) {
   if (typeof userId !== 'string' || !userId) throw Error('Stable user ID required');
   return Object.freeze({ userId, role: 'PARENT', scopeType: 'PLATFORM', scopeId: '*', revokedAt: null });
