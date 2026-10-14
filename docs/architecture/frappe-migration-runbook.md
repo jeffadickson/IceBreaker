@@ -114,3 +114,16 @@ This is a **development checklist**, not a production runbook. Execute in a disp
 - [ ] Record tests, exact Frappe version, database engine, migration logs, anonymized reconciliation counts, backup restore evidence, reviewer and approval decision in the requirement tracker.
 
 **M3 is not started merely by installing the app.** Define and independently test signed roster/rules snapshots and certified result envelopes before any central-to-rink or rink-to-central authority switch. The detailed contracts and ownership are in [Frappe central-league technical design](frappe-central-league-design.md).
+
+## M3 certified-result pilot — fictional data only
+
+After installing/migrating the app in a **disposable Frappe v16 Bench**, configure the issuer-bound Ed25519 **public** key in site configuration as documented in [M3 signed-result design](frappe-m3-signed-results.md). Never place a signing private key in Frappe. The certification service's signing key and automatic result delivery are not implemented yet; only use independently constructed fictional signed test envelopes.
+
+1. Verify the new `IceBreaker Certified Result` DocType exists and System Manager can read but not directly create, edit or delete records.
+2. Submit a fictional signed envelope using an authenticated System Manager **POST** to `icebreaker_league.result_receiver.preview_certified_result`; it must return `insert` without writing.
+3. Submit the identical envelope to `icebreaker_league.result_receiver.receive_certified_result`; expect `imported`, then `unchanged` on exact retry.
+4. Change a signed score or digest without resigning; expect signature rejection. Resign with a different value for the same revision; expect conflict. Submit revision 3 before revision 2; expect out-of-order rejection.
+5. Try wrong league, untrusted key, Guest, and League Admin role; all must be denied. Verify no source game, clock or event journal mutation occurs.
+6. Run concurrent duplicate submissions against a real Bench database and verify one projection only. Exercise backup/restore and repeat import; record exact Frappe version and migration logs in the requirement tracker.
+
+This is **not** a production integration or authorization model. The pilot remains System Manager-only and fictional-only. Production requires service identities, signing key rotation, result generation from the official certification service, offline outbox/replay, cross-tenant permission testing, and a controlled cutover.
