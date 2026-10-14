@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -11,8 +12,12 @@ namespace Icebreaker.Core.Integration;
 /// </summary>
 public sealed class RinkClockClient(HttpClient http, string operatorKey, string operatorId = "desktop-timekeeper")
 {
+    public static readonly ActivitySource Telemetry = new("IceBreaker.Desktop", "1.0.0");
+    private static readonly HashSet<string> SafeEvents = new(StringComparer.Ordinal) { "GOAL_RECORDED", "GOAL_ATTRIBUTION_CORRECTED", "PENALTY_ASSESSED", "GOALIE_CHANGED", "CLOCK_UPDATED", "CLOCK_SYNCED", "PERIOD_ENDED", "PERIOD_ADVANCED", "OVERTIME_STARTED", "TIMEOUT_TAKEN" };
+
     public async Task<RinkClockSnapshot> SnapshotAsync(CancellationToken token = default)
     {
+        using var span = Telemetry.StartActivity("icebreaker.rink.snapshot", ActivityKind.Client);
         using var response = await http.GetAsync("/api/games/demo/snapshot", token);
         response.EnsureSuccessStatusCode();
         using var json = await response.Content.ReadFromJsonAsync<JsonDocument>(cancellationToken: token)
@@ -40,10 +45,14 @@ public sealed class RinkClockClient(HttpClient http, string operatorKey, string 
 
     public async Task CommandAsync(object command, CancellationToken token = default)
     {
+        using var span = Telemetry.StartActivity("icebreaker.rink.command", ActivityKind.Client);
+        var eventType = command.GetType().GetProperty("type")?.GetValue(command)?.ToString();
+        span?.SetTag("icebreaker.game.event_type", eventType is not null && SafeEvents.Contains(eventType) ? eventType : "OTHER");
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/operator/command")
         {
             Content = JsonContent.Create(command)
         };
+        if (Activity.Current?.Id is { } traceparent) request.Headers.TryAddWithoutValidation("traceparent", traceparent);
         request.Headers.Add("X-Operator-Key", operatorKey);
         request.Headers.Add("X-Operator-Id", operatorId);
         request.Headers.Add("Idempotency-Key", "desktop-" + Guid.NewGuid().ToString("N"));
