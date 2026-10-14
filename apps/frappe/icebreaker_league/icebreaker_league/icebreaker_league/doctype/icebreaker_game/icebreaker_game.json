@@ -15,6 +15,9 @@
     "home_team",
     "away_team",
     "scheduled_at",
+    "scheduled_source_iso",
+    "scheduled_utc",
+    "source_game_state",
     "venue",
     "rink",
     "schedule_status"
@@ -53,7 +56,33 @@
       "fieldname": "scheduled_at",
       "label": "Scheduled At",
       "fieldtype": "Datetime",
-      "reqd": 1
+      "reqd": 1,
+      "description": "UTC naive projection; original offset and canonical UTC stored separately"
+    },
+    {
+      "fieldname": "scheduled_source_iso",
+      "label": "Original Scheduled ISO 8601",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1,
+      "description": "Original offset-aware timestamp preserved from legacy source; used for timezone parity"
+    },
+    {
+      "fieldname": "scheduled_utc",
+      "label": "Scheduled UTC ISO 8601",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "read_only": 1,
+      "description": "Canonical UTC timestamp with Z suffix"
+    },
+    {
+      "fieldname": "source_game_state",
+      "label": "Legacy Game State",
+      "fieldtype": "Select",
+      "options": "Scheduled\nLive\nFinal",
+      "reqd": 1,
+      "read_only": 1,
+      "description": "Informational legacy status; not a certified result"
     },
     {
       "fieldname": "venue",
