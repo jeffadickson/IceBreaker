@@ -47,3 +47,9 @@ Read the [canonical central-league technical design](../../../docs/architecture/
 **Current status:** source-controlled Frappe app and unit/contract tests pass; **no live Frappe v16 Bench integration, Desk permission audit, or production migration has been verified**. The IceBreaker League Admin role currently receives a **scoped read-only schedule API**, not general DocType rights. Rink-local scoring and certification remain authoritative.
 
 Next development milestone: disposable Bench install; two-tenant permission tests (including generic REST, link queries, reports and exports); venue timezone/DST parity; and signed M3 contract specification. Do not migrate real minors' data.
+
+## M3 signed certified-result projection (development)
+
+A separate, append-only `IceBreaker Certified Result` DocType and strict Ed25519 envelope validator are implemented in `result_contract.py` and `result_receiver.py`. An authenticated **System Manager** can preview or import a **fictional** signed result through `icebreaker_league.result_receiver.preview_certified_result` and `receive_certified_result` (POST). The receiver validates the pinned issuer/public key, league/game links, replay/idempotency, and sequential revisions. It never modifies the rink clock, journal, or schedule game record.
+
+See [M3 design and key configuration](../../../docs/architecture/frappe-m3-signed-results.md). This is **not** a live production interface: no running Frappe Bench verification, automatic rink-side signer, authenticated service delivery, or cross-tenant integration tests yet. Source-level tests run in CI.
