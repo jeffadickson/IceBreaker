@@ -71,6 +71,8 @@ def publish(db, preview, seed, *, approved_by, approval_ticket,
     """
     instant = _utc(now or datetime.now(timezone.utc))
     unsigned = _preview(preview, instant)
+    if unsigned["issuer"] != issuer or unsigned["key_id"] != key_id:
+        raise ValueError("Preview issuer or signing key differs from publisher configuration")
     if (not isinstance(approved_by, str) or not 2 <= len(approved_by) <= 100
             or not isinstance(approval_ticket, str) or
             not 2 <= len(approval_ticket) <= 100):
