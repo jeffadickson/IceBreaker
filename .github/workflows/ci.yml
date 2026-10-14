@@ -24,8 +24,11 @@ jobs:
           enable-cache: true
       - name: Restore locked Node dependencies
         run: npm ci --ignore-scripts --no-audit
-      - name: Check documentation and architecture
-        run: python tools/check_docs.py
+      - name: Check documentation, build manifests and tool syntax
+        run: |
+          python tools/check_docs.py
+          python tools/check_build.py
+          python -m py_compile tools/icebreaker.py tools/check_build.py
       - name: Run rink-local Node tests
         run: npm test
       - name: Run distributed synchronization and architecture tests
