@@ -55,17 +55,17 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
   }
   if(pathname==='/api/scoresheet/v1/submit'&&req.method==='POST'){
    if(!auth(req))return send(res,403,{error:'Operator credential required'});
-   try{return send(res,201,certification.submit(String(req.headers['x-operator-id']||'scorekeeper')));}catch(e){return send(res,409,{error:e.message});}
+   try{return send(res,201,telemetry.withSpan('icebreaker.scoresheet.submit',{},()=>certification.submit(String(req.headers['x-operator-id']||'scorekeeper'))));}catch(e){return send(res,409,{error:e.message});}
   }
   if(pathname==='/api/scoresheet/v1/correct'&&req.method==='POST'){
    if(!auth(req))return send(res,403,{error:'Operator credential required'});
-   try{return send(res,200,certification.amend({...await readBody(req),actor:String(req.headers['x-operator-id']||'scorekeeper')}));}catch(e){return send(res,409,{error:e.message});}
+   try{return send(res,200,telemetry.withSpan('icebreaker.scoresheet.amend',{},()=>certification.amend({...await readBody(req),actor:String(req.headers['x-operator-id']||'scorekeeper')})));}catch(e){return send(res,409,{error:e.message});}
   }
   if(pathname==='/api/scoresheet/v1/review'&&req.method==='GET'){
    try{certification.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));const rev=certification.get();return rev?send(res,200,{...rev,signatures:certification.signatures(rev.revision)}):send(res,404,{error:'No scoresheet submitted'});}catch(e){return send(res,403,{error:e.message});}
   }
   if(pathname==='/api/scoresheet/v1/sign'&&req.method==='POST'){
-   try{const refereeId=certification.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));return send(res,200,certification.decide({...await readBody(req),refereeId}));}catch(e){return send(res,/authentication|assigned/i.test(e.message)?403:409,{error:e.message});}
+   try{const refereeId=certification.authenticate(String(req.headers.authorization||'').replace(/^Bearer /i,''));return send(res,200,telemetry.withSpan('icebreaker.scoresheet.decide',{},()=>certification.decide({...await readBody(req),refereeId})));}catch(e){return send(res,/authentication|assigned/i.test(e.message)?403:409,{error:e.message});}
   }
   if(req.method==='GET'&&pathname==='/api/scoresheet/v1/workflow'){
    if(!auth(req))return send(res,403,{error:'Operator credential required'});
@@ -77,7 +77,7 @@ function createRinkServer({dbPath=path.join(__dirname,'../data/demo.db'),host='1
   }
   if(req.method==='POST'&&pathname==='/api/scoresheet/v1/deliver'){
    if(!auth(req))return send(res,403,{error:'Administrator credential required'});
-   return send(res,200,delivery.run());
+   return send(res,200,telemetry.withSpan('icebreaker.scoresheet.delivery',{},()=>delivery.run()));
   }
   if(req.method==='GET'&&pathname==='/api/scoresheet/v1/pregame'){if(!auth(req))return send(res,403,{error:'Operator credential required'});if(!leagueGameId)return send(res,200,{bound:false,ready:null});try{const {pregameSnapshot}=require('./pregame-gate');return send(res,200,{bound:true,...pregameSnapshot(authority.db,leagueGameId)});}catch(e){return send(res,409,{error:e.message});}}
   if(pathname==='/api/games/demo/auxiliary-clock'&&req.method==='GET')return send(res,200,authority.timingRules.showAuxiliaryClock?{visible:true,...auxiliaryClock.snapshot()}:{visible:false});
