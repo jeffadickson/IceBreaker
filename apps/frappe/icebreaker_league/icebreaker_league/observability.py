@@ -1,9 +1,6 @@
-"""PII-safe, optional OpenTelemetry manual spans for central Frappe operations.
-
-No automatic SQL/HTTP instrumentation: URLs, request bodies and Frappe
-documents may contain private youth records. Telemetry must never gate writes.
-"""
+"""Privacy-safe, optional OpenTelemetry spans. No payload or SQL capture."""
 from contextlib import contextmanager
+from .otel_bootstrap import configure
 
 ALLOWED_OPERATIONS = frozenset({
     "league.overview",
@@ -19,16 +16,22 @@ ALLOWED_OUTCOMES = frozenset({"ok", "rejected", "error"})
 def league_span(operation):
     if operation not in ALLOWED_OPERATIONS:
         raise ValueError("Unapproved telemetry operation")
+    # Only SDK/configuration errors are isolated. Never swallow exceptions
+    # thrown by the business operation inside the context.
     try:
+        configure()
         from opentelemetry import trace
-        tracer = trace.get_tracer("icebreaker.league-frappe")
-        with tracer.start_as_current_span(
-            operation,
-            attributes={"icebreaker.operation": operation},
-        ) as span:
-            yield span
-    except ImportError:
+    except (ImportError, RuntimeError, OSError):
+        trace = None
+    if trace is None:
         yield None
+        return
+    tracer = trace.get_tracer("icebreaker.league-frappe")
+    with tracer.start_as_current_span(
+        operation,
+        attributes={"icebreaker.operation": operation},
+    ) as span:
+        yield span
 
 
 def mark_outcome(span, outcome):
