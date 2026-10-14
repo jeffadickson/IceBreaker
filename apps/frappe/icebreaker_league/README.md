@@ -77,3 +77,7 @@ release sequence, KMS signing, atomic offline staging, live Bench permission
 testing and explicit league cutover approval remain required. Do not use the
 preview bundle to change game-day eligibility. See
 [the M4 design](../../../docs/architecture/frappe-m4-training-policies.md).
+
+## M4.2 offline training-policy staging (development)
+
+The Node rink-side `frappe-training-staging.js` and `stage-frappe-training.js` now accept **only fictional, Ed25519-signed policy bundles** into an independent SQLite staging cache. This is not the official rink database. They persist a per-league high-water revision and reject older or conflicting releases, but do not modify game rules, player evidence, rosters, or eligibility. The Frappe training preview endpoint remains **unsigned** and cannot be staged as an authoritative release. See [M4 design](../../../docs/architecture/frappe-m4-training-policies.md) for the offline command and outstanding controlled publisher/live Bench requirements.
