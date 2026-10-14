@@ -1,6 +1,9 @@
-name: Package Windows beta (manual)
+name: Package Windows beta
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/release-beta.yml
 
 permissions:
   contents: read
