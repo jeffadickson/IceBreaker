@@ -2,6 +2,10 @@ name: CI
 on:
   push:
   pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   node-and-docs:
     runs-on: ubuntu-latest
@@ -9,35 +13,49 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
+          cache: npm
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate manual links
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.9.26'
+          enable-cache: true
+      - name: Restore locked Node dependencies
+        run: npm ci --ignore-scripts --no-audit
+      - name: Check documentation and architecture
         run: python tools/check_docs.py
-      - name: Run local-backend tests
-        run: node --test apps/rink-local/tests/browser/*.test.js
-      - name: Install Frappe contract test dependencies
-        run: python -m pip install 'cryptography>=44,<49'
-      - name: Check Frappe app Python syntax and migration rules (no Bench required)
+      - name: Run rink-local Node tests
+        run: npm test
+      - name: Run distributed synchronization and architecture tests
+        run: node --test tests/integration/*.test.js tests/architecture/*.test.js
+      - name: Verify locked Frappe contract dependencies and run tests
         env:
           PYTHONPATH: apps/frappe/icebreaker_league
         run: |
-          python -m compileall -q apps/frappe/icebreaker_league/icebreaker_league
-          python -m unittest discover -s apps/frappe/icebreaker_league/tests -p 'test_*.py'
-      - name: Run distributed synchronization and architecture integration tests
-        run: node --test tests/integration/*.test.js tests/architecture/*.test.js
+          uv run --project apps/frappe/icebreaker_league --locked --no-dev python -m compileall -q apps/frappe/icebreaker_league/icebreaker_league
+          uv run --project apps/frappe/icebreaker_league --locked --no-dev python -m unittest discover -s apps/frappe/icebreaker_league/tests -p 'test_*.py'
+
   dotnet:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      - name: Restore locked NuGet dependencies
+        run: |
+          dotnet restore apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj --locked-mode
+          dotnet restore apps/rink-local/src/Icebreaker.SpectatorGateway/Icebreaker.SpectatorGateway.csproj --locked-mode
       - name: Test core
-        run: dotnet test apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj -c Release
+        run: dotnet test apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj -c Release --no-restore
       - name: Build native Avalonia desktop
-        run: dotnet build apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -c Release
+        run: dotnet build apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -c Release --no-restore
+      - name: Build read-only spectator gateway
+        run: dotnet build apps/rink-local/src/Icebreaker.SpectatorGateway/Icebreaker.SpectatorGateway.csproj -c Release --no-restore
 
   windows-desktop:
     runs-on: windows-latest
@@ -45,10 +63,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages*.lock.json'
+      - name: Restore Windows runtime against committed lock
+        shell: pwsh
+        run: dotnet restore apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -r win-x64 --locked-mode -p:NuGetLockFilePath=packages.win-x64.lock.json
       - name: Publish native Windows x64 timekeeper
-        run: dotnet publish apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -c Release -r win-x64 --self-contained false -o out/desktop
+        shell: pwsh
+        run: dotnet publish apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -c Release -r win-x64 --self-contained false --no-restore -p:NuGetLockFilePath=packages.win-x64.lock.json -o out/desktop
       - uses: actions/upload-artifact@v4
         with:
           name: IceBreaker-Timekeeper-win-x64
           path: out/desktop/
+
+  camera-observer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.9.26'
+          enable-cache: true
+      - name: Test optional camera observer with locked dependencies
+        run: uv run --project tools/scoreboard-camera --locked python -m unittest discover -s tools/scoreboard-camera -p 'test_*.py'
