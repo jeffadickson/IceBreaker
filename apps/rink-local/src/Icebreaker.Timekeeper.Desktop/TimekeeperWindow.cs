@@ -122,7 +122,7 @@ public sealed class TimekeeperWindow : Window
             Text = "Use jersey numbers from the approved game lineup. NONE means no assist. The server validates the event before committing it.",
             TextWrapping = TextWrapping.Wrap
         });
-        goalBody.Children.Add(Buttons(_goalTeam, PlayerPicker(_goalScorer, "Scorer"), PlayerPicker(_goalAssist1, "Assist 1", true), PlayerPicker(_goalAssist2, "Assist 2", true)));
+        goalBody.Children.Add(Buttons(_goalTeam, PlayerPicker(_goalScorer, "Scorer"), PlayerPicker(_goalAssist1, "Assist 1"), PlayerPicker(_goalAssist2, "Assist 2")));
         goalBody.Children.Add(_goalConfirm);
         goalBody.Children.Add(ActionButton("RECORD GOAL", async () =>
         {
@@ -173,7 +173,7 @@ public sealed class TimekeeperWindow : Window
             Text = "Record a goalie substitution or enter EMPTY for a pulled goalie. This does not modify the approved roster.",
             TextWrapping = TextWrapping.Wrap
         });
-        goalieBody.Children.Add(Buttons(_goalieTeam, PlayerPicker(_goalieNumber, "Goalie", false, true), _goalieReason,
+        goalieBody.Children.Add(Buttons(_goalieTeam, PlayerPicker(_goalieNumber, "Goalie"), _goalieReason,
             ActionButton("RECORD GOALIE CHANGE", async () =>
             {
                 var jersey = (_goalieNumber.Text ?? "").Trim().ToUpperInvariant();
@@ -204,7 +204,7 @@ public sealed class TimekeeperWindow : Window
             _correctAssist2.Text = selected.Assist2;
         };
         correctionBody.Children.Add(_correctionGoal);
-        correctionBody.Children.Add(Buttons(PlayerPicker(_correctScorer, "Correct scorer"), PlayerPicker(_correctAssist1, "Correct assist 1", true), PlayerPicker(_correctAssist2, "Correct assist 2", true)));
+        correctionBody.Children.Add(Buttons(PlayerPicker(_correctScorer, "Correct scorer"), PlayerPicker(_correctAssist1, "Correct assist 1"), PlayerPicker(_correctAssist2, "Correct assist 2")));
         correctionBody.Children.Add(_correctReason);
         correctionBody.Children.Add(ActionButton("SUBMIT AUDITED CORRECTION", async () =>
         {
@@ -381,7 +381,7 @@ public sealed class TimekeeperWindow : Window
         _correctionGoal.SelectedIndex = choices.Length > 0 ? 0 : -1;
     }
 
-    private Control PlayerPicker(TextBox target, string title, bool allowNone = false, bool allowEmpty = false)
+    private Control PlayerPicker(TextBox target, string title)
     {
         var choices = new ComboBox { Width = 190, MinHeight = 42 };
         choices.SelectionChanged += (_, _) =>
@@ -415,9 +415,8 @@ public sealed class TimekeeperWindow : Window
                 "#" + p.GetProperty("jersey").ToString() + " · " +
                 (p.TryGetProperty("name", out var name) ? name.GetString() : "Player")))
             .ToArray();
-        var targets = side == "home"
-            ? new[] { _goalScorer, _goalAssist1, _goalAssist2, _goalieNumber, _penaltyPlayer, _correctScorer, _correctAssist1, _correctAssist2 }
-            : new[] { _goalScorer, _goalAssist1, _goalAssist2, _goalieNumber, _penaltyPlayer, _correctScorer, _correctAssist1, _correctAssist2 };
+        var targets = new[] { _goalScorer, _goalAssist1, _goalAssist2, _goalieNumber, _penaltyPlayer,
+            _correctScorer, _correctAssist1, _correctAssist2 };
         foreach (var target in targets)
         {
             if (!_rosterSelectors.TryGetValue(target, out var selector)) continue;
