@@ -98,3 +98,19 @@ PYTHONPATH=apps/frappe/icebreaker_league python -m unittest discover -s apps/fra
 The app now includes a restricted `IceBreaker League Access` DocType. Only System Managers can create or revoke these grants. The install hook creates the `IceBreaker League Admin` role with **no generic DocType permissions**. A System Manager must assign that role to a real authenticated Frappe user and create an enabled access record linking that exact user to the exact league. The `league_schedule` API checks **both** the role and an enabled membership before querying the requested league's seasons, divisions and games. No other league's schedule is returned. The admin import endpoints remain **System Manager only**.
 
 If upgrading an already-installed development app, run `bench --site icebreaker-dev.local migrate` and `bench --site icebreaker-dev.local execute icebreaker_league.setup.ensure_roles` before assigning memberships. Test two fictional leagues and verify that the league-scoped user can only read their own schedule. Do **not** grant general DocType access to this role; doing so could bypass the carefully scoped API. This permission path has pure policy unit tests but **has not yet been validated against a running Frappe Bench**. No non-demo data migration is authorized.
+
+## M2 acceptance checklist — mandatory before M3 or non-demo data
+
+This is a **development checklist**, not a production runbook. Execute in a disposable Frappe v16 Bench using fictional data and a database snapshot for each run.
+
+- [ ] Confirm supported Python, Node, database and Redis versions for the exact pinned Frappe release; install `icebreaker_league`, run `bench migrate`, verify all seven DocTypes and controllers load in Desk.
+- [ ] Import the M1 fictional administrative snapshot twice; second import must be unchanged. Introduce a conflicting stable ID and verify no partial inserts remain after request rollback.
+- [ ] Import M2 schedule twice; compare stable game UUID, division, teams, source offset, UTC timestamp and local display time with the original demo database.
+- [ ] Test spring-forward and fall-back DST transitions, ambiguous/nonexistent local times, and a game held outside the league timezone. The current M2 venue-timezone limitation is an explicit **NO-GO** for out-of-area production schedules.
+- [ ] Create two fictional leagues and two users. Verify: Guest denied; role without membership denied; membership without role denied; league A cannot read league B; System Manager can administer the pilot.
+- [ ] Check direct `/api/resource` and Desk list/detail, link search, report, export and file attachment paths for leakage. **Do not** give League Admin generic DocType rights to make the test pass.
+- [ ] Verify import and read APIs are properly authenticated and use write-only HTTP methods for mutations. Never log snapshots, tokens or private fields.
+- [ ] Stop the Collector and simulate network loss; confirm Frappe imports behave normally and the rink clock continues independently.
+- [ ] Record tests, exact Frappe version, database engine, migration logs, anonymized reconciliation counts, backup restore evidence, reviewer and approval decision in the requirement tracker.
+
+**M3 is not started merely by installing the app.** Define and independently test signed roster/rules snapshots and certified result envelopes before any central-to-rink or rink-to-central authority switch. The detailed contracts and ownership are in [Frappe central-league technical design](frappe-central-league-design.md).
