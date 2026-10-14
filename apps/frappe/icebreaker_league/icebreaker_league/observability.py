@@ -10,6 +10,7 @@ ALLOWED_OPERATIONS = frozenset({
     "league.result_receive",
     "league.rink_bundle_preview",
     "league.training_policy_read",
+    "league.training_bundle_preview",
 })
 ALLOWED_OUTCOMES = frozenset({"ok", "rejected", "error"})
 
