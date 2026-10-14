@@ -60,7 +60,7 @@ def import_admin_snapshot(payload):
                 if current:
                     existing = frappe.db.get_value(doctype, current, list(KINDS[kind]), as_dict=True)
                     # Never silently rewrite a previously imported administrative record.
-                    if any(existing[field] != value for field, value in row.items()):
+                    if any(str(existing[field]) != str(value) for field, value in row.items()):
                         frappe.throw(f"Conflicting existing {doctype} stable ID")
                     continue
                 frappe.get_doc({"doctype": doctype, **row}).insert()
