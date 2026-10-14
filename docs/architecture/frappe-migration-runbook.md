@@ -127,3 +127,11 @@ After installing/migrating the app in a **disposable Frappe v16 Bench**, configu
 6. Run concurrent duplicate submissions against a real Bench database and verify one projection only. Exercise backup/restore and repeat import; record exact Frappe version and migration logs in the requirement tracker.
 
 This is **not** a production integration or authorization model. The pilot remains System Manager-only and fictional-only. Production requires service identities, signing key rotation, result generation from the official certification service, offline outbox/replay, cross-tenant permission testing, and a controlled cutover.
+
+## M4.4 offline fictional training-policy publication
+
+The development publisher now exists. Follow the step-by-step procedure in [M4 training-policy design](frappe-m4-training-policies.md): export a fresh unsigned Frappe preview, independently review its policies, sign outside the Frappe worker with a permission-restricted Ed25519 seed, and store each release in a **separate** SQLite revision ledger. The publisher is disabled in production and the reviewer/ticket fields are development assertions, not authenticated approvals.
+
+After publication, use `stage-frappe-training.js` to verify the signed envelope and `compare-frappe-training.js` to inspect central/local policy parity. Both remain read-only relative to official game and training authority. Test duplicate publication, revised policy release, expired release renewal, staging antirollback, and restart of the release ledger.
+
+**Do not cut over.** A real Frappe Bench installation and two-tenant permission audit, authenticated approval, KMS-backed signing, tamper-resistant release state, secure delivery, mapping review and explicit activation/rollback remain required. Do not process actual player or family records.
