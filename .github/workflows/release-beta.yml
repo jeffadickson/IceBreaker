@@ -1,0 +1,74 @@
+name: Package Windows beta (manual)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.9.26'
+          enable-cache: true
+      - name: Locked dependency restore
+        run: |
+          npm ci --ignore-scripts --no-audit
+          dotnet restore apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj --locked-mode
+          dotnet restore apps/rink-local/src/Icebreaker.SpectatorGateway/Icebreaker.SpectatorGateway.csproj --locked-mode
+      - name: Verify full source and tests
+        run: python tools/icebreaker.py check --configuration Release
+
+  package:
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages*.lock.json'
+      - name: Restore RID-specific NuGet lock
+        shell: pwsh
+        run: dotnet restore apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -r win-x64 --locked-mode -p:NuGetLockFilePath=packages.win-x64.lock.json
+      - name: Publish unsigned Windows beta
+        shell: pwsh
+        run: dotnet publish apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -c Release -r win-x64 --self-contained false --no-restore -p:NuGetLockFilePath=packages.win-x64.lock.json -o out/desktop
+      - name: Build manifest and checksum
+        shell: pwsh
+        run: |
+          $manifest = @{
+            product = 'IceBreaker Timekeeper'
+            classification = 'UNSIGNED DEVELOPMENT BETA'
+            commit = $env:GITHUB_SHA
+            runtime = 'win-x64'
+            framework = 'net8.0'
+            dotnetSdk = (dotnet --version).Trim()
+          } | ConvertTo-Json
+          Set-Content -Path out/desktop/build-manifest.json -Value $manifest -Encoding utf8
+          Compress-Archive -Path out/desktop/* -DestinationPath out/IceBreaker-Timekeeper-win-x64.zip
+          $hash = (Get-FileHash -Path out/IceBreaker-Timekeeper-win-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path out/IceBreaker-Timekeeper-win-x64.sha256 -Value "$hash  IceBreaker-Timekeeper-win-x64.zip" -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IceBreaker-Timekeeper-win-x64-beta
+          path: |
+            out/IceBreaker-Timekeeper-win-x64.zip
+            out/IceBreaker-Timekeeper-win-x64.sha256
+          retention-days: 30
