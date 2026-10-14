@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   locks:
@@ -32,6 +32,7 @@ jobs:
         run: |
           dotnet restore apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj --use-lock-file
           dotnet restore apps/rink-local/src/Icebreaker.SpectatorGateway/Icebreaker.SpectatorGateway.csproj --use-lock-file
+          dotnet restore apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj --use-lock-file -r win-x64 -p:NuGetLockFilePath=packages.win-x64.lock.json
       - uses: actions/upload-artifact@v4
         with:
           name: icebreaker-dependency-locks
@@ -42,3 +43,17 @@ jobs:
             apps/frappe/icebreaker_league/uv.lock
             tools/scoreboard-camera/uv.lock
             apps/rink-local/**/packages.lock.json
+            apps/rink-local/**/packages.win-x64.lock.json
+      - name: Commit generated lockfiles to main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- package-lock.json apps/frappe/icebreaker_league/uv.lock tools/scoreboard-camera/uv.lock
+          find apps/rink-local -name 'packages*.lock.json' -print0 | xargs -0 -r git add --
+          if ! git diff --cached --quiet; then
+            git commit -m 'build(deps): commit generated npm, uv and NuGet lockfiles'
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
