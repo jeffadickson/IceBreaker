@@ -1,12 +1,9 @@
 name: Generate dependency locks (bootstrap)
 on:
-  push:
-    paths:
-      - .github/workflows/generate-locks.yml
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   locks:
@@ -44,16 +41,3 @@ jobs:
             tools/scoreboard-camera/uv.lock
             apps/rink-local/**/packages.lock.json
             apps/rink-local/**/packages.win-x64.lock.json
-      - name: Commit generated lockfiles to main
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- package-lock.json apps/frappe/icebreaker_league/uv.lock tools/scoreboard-camera/uv.lock
-          find apps/rink-local -name 'packages*.lock.json' -print0 | xargs -0 -r git add --
-          if ! git diff --cached --quiet; then
-            git commit -m 'build(deps): commit generated npm, uv and NuGet lockfiles'
-            git fetch origin main
-            git rebase origin/main
-            git push origin HEAD:main
-          fi
