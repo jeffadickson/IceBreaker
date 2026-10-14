@@ -98,3 +98,9 @@ The Node rink-side `frappe-training-staging.js` and `stage-frappe-training.js` n
 The separate `icebreaker_league.training_publisher` module and `icebreaker_league.publish_training_cli` command turn a recently generated **unsigned Frappe preview** into a signed, versioned Ed25519 training-policy release. They do **not** run in the Frappe web process and do not receive any participant records. A standalone SQLite release ledger allocates a monotonically increasing revision per league and stores each signed envelope for repeatable delivery. The CLI requires an operator-supplied review name and ticket, a permission-restricted private seed file, and a distinct ledger database; it refuses production mode.
 
 This enables the existing Node `stage-frappe-training.js` and `compare-frappe-training.js` tools to consume an offline fictional release, but **does not activate** the policy. See [M4.4 documentation](../../../docs/architecture/frappe-m4-training-policies.md). A live Frappe v16 Bench installation, authenticated approval workflow, KMS/HSM, protected delivery and release-state rollback resistance are still required.
+
+## Host identity and account lifecycle (planned integration)
+
+IceBreaker will reuse Frappe's built-in User account creation, invitation, password change/reset, 2FA, and account disablement. See [ADR-002](../../../docs/architecture/adr-002-host-identity-and-offline-authorization.md) and [issue #11](https://github.com/jeffadickson/IceBreaker/issues/11).
+
+**Important:** This is an architectural commitment, not a completed login integration. The live Bench, test SMTP, scoped membership DocTypes, offline signed operator grants and production session/permission validation remain open. Do not enable public registration or use real minors' data in the development system.
