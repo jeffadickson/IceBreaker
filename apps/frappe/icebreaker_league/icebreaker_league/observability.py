@@ -21,7 +21,7 @@ def league_span(operation):
     try:
         configure()
         from opentelemetry import trace
-    except (ImportError, RuntimeError, OSError):
+    except (ImportError, RuntimeError, OSError, ValueError):
         trace = None
     if trace is None:
         yield None
