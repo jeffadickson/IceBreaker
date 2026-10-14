@@ -55,6 +55,12 @@ New backend-only [ClamAV quarantine scanner](apps/rink-local/server/scan-quarant
 
 League administrators can now define training courses once and assign versioned requirements by role, league or tournament, and season. Renewal can be once, per hockey season, per calendar year, or after a configurable number of days. Verified completion and revocation history is retained across seasons, and the game-day roster gate checks current requirements. See [training catalog and renewal requirements](requirements/training-catalog-and-renewals.md). The league administrator editor is available in `/registration.html`.
 
+## Frappe central league administration (active migration)
+
+The standalone [Frappe custom app](apps/frappe/icebreaker_league/README.md) provides central league/season/division/team/game administration, scoped schedule readers, certified-result projections and configurable training policy definitions. [Frappe migration requirements](requirements/frappe-league-migration.md) and the [migration runbook](docs/architecture/frappe-migration-runbook.md) track the cutover gates.
+
+M4 development now includes signed training-policy verification, an **isolated persistent staging cache** and a [read-only central/local policy parity report](docs/architecture/frappe-m4-training-policies.md) with explicit course-ID mapping. **None of these changes alters the rink-local official clock, event journal, training evidence or eligibility.** Frappe v16 Bench installation and tenant permissions have not yet been validated in a live environment; the current Node league implementation remains authoritative.
+
 ## Backend training certificate CLI
 
 An offline [IceBreaker admin CLI](apps/rink-local/server/icebreaker-admin.js) now supports staged certificate ingestion, duplicate-safe email-source references, a pending review queue, explicit approval/rejection and training-status queries. A future mail parser can supply JSON metadata without writing directly to the database. **Unverified imports never satisfy training eligibility.** See the [CLI integration guide](apps/rink-local/docs/backend-cli-training-intake.md).
