@@ -7,7 +7,10 @@
     "test": "node --test apps/rink-local/tests/browser/*.test.js",
     "docs:check": "python tools/check_docs.py",
     "start": "node apps/rink-local/server/rink-server.js",
-    "start:otel": "node --require ./apps/rink-local/server/otel-bootstrap.js apps/rink-local/server/rink-server.js"
+    "start:otel": "node --require ./apps/rink-local/server/otel-bootstrap.js apps/rink-local/server/rink-server.js",
+    "test:all": "python tools/icebreaker.py test",
+    "doctor": "python tools/icebreaker.py doctor",
+    "build:all": "python tools/icebreaker.py build --configuration Release"
   },
   "optionalDependencies": {
     "@opentelemetry/api": "1.9.1",
@@ -15,5 +18,10 @@
     "@opentelemetry/exporter-trace-otlp-http": "0.223.0",
     "@opentelemetry/exporter-metrics-otlp-http": "0.223.0",
     "@opentelemetry/sdk-metrics": "2.12.0"
+  },
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=22.13.0 <23",
+    "npm": ">=10 <11"
   }
 }
