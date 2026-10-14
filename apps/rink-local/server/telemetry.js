@@ -64,7 +64,8 @@ function withRequest(req,res,handler){
  const pathname=(()=>{try{return new URL(req.url,'http://localhost').pathname;}catch{return '/invalid';}})();
  const family=routeFamily(pathname);
  const method=['GET','POST','PUT','DELETE','PATCH'].includes(req.method)?req.method:'OTHER';
- return withSpan('icebreaker.http.request',{ 'http.request.method':method,'icebreaker.route.family':family },async()=>{
+ const parent=api?api.propagation.extract(api.context.active(),{'traceparent':typeof req.headers?.traceparent==='string'?req.headers.traceparent:''}):null;
+ const execute=()=>withSpan('icebreaker.http.request',{ 'http.request.method':method,'icebreaker.route.family':family },async()=>{
   const start=process.hrtime.bigint();
   let finished=false;
   const finish=()=>{
@@ -80,6 +81,7 @@ function withRequest(req,res,handler){
   try{return await handler();}
   catch(err){count('icebreaker.http.unhandled_errors',{family});throw err;}
  });
+ return api?api.context.with(parent,execute):execute();
 }
 function recordGameCommand(command,execute){
  const type=safeEventType(command?.type);
