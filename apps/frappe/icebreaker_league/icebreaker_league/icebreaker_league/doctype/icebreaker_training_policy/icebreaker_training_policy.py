@@ -17,7 +17,8 @@ class IceBreakerTrainingPolicy(Document):
         try:
             validate_policy_values(
                 role=self.role, renewal_mode=self.renewal_mode,
-                validity_days=int(self.validity_days) if self.validity_days not in (None, "") else None,
+                validity_days=(int(self.validity_days) if self.renewal_mode == "ROLLING_DAYS"
+                               else None),
                 effective_from=self.effective_from,
                 effective_to=self.effective_to,
                 required=bool(int(self.required)),
