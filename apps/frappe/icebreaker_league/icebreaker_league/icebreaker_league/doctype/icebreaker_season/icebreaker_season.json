@@ -1,0 +1,70 @@
+{
+  "doctype": "DocType",
+  "name": "IceBreaker Season",
+  "module": "IceBreaker League",
+  "custom": 0,
+  "istable": 0,
+  "autoname": "field:icebreaker_id",
+  "title_field": "season_title",
+  "track_changes": 1,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "field_order": [
+    "icebreaker_id",
+    "season_title",
+    "league",
+    "start_date",
+    "end_date"
+  ],
+  "fields": [
+    {
+      "fieldname": "icebreaker_id",
+      "label": "IceBreaker ID",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "season_title",
+      "label": "Season Name",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "league",
+      "label": "League",
+      "fieldtype": "Link",
+      "options": "IceBreaker League",
+      "reqd": 1
+    },
+    {
+      "fieldname": "start_date",
+      "label": "Start Date",
+      "fieldtype": "Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "end_date",
+      "label": "End Date",
+      "fieldtype": "Date",
+      "reqd": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "share": 0
+    }
+  ],
+  "links": [],
+  "actions": []
+}
