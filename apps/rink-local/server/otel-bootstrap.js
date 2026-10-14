@@ -20,6 +20,8 @@ if(process.env.ICEBREAKER_OTEL_ENABLED==='1'){
   throw Error('Rink metrics must use a local Collector endpoint without credentials');
  const sdk=new NodeSDK({
   serviceName:'icebreaker.rink-local',
+  resourceDetectors:[],
+  instrumentations:[],
   traceExporter:new OTLPTraceExporter({url:endpoint}),
   metricReader:new PeriodicExportingMetricReader({exporter:new OTLPMetricExporter({url:metricsUrl}),exportIntervalMillis:60000}),
   // No automatic HTTP, SQL, or request-body instrumentation: all attributes
