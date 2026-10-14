@@ -7,6 +7,24 @@
 
 > **Status: development prototype.** The Node.js local server and C# components are not yet one unified production authority. No public-internet deployment or game certification is supported. Sample teams/results are fictional.
 
+## Quick start — reproducible developer setup
+
+Install Node.js 22, .NET 8 SDK, Python 3.12+, Git and [uv](https://docs.astral.sh/uv/), then run:
+
+```bash
+git clone https://github.com/jeffadickson/IceBreaker.git
+cd IceBreaker
+python tools/icebreaker.py doctor
+python tools/icebreaker.py bootstrap
+python tools/icebreaker.py check --configuration Release
+```
+
+The repository commits `package-lock.json`, NuGet `packages.lock.json`, and separate Python `uv.lock` files. Locked restore and Windows desktop packaging are tested by GitHub Actions. To run the local backend, use `npm start`; to debug the Windows timekeeper, start the authority separately and use the committed VS Code launch configurations.
+
+**[Complete build, debug, dependency and release guide](docs/build-and-release.md)** · [CI](.github/workflows/ci.yml) · [Manual Windows beta package](.github/workflows/release-beta.yml).
+
+Frappe v16 Bench deployment is a **separate** environment requiring Python 3.14, Node 24 and supported services; the standalone Frappe contract tests do not prove a live Bench deployment.
+
 ## Frappe redevelopment progress — M2 pilot
 
 The Frappe custom app now includes league/season/division/club/team/game DocTypes, a fictional-only M1 administration importer, and an **M2 schedule exporter/importer** that preserves original timezone offsets and canonical UTC without migrating scores or private data. A restricted `IceBreaker League Access` membership and narrow `IceBreaker League Admin` role provide an explicitly scoped **read-only** schedule API; imports remain System-Manager-only. See [M2 migration runbook](docs/architecture/frappe-migration-runbook.md) and [Frappe tests](apps/rink-local/tests/browser/frappe-schedule-m2.test.js).
