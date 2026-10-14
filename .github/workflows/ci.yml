@@ -17,6 +17,12 @@ jobs:
         run: python tools/check_docs.py
       - name: Run local-backend tests
         run: node --test apps/rink-local/tests/browser/*.test.js
+      - name: Check Frappe app Python syntax and migration rules (no Bench required)
+        env:
+          PYTHONPATH: apps/frappe/icebreaker_league
+        run: |
+          python -m compileall -q apps/frappe/icebreaker_league/icebreaker_league
+          python -m unittest discover -s apps/frappe/icebreaker_league/tests -p 'test_*.py'
       - name: Run distributed synchronization and architecture integration tests
         run: node --test tests/integration/*.test.js tests/architecture/*.test.js
   dotnet:
