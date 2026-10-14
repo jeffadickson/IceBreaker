@@ -99,27 +99,50 @@ def build(configuration: str) -> None:
     run("python", "-m", "compileall", "-q", str(FRAPPE / "icebreaker_league"))
 
 
+def bootstrap(profile: str) -> None:
+    if not doctor("frappe" if profile == "core" else profile):
+        raise RuntimeError("Install the required SDKs and retry")
+    for required in (
+        ROOT / "package-lock.json",
+        FRAPPE / "uv.lock",
+        DOTNET_TEST.parent / "packages.lock.json",
+        DOTNET_DESKTOP.parent / "packages.lock.json",
+    ):
+        if not required.exists():
+            raise RuntimeError(f"Missing committed lockfile: {required.relative_to(ROOT)}")
+    run("npm", "ci", "--ignore-scripts", "--no-audit")
+    run("dotnet", "restore", str(DOTNET_TEST), "--locked-mode", "--nologo")
+    run("dotnet", "restore", str(DOTNET_GATEWAY), "--locked-mode", "--nologo")
+    run("uv", "sync", "--project", str(FRAPPE), "--locked", "--no-dev")
+    if profile in ("camera", "all"):
+        run("uv", "sync", "--project", str(CAMERA), "--locked")
+
+
 def publish(configuration: str, runtime: str, output: str) -> None:
-    if runtime not in {"win-x64", "win-arm64"}:
-        raise ValueError("Desktop publish supports win-x64 and win-arm64 only")
+    if runtime != "win-x64":
+        raise ValueError("Only win-x64 is currently release-locked")
     destination = Path(output).resolve()
     if ROOT not in destination.parents:
         raise ValueError("Publish output must be within the repository working tree")
     run("dotnet", "publish", str(DOTNET_DESKTOP), "-c", configuration,
-        "-r", runtime, "--self-contained", "false", "-o", str(destination), "--nologo")
+        "-r", runtime, "--self-contained", "false", "-o", str(destination),
+        "-p:RestoreLockedMode=true", "-p:NuGetLockFilePath=packages.win-x64.lock.json",
+        "--nologo")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["doctor", "test", "build", "check", "publish", "frappe-test", "camera-test"])
+    parser.add_argument("command", choices=["doctor", "bootstrap", "test", "build", "check", "publish", "frappe-test", "camera-test"])
     parser.add_argument("--profile", choices=["core", "frappe", "camera", "all"], default="core")
     parser.add_argument("--configuration", choices=["Debug", "Release"], default="Debug")
-    parser.add_argument("--runtime", choices=["win-x64", "win-arm64"], default="win-x64")
+    parser.add_argument("--runtime", choices=["win-x64"], default="win-x64")
     parser.add_argument("--output", default="out/desktop")
     args = parser.parse_args(argv)
     if args.command == "doctor":
         return 0 if doctor(args.profile) else 1
     try:
+        if args.command == "bootstrap":
+            bootstrap(args.profile)
         if args.command in ("test", "check"):
             run("python", str(ROOT / "tools" / "check_docs.py"))
             node_tests()
