@@ -52,3 +52,12 @@ test('native penalty dialog exposes authority-supported classifications and coin
  assert.match(code,/coincidental = _penaltyCoincidental.IsChecked == true/);
  assert.match(code,/classification = _penaltyClass.SelectedItem/);
 });
+
+test('roster-backed player pickers cover scoring, penalties, goalies and corrections',()=>{
+ for (const label of ['Scorer','Assist 1','Assist 2','Goalie','Penalty player','Correct scorer','Correct assist 1','Correct assist 2'])
+   assert.ok(code.includes('PlayerPicker(') && code.includes('"'+label+'"'),label);
+ assert.match(code,/ApplyRosterChoices\(side, team.GetProperty\("players"\)\)/);
+ assert.match(code,/new RosterChoice\("NONE"/);
+ assert.match(code,/new RosterChoice\("EMPTY"/);
+ assert.match(code,/selector.ItemsSource = special.Concat\(choices\).ToArray\(\)/);
+});
