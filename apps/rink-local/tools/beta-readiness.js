@@ -20,11 +20,13 @@ function requiredGates(manifest,profile,seen=new Set()){
  return [...new Set([...inherited,...p.gates])];
 }
 function safeEvidenceFile(root,rel){
- if(typeof rel!=='string'||!rel.trim()||path.isAbsolute(rel)||rel.includes('\0'))return false;
+ if(typeof rel!=='string'||!rel.trim()||path.isAbsolute(rel)||path.win32.isAbsolute(rel)||rel.includes('\0'))return false;
  const full=path.resolve(root,rel);
  if(!full.startsWith(path.resolve(root)+path.sep))return false;
- try{return fs.statSync(full).isFile()&&!fs.lstatSync(full).isSymbolicLink();}
- catch{return false;}
+ try{
+  const realRoot=fs.realpathSync(root),realFile=fs.realpathSync(full);
+  return realFile.startsWith(realRoot+path.sep)&&fs.statSync(realFile).isFile()&&!fs.lstatSync(full).isSymbolicLink();
+ }catch{return false;}
 }
 function assess(manifest,{profile,revision,evidence=[],root=DEFAULT_ROOT,now=new Date()}){
  if(typeof revision!=='string'||!/^[a-f0-9]{7,40}$/i.test(revision))throw Error('Explicit Git revision required');
