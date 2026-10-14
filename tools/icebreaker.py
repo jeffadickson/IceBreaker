@@ -32,7 +32,7 @@ def version(executable: str, flag: str = "--version") -> str | None:
     if not shutil.which(executable):
         return None
     try:
-        return subprocess.check_output([executable, flag], text=True, stderr=subprocess.STDOUT, timeout=12).strip()
+        return subprocess.check_output([executable, flag], cwd=ROOT, text=True, stderr=subprocess.STDOUT, timeout=12).strip()
     except (OSError, subprocess.SubprocessError):
         return None
 
