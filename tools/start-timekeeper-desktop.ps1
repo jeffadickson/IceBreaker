@@ -30,5 +30,8 @@ if (-not (AuthorityReady)) {
 }
 Write-Host 'Local rink authority ready; starting native Avalonia timekeeper.'
 Write-Host 'Closing the desktop window will NOT terminate the rink authority.'
-& dotnet run --project $project -c Release
+# Resolve only the committed NuGet dependency graph before launching.
+& dotnet restore $project --locked-mode --nologo
+if ($LASTEXITCODE -ne 0) { throw 'Locked NuGet restore failed; run bootstrap and review the committed package locks.' }
+& dotnet run --project $project -c Release --no-restore
 if ($LASTEXITCODE -ne 0) { throw "Desktop app exited with code $LASTEXITCODE" }
