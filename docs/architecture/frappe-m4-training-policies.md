@@ -69,3 +69,31 @@ Frappe Desk policy administration
 ```
 
 **Do not activate this bundle as rink policy yet.** A signed policy is not evidence that a person completed training. Before cutover: implement an authenticated release publisher with a durable per-league monotonic sequence, key rotation and revocation; independently verify Python/Node canonicalization; perform live v16 Bench tenant tests; map central course IDs to existing local course IDs; stage changes atomically with rollback; validate offline/restart behavior; and obtain explicit league acceptance. The existing rink-local training ledger remains authoritative. This milestone does not close FRAPPE-009 or FRAPPE-013.
+
+## M4.2 signed policy staging — development increment (2026-10-14)
+
+A **separate persistent SQLite cache** now stages authenticated training policy bundles without changing the authoritative rink game database or training evidence ledger.
+
+- `apps/rink-local/server/frappe-training-staging.js` verifies the entire Ed25519 envelope, league/key pinning, expiry, field allowlist, sorted policy entries and release revision before writing.
+- It atomically stores the policy-only JSON and a per-league high-water revision. Exact duplicate replay is idempotent; older releases and same-revision conflicting payloads are rejected.
+- `openTrainingStagingDatabase` refuses a rink game database or private registration database, and refuses an existing symlink database.
+- `apps/rink-local/server/stage-frappe-training.js` provides a bounded offline CLI. It refuses production mode and requires a separately pinned trust file.
+- `apps/rink-local/tests/browser/frappe-training-staging.test.js` exercises signature failures, PII rejection, cross-league denial, expiry, replay/rollback, restart persistence, cache isolation and the CLI production guard.
+
+### Fictional offline demonstration
+
+Obtain a **signed fictional** training-policy bundle from a trusted offline development signer (the Frappe preview endpoint is unsigned and cannot be staged). Pin the signer's Ed25519 public key to the expected issuer and league in a separate JSON trust file, then run:
+
+```bash
+node apps/rink-local/server/stage-frappe-training.js \
+  --staging-db /tmp/icebreaker-training-cache.db \
+  --bundle /tmp/fictional-signed-training.json \
+  --trust /tmp/fictional-training-public-keys.json \
+  --league demo-league
+```
+
+The output reports `staged` or `duplicate`, league, revision and policy count. It does **not** report participant completion, eligibility, or change a game. The cache is intentionally not connected to the local training evaluator.
+
+### Remaining acceptance gates
+
+**FRAPPE-018 remains PARTIAL.** A controlled publisher with durable per-league revision allocation, private-key isolation/KMS and authenticated delivery is still missing. Also required: live v16 Bench installation and permission tests, cross-language fixture parity, central-to-local course ID mapping, offline parity/reconciliation reports, approved activation and rollback strategy, secure production storage, and dual-laptop failure injection. A cache high-water mark can itself be rolled back by restoring an older file; production requires tamper-resistant release state.
