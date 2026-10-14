@@ -27,11 +27,15 @@ function createParentAuth({dbPath,baseUrl=process.env.ICEBREAKER_PUBLIC_URL||'ht
  CREATE TABLE IF NOT EXISTS parent_preferences(user_id TEXT PRIMARY KEY REFERENCES parent_users(id),email_mode TEXT NOT NULL DEFAULT 'certified',include_player_stats INTEGER NOT NULL DEFAULT 1);
  CREATE TABLE IF NOT EXISTS parent_mail_outbox(id TEXT PRIMARY KEY,recipient TEXT NOT NULL,subject TEXT NOT NULL,body TEXT NOT NULL,created_ms INTEGER NOT NULL,delivered_ms INTEGER);
  CREATE TABLE IF NOT EXISTS parent_oauth_flows(state_hash TEXT PRIMARY KEY,code_verifier TEXT NOT NULL,nonce TEXT NOT NULL,expires_ms INTEGER NOT NULL);
+ CREATE TABLE IF NOT EXISTS identity_role_grants(user_id TEXT NOT NULL REFERENCES parent_users(id),role TEXT NOT NULL,scope_type TEXT NOT NULL,scope_id TEXT NOT NULL,created_ms INTEGER NOT NULL,PRIMARY KEY(user_id,role,scope_type,scope_id));
  CREATE TABLE IF NOT EXISTS parent_auth_attempts(key TEXT PRIMARY KEY,count INTEGER NOT NULL,reset_ms INTEGER NOT NULL);`);
  const base=new URL(baseUrl);if(base.protocol!=='https:'&&!['127.0.0.1','localhost'].includes(base.hostname))throw Error('Parent authentication requires HTTPS outside loopback');
  const secure=base.protocol==='https:';
  const userById=db.prepare('SELECT id,email,email_verified,display_name FROM parent_users WHERE id=?');
  function session(req){const t=parseCookies(req).icebreaker_parent;if(!t||t.length>128)return null;const r=db.prepare('SELECT user_id FROM parent_sessions WHERE token_hash=? AND expires_ms>?').get(hash(t),now());return r?userById.get(r.user_id):null;}
+ function ensureParentGrant(userId){
+  db.prepare("INSERT OR IGNORE INTO identity_role_grants(user_id,role,scope_type,scope_id,created_ms) VALUES(?,'PARENT','PLATFORM','*',?)").run(userId,now());
+ }
  function sendSession(res,userId){const token=rand();db.prepare('INSERT INTO parent_sessions VALUES(?,?,?)').run(hash(token),userId,now()+14*86400000);return cookieFor(token,secure);}
  function throttle(req,email){const key=hash(`${req.socket.remoteAddress||'local'}|${email}`);const t=now();const r=db.prepare('SELECT count,reset_ms FROM parent_auth_attempts WHERE key=?').get(key);const n=r&&r.reset_ms>t?r.count:0;if(n>=8)throw Object.assign(Error('Too many attempts; try later'),{status:429});db.prepare('INSERT INTO parent_auth_attempts VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET count=excluded.count,reset_ms=excluded.reset_ms').run(key,n+1,t+15*60000);}
  function dispatchEmail(to,subject,body){const id=crypto.randomUUID();db.prepare('INSERT INTO parent_mail_outbox VALUES(?,?,?,?,?,NULL)').run(id,to,subject,body,now());if(onEmail)onEmail({id,to,subject,body});}
@@ -43,7 +47,7 @@ function createParentAuth({dbPath,baseUrl=process.env.ICEBREAKER_PUBLIC_URL||'ht
   try{
    if(!['GET','HEAD','OPTIONS'].includes(req.method)){const origin=req.headers.origin;if(origin&&origin!==base.origin)return json(res,403,{error:'Cross-origin request rejected'});}
    if(req.method==='POST'&&pathname==='/api/parent/register'){
-    const v=await getBody(req),email=normalizeEmail(v.email);throttle(req,email);const p=makePassword(v.password);const id=crypto.randomUUID();try{db.prepare('INSERT INTO parent_users(id,email,password_hash,created_ms) VALUES(?,?,?,?)').run(id,email,p,now());}catch(e){if(String(e).includes('UNIQUE'))return json(res,409,{error:'Account already exists'});throw e;}sendVerification(id,email);return json(res,201,{message:'Account created. Check your email to verify it.'});
+    const v=await getBody(req),email=normalizeEmail(v.email);throttle(req,email);const p=makePassword(v.password);const id=crypto.randomUUID();try{db.prepare('INSERT INTO parent_users(id,email,password_hash,created_ms) VALUES(?,?,?,?)').run(id,email,p,now());}catch(e){if(String(e).includes('UNIQUE'))return json(res,409,{error:'Account already exists'});throw e;}ensureParentGrant(id);sendVerification(id,email);return json(res,201,{message:'Account created. Check your email to verify it.'});
    }
    if(req.method==='POST'&&pathname==='/api/parent/verify'){
     const v=await getBody(req),h=hash(String(v.token||''));const r=db.prepare("SELECT user_id FROM parent_tokens WHERE token_hash=? AND purpose='verify' AND used_ms IS NULL AND expires_ms>?").get(h,now());if(!r)return json(res,400,{error:'Verification link invalid or expired'});db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE parent_tokens SET used_ms=? WHERE token_hash=?').run(now(),h);db.prepare('UPDATE parent_users SET email_verified=1 WHERE id=?').run(r.user_id);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}return json(res,200,{verified:true});
@@ -52,7 +56,7 @@ function createParentAuth({dbPath,baseUrl=process.env.ICEBREAKER_PUBLIC_URL||'ht
     const v=await getBody(req),email=normalizeEmail(v.email);throttle(req,email);const r=db.prepare('SELECT id,email,email_verified FROM parent_users WHERE email=?').get(email);if(r&&!r.email_verified)sendVerification(r.id,email);return json(res,200,{message:'If an unverified account exists, a verification message has been queued.'});
    }
    if(req.method==='POST'&&pathname==='/api/parent/login'){
-    const v=await getBody(req),email=normalizeEmail(v.email);throttle(req,email);const r=db.prepare('SELECT * FROM parent_users WHERE email=?').get(email);if(!r||!r.password_hash||!checkPassword(v.password,r.password_hash))return json(res,401,{error:'Invalid credentials'});if(!r.email_verified)return json(res,403,{error:'Verify your email before signing in'});return json(res,200,{user:safeUser(r)},sendSession(res,r.id));
+    const v=await getBody(req),email=normalizeEmail(v.email);throttle(req,email);const r=db.prepare('SELECT * FROM parent_users WHERE email=?').get(email);if(!r||!r.password_hash||!checkPassword(v.password,r.password_hash))return json(res,401,{error:'Invalid credentials'});if(!r.email_verified)return json(res,403,{error:'Verify your email before signing in'});ensureParentGrant(r.id);return json(res,200,{user:safeUser(r)},sendSession(res,r.id));
    }
    if(req.method==='POST'&&pathname==='/api/parent/logout'){
     const t=parseCookies(req).icebreaker_parent;if(t)db.prepare('DELETE FROM parent_sessions WHERE token_hash=?').run(hash(t));return json(res,200,{loggedOut:true},cookieClear(secure));
@@ -70,11 +74,11 @@ function createParentAuth({dbPath,baseUrl=process.env.ICEBREAKER_PUBLIC_URL||'ht
      // Never automatically link an existing password account by email; account takeover risk.
      if(db.prepare('SELECT id FROM parent_users WHERE email=?').get(email))return redirect(res,'/parent.html?error=account_exists');
      userId=crypto.randomUUID();db.exec('BEGIN IMMEDIATE');try{db.prepare('INSERT INTO parent_users(id,email,email_verified,display_name,created_ms) VALUES(?,?,1,?,?)').run(userId,email,String(p.name||'').slice(0,120),now());db.prepare('INSERT INTO parent_identities VALUES(?,?,?)').run('google',p.sub,userId);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
-    }return redirect(res,'/parent.html',sendSession(res,userId));
+    }ensureParentGrant(userId);return redirect(res,'/parent.html',sendSession(res,userId));
    }
    if(!pathname.startsWith('/api/parent/'))return false;
    const user=session(req);if(!user)return json(res,401,{error:'Parent sign-in required'});
-   if(req.method==='GET'&&pathname==='/api/parent/me')return json(res,200,{user:safeUser(user),favorites:db.prepare('SELECT kind,entity_id AS entityId FROM parent_favorites WHERE user_id=? ORDER BY kind,entity_id').all(user.id),preferences:db.prepare('SELECT email_mode AS emailMode,include_player_stats AS includePlayerStats FROM parent_preferences WHERE user_id=?').get(user.id)||{emailMode:'certified',includePlayerStats:1}});
+   if(req.method==='GET'&&pathname==='/api/parent/me')return json(res,200,{user:safeUser(user),roles:db.prepare('SELECT role FROM identity_role_grants WHERE user_id=? AND scope_type=? AND scope_id=?').all(user.id,'PLATFORM','*').map(r=>r.role),favorites:db.prepare('SELECT kind,entity_id AS entityId FROM parent_favorites WHERE user_id=? ORDER BY kind,entity_id').all(user.id),preferences:db.prepare('SELECT email_mode AS emailMode,include_player_stats AS includePlayerStats FROM parent_preferences WHERE user_id=?').get(user.id)||{emailMode:'certified',includePlayerStats:1}});
    if(req.method==='POST'&&pathname==='/api/parent/favorites'){
     const v=await getBody(req);if(!['team','player'].includes(v.kind)||typeof v.entityId!=='string'||!/^[-\w]{1,100}$/.test(v.entityId))return json(res,400,{error:'Invalid favorite'});db.prepare('INSERT OR IGNORE INTO parent_favorites VALUES(?,?,?)').run(user.id,v.kind,v.entityId);return json(res,200,{saved:true});
    }
