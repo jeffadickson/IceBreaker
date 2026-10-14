@@ -66,3 +66,9 @@ A **schedule-only**, fictional-data Ed25519 contract has been added as the first
 - Python and Node negative tests cover signatures, cross-league keys, tampering, expiration, unexpected PII fields and duplicate games.
 
 This is **partial FRAPPE-009**, not a completed signed roster/rules snapshot system. Remaining: real Bench integration, KMS-backed signing service, monotonic published release revisions, a protected delivery channel, rink-side atomic staging/apply, offline fallback and rollback, roster and game-rule contracts, and end-to-end acceptance. Never treat an unsigned preview as a trusted snapshot.
+
+## M3 signed schedule v2 staging increment (source-level, not production)
+
+A version-2 Ed25519 schedule bundle now includes a signed positive `release_revision`. Python and Node validation support v1 for legacy read-only verification and v2 for revisioned releases. The rink-side `frappe-schedule-staging.js` accepts **only v2** into an independent persistent SQLite cache, atomically tracks the highest accepted revision per league, rejects rollback and same-revision conflicts, and allows exact duplicate replay. It does not touch the authoritative rink SQLite game, clock, roster, or event journal. `stage-frappe-schedule.js` is an offline fictional-data CLI, not an Internet-facing service.
+
+**FRAPPE-009 remains partial:** the bundle currently contains only schedule fields, not approved roster IDs or game rules. No production KMS release signer, tamper-resistant high-water storage, operator-authorized activation, live Frappe Bench integration, or dual-laptop field validation is implemented. Do not mark FRAPPE-009 or production cutover as complete.
