@@ -21,16 +21,15 @@ function signer(){
 }
 test('M3 signed schedule staging persists highest revision across restart without modifying authority',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-frappe-stage-')),file=path.join(dir,'staging.db');
- t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
  const {trust,bundle}=signer();
  let db=openStagingDatabase(file);
+ t.after(()=>{db.close();fs.rmSync(dir,{recursive:true,force:true});});
  assert.equal(stageSignedSchedule(db,bundle(4),trust,'demo-league',{now}).status,'staged');
  assert.equal(stageSignedSchedule(db,bundle(4),trust,'demo-league',{now}).status,'duplicate');
  assert.equal(latestStaged(db,'demo-league').releaseRevision,4);
  assert.equal(latestStaged(db,'demo-league').games.length,1);
  db.close();
  db=openStagingDatabase(file);
- t.after(()=>db.close());
  assert.throws(()=>stageSignedSchedule(db,bundle(3),trust,'demo-league',{now}),/rollback/);
  assert.throws(()=>stageSignedSchedule(db,bundle(4,{games:[]}),trust,'demo-league',{now}),/Conflicting/);
  assert.equal(stageSignedSchedule(db,bundle(5),trust,'demo-league',{now}).releaseRevision,5);
