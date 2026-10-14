@@ -43,6 +43,18 @@ public sealed class RinkClockClient(HttpClient http, string operatorKey, string 
                 : []);
     }
 
+    /// <summary>Read-only confirmed game-day roster; never used as a scoring authority.</summary>
+    public async Task<JsonDocument> GameRostersAsync(CancellationToken token = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/operator/game-rosters");
+        request.Headers.Add("X-Operator-Key", operatorKey);
+        request.Headers.Add("X-Operator-Id", operatorId);
+        using var response = await http.SendAsync(request, token);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<JsonDocument>(cancellationToken: token)
+            ?? throw new InvalidOperationException("Empty game roster response");
+    }
+
     public async Task CommandAsync(object command, CancellationToken token = default)
     {
         using var span = Telemetry.StartActivity("icebreaker.rink.command", ActivityKind.Client);
