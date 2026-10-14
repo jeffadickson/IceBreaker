@@ -97,3 +97,9 @@ The output reports `staged` or `duplicate`, league, revision and policy count. I
 ### Remaining acceptance gates
 
 **FRAPPE-018 remains PARTIAL.** A controlled publisher with durable per-league revision allocation, private-key isolation/KMS and authenticated delivery is still missing. Also required: live v16 Bench installation and permission tests, cross-language fixture parity, central-to-local course ID mapping, offline parity/reconciliation reports, approved activation and rollback strategy, secure production storage, and dual-laptop failure injection. A cache high-water mark can itself be rolled back by restoring an older file; production requires tamper-resistant release state.
+
+## M4.3 read-only policy parity (2026-10-14)
+
+`apps/rink-local/server/frappe-training-parity.js` now compares the **latest staged** central policy definitions against local `training_policy_versions` for a selected league, season and date. It requires an explicit, one-to-one mapping of central course IDs to local course IDs and reports missing courses, mismatched renewal/required/revision/effective dates, and missing local or central policies. It does not infer identities from titles or change any policy, roster, training completion or official clock.
+
+`apps/rink-local/tests/browser/frappe-training-parity.test.js` uses fictional local tables to verify exact match, mismatch, unmapped courses, duplicate mapping rejection, wrong league, expired staging and read-only behavior. This is a **library API for development reconciliation**, not an approved activation path. A production cutover still requires operator-reviewed mapping, signed publisher, live Frappe Bench parity, service authentication and an explicit policy activation mechanism with rollback.
