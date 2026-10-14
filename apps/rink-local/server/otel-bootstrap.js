@@ -3,6 +3,7 @@
 // Disabled by default; no external telemetry network traffic unless opted in.
 // OTLP should target a localhost collector with privacy filters and TLS on
 // collector->backend traffic, not a vendor endpoint from the rink laptop.
+let sdk=null;
 if(process.env.ICEBREAKER_OTEL_ENABLED==='1'){
  const {NodeSDK}=require('@opentelemetry/sdk-node');
  const {OTLPTraceExporter}=require('@opentelemetry/exporter-trace-otlp-http');
@@ -18,7 +19,7 @@ if(process.env.ICEBREAKER_OTEL_ENABLED==='1'){
  const metricsEndpoint=new URL(metricsUrl);
  if(!['localhost','127.0.0.1','::1'].includes(metricsEndpoint.hostname)||!['http:','https:'].includes(metricsEndpoint.protocol)||metricsEndpoint.username||metricsEndpoint.password||metricsEndpoint.search||metricsEndpoint.hash)
   throw Error('Rink metrics must use a local Collector endpoint without credentials');
- const sdk=new NodeSDK({
+ sdk=new NodeSDK({
   serviceName:'icebreaker.rink-local',
   resourceDetectors:[],
   instrumentations:[],
@@ -32,3 +33,5 @@ if(process.env.ICEBREAKER_OTEL_ENABLED==='1'){
  process.once('SIGINT',shutdown);
  process.once('SIGTERM',shutdown);
 }
+
+module.exports={sdk};
