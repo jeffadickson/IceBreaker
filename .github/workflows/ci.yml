@@ -82,7 +82,7 @@ jobs:
       - name: Publish native Windows x64 timekeeper
         shell: pwsh
         run: dotnet publish apps/rink-local/src/Icebreaker.Timekeeper.Desktop/Icebreaker.Timekeeper.Desktop.csproj -c Release -r win-x64 --self-contained false --no-restore -p:NuGetLockFilePath=packages.win-x64.lock.json -o out/desktop
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: IceBreaker-Timekeeper-win-x64
           path: out/desktop/
