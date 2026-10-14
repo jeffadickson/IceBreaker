@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "IceBreaker: rink authority (Node)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/rink-local/server/rink-server.js",
+      "cwd": "${workspaceFolder}/apps/rink-local",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "IceBreaker: timekeeper (Avalonia/.NET)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/rink-local/src/Icebreaker.Timekeeper.Desktop/bin/Debug/net8.0/Icebreaker.Timekeeper.Desktop.dll",
+      "cwd": "${workspaceFolder}/apps/rink-local",
+      "console": "integratedTerminal",
+      "preLaunchTask": "build:desktop",
+      "justMyCode": true
+    }
+  ]
+}
