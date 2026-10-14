@@ -36,6 +36,7 @@ Example site configuration shape (public key only):
   "icebreaker_result_public_keys": {
     "rink-dev-1": {
       "issuer": "rink-certification",
+      "leagues": ["demo-league"],
       "public_key_base64": "<base64 of 32-byte Ed25519 public key>"
     }
   }
