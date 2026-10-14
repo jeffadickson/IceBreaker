@@ -1,0 +1,56 @@
+{
+  "doctype": "DocType",
+  "name": "IceBreaker Club",
+  "module": "IceBreaker League",
+  "custom": 0,
+  "istable": 0,
+  "autoname": "field:icebreaker_id",
+  "title_field": "club_title",
+  "track_changes": 1,
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "field_order": [
+    "icebreaker_id",
+    "club_title",
+    "league"
+  ],
+  "fields": [
+    {
+      "fieldname": "icebreaker_id",
+      "label": "IceBreaker ID",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "club_title",
+      "label": "Club Name",
+      "fieldtype": "Data",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "league",
+      "label": "League",
+      "fieldtype": "Link",
+      "options": "IceBreaker League",
+      "reqd": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1,
+      "report": 1,
+      "export": 1,
+      "print": 1,
+      "share": 0
+    }
+  ],
+  "links": [],
+  "actions": []
+}
