@@ -34,10 +34,16 @@ function safeEventType(value){return EVENT_TYPES.has(value)?value:'OTHER';}
 function tracer(){return api?.trace.getTracer(SERVICE,'1.0.0');}
 function meter(){return api?.metrics.getMeter(SERVICE,'1.0.0');}
 const counters=new Map();
+const histograms=new Map();
 function counter(name){
  if(!api)return null;
  if(!counters.has(name))counters.set(name,meter().createCounter(name));
  return counters.get(name);
+}
+function histogram(name){
+ if(!api)return null;
+ if(!histograms.has(name))histograms.set(name,meter().createHistogram(name,{unit:'ms'}));
+ return histograms.get(name);
 }
 function count(name,attrs={}){
  counter(name)?.add(1,attrs);
@@ -67,7 +73,7 @@ function withRequest(req,res,handler){
    const group=status>=500?'5xx':status>=400?'4xx':status>=300?'3xx':'2xx';
    count('icebreaker.http.requests',{family,method,status_group:group});
    const elapsedMs=Number(process.hrtime.bigint()-start)/1e6;
-   if(api)meter().createHistogram('icebreaker.http.duration',{unit:'ms'}).record(elapsedMs,{family,method,status_group:group});
+   histogram('icebreaker.http.duration')?.record(elapsedMs,{family,method,status_group:group});
   };
   res.once('finish',finish);
   res.once('close',finish);
