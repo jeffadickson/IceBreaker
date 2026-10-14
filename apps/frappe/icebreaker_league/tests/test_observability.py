@@ -32,6 +32,7 @@ class TestObservability(unittest.TestCase):
     def test_no_dynamic_sensitive_attributes(self):
         self.assertEqual(ALLOWED_OUTCOMES, {"ok", "rejected", "error"})
         self.assertIn("league.overview", ALLOWED_OPERATIONS)
+        self.assertIn("league.rink_bundle_preview", ALLOWED_OPERATIONS)
         with self.assertRaises(ValueError):
             with league_span("player.private_record"):
                 pass
