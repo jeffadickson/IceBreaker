@@ -41,8 +41,10 @@ public sealed class OperatorActionLogTests
     public void RejectsEmptyActionWithoutWriting()
     {
         var path = TempPath();
-        using var log = new OperatorActionLog(path);
-        Assert.Throws<ArgumentException>(() => log.Record("s", "sk", "", "g", null, null));
+        // Close the append writer before opening File.ReadAllLines: its default
+        // sharing mode does not permit an existing writer on Windows.
+        using (var log = new OperatorActionLog(path))
+            Assert.Throws<ArgumentException>(() => log.Record("s", "sk", "", "g", null, null));
         Assert.Empty(File.ReadAllLines(path));
     }
 }

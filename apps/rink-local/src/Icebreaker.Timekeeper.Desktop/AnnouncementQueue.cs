@@ -12,10 +12,22 @@ namespace Icebreaker.Timekeeper.Desktop;
 public sealed class AnnouncementQueue : IDisposable
 {
     private readonly SqliteConnection _db;
+    /// <summary>
+    /// Opens a persistent queue and marks interrupted playback for manual review.
+    /// The caller owns disposal; the unpooled connection releases its file on close.
+    /// Filesystem and database failures propagate to the caller.
+    /// </summary>
+    /// <param name="file">Local queue database path, separate from the official journal.</param>
     public AnnouncementQueue(string file)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(file))!);
-        _db = new SqliteConnection($"Data Source={file}");
+        // One long-lived queue owns this connection. Disable pooling so Dispose
+        // releases the database file for restart, maintenance and Windows cleanup.
+        _db = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = file,
+            Pooling = false
+        }.ToString());
         _db.Open();
         using var cmd = _db.CreateCommand();
         cmd.CommandText = """

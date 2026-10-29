@@ -1,5 +1,9 @@
 # Release traceability gate
 
+WIN-RES-001/002, WIN-IPC-001 and WIN-UI-001: [StrictDoc baseline](windows-development-baseline.sdoc), [Windows verification evidence](../docs/development/windows-baseline-verification-2026-10-24.md). Development verification; UI runtime and canonical pinned-SDK acceptance limitations are explicit in the evidence.
+
+ID-012 scoped identity policy: [StrictDoc requirement](identity-policy.sdoc), implementation `apps/rink-local/server/identity-policy.js`, regression tests `apps/rink-local/tests/browser/identity-policy.test.js`, and [2026-10-24 verification evidence](../docs/development/identity-policy-verification-2026-10-24.md). Development verification only; full-suite and production acceptance limitations are recorded in the evidence.
+
 | Requirement | Intended evidence | Current state |
 |---|---|---|
 | LOG — private low-level actions | Node `rink-backend.test.js`; C# OperatorActionLogTests | Development tests; not full durability proof |

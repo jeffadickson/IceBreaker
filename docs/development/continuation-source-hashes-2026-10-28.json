@@ -1,0 +1,50 @@
+[
+  {
+    "path": "apps/rink-local/server/authority-sqlite.js",
+    "sha256": "674e3a769f5c3c46f4c6b5c13c7a03f879df8199719095cd9e8087da75e0f8b2"
+  },
+  {
+    "path": "apps/rink-local/server/identity-policy.js",
+    "sha256": "68d2915b71dba69078926e3e1d19a871b9c63e1ab10fd2fc1b72f2496f2c6cb6"
+  },
+  {
+    "path": "apps/rink-local/server/malware-scanner.js",
+    "sha256": "76f418a33f3ec56c4a2357503a57814c4344aa400ee46edfbfe6052469f1576a"
+  },
+  {
+    "path": "apps/rink-local/src/Icebreaker.Timekeeper.Desktop/AnnouncementQueue.cs",
+    "sha256": "1fa8aef66e9a841db03798a52d7cf584ff2323d431447d393f5db8cea1716e63"
+  },
+  {
+    "path": "apps/rink-local/src/Icebreaker.Timekeeper.Desktop/TimekeeperWindow.cs",
+    "sha256": "bec3f1fe36775ac95d7700f09db585aab1da7f62f8479f22ed2c54c75e4c20d9"
+  },
+  {
+    "path": "apps/rink-local/tests/browser/identity-policy.test.js",
+    "sha256": "a8e1bf346a4079ed82dae60cd74cb502f602b83cd3680727f035ae1e18db588e"
+  },
+  {
+    "path": "apps/rink-local/tests/browser/malware-scanner.test.js",
+    "sha256": "2cb97cffdea55a347a47577cc0e008d61aa7f66db4ff4557d0f3808fbe68b894"
+  },
+  {
+    "path": "apps/rink-local/tests/browser/frappe-training-staging.test.js",
+    "sha256": "33958de7d259e959c111624e0289ae636305258326d2f5bde89d7bf5fccc45a8"
+  },
+  {
+    "path": "apps/rink-local/tests/Icebreaker.Core.Tests/OperatorActionLogTests.cs",
+    "sha256": "fc81a1ebe8b3805f3585241a1d8198cad9465dcd4b260ffac180685fa6065ebe"
+  },
+  {
+    "path": "requirements/identity-policy.sdoc",
+    "sha256": "b90244110576b3d2cc0ba807d75f8e9ebe6ec9ad86615ddef045a08dd030091a"
+  },
+  {
+    "path": "requirements/windows-development-baseline.sdoc",
+    "sha256": "d4276a05b07328407c770edab19428f6f866abab6589127abfd117238f3eae54"
+  },
+  {
+    "path": ".github/workflows/ci.yml",
+    "sha256": "7695ccf4092796650a94b128b16ac5afb0b033b41913da607890d65f90154448"
+  }
+]

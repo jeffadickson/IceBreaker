@@ -70,8 +70,19 @@ test('M4 persistent cache survives restart and refuses authoritative game databa
  unsafe.close();
  assert.throws(()=>openTrainingStagingDatabase(authority),/Refusing authoritative/);
  assert.throws(()=>openTrainingStagingDatabase(':memory:'),/persistent/);
- const link=path.join(dir,'link.db');fs.symlinkSync(authority,link);
- assert.throws(()=>openTrainingStagingDatabase(link),/Symlink/);
+ if(process.platform==='win32'){
+  // Unprivileged Windows cannot create file symlinks. Exercise the rejection
+  // branch with a controlled filesystem result; other platforms use a real link.
+  const original=fs.lstatSync;
+  const mock=t.mock.method(fs,'lstatSync',function(filename,...args){
+   return filename===authority?{isSymbolicLink:()=>true}:original.call(fs,filename,...args);
+  });
+  try{assert.throws(()=>openTrainingStagingDatabase(authority),/Symlink/);}
+  finally{mock.mock.restore();}
+ }else{
+  const link=path.join(dir,'link.db');fs.symlinkSync(authority,link);
+  assert.throws(()=>openTrainingStagingDatabase(link),/Symlink/);
+ }
 });
 test('M4 offline CLI stages signed policy, deduplicates, and refuses production',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ib-training-cli-'));

@@ -19,11 +19,13 @@ const PERMISSIONS = Object.freeze({
  * @param {object} principal Authenticated user with server-loaded grants and MFA context.
  * @param {string} action Exact permission, e.g. game:score.
  * @param {{scopeType:string,scopeId:string}} resource Trusted target scope.
- * @param {number} at Evaluation time in Unix milliseconds (injectable for tests).
+ * @param {number} at Finite evaluation time in Unix milliseconds (injectable for tests).
  * @returns {boolean} False for unknown, expired, revoked or mismatched grants.
  * @remarks This pure helper does not verify sessions or token signatures.
  */
 function can(principal, action, resource, at = Date.now()) {
+  // Invalid clocks must never turn an expired grant into an indefinite grant.
+  if (!Number.isFinite(at)) return false;
   if (!principal || principal.disabled || !principal.id || !resource || !action) return false;
   const grants = Array.isArray(principal.grants) ? principal.grants : [];
   return grants.some(g => {

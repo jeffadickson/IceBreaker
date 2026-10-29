@@ -1,0 +1,8 @@
+[DOCUMENT]
+TITLE: Identity policy verification
+
+[REQUIREMENT]
+UID: ID-012
+TITLE: Deny-by-default scoped authorization
+STATEMENT: Authorization shall deny unknown, expired, revoked or mismatched grants. Evaluation time shall be a finite number of Unix milliseconds; malformed evaluation times shall deny every grant, including grants without expiry. An expiring grant shall be denied at and after its expiry instant.
+COMMENT: Implementation: apps/rink-local/server/identity-policy.js, can. Verification: apps/rink-local/tests/browser/identity-policy.test.js, invalid evaluation clocks and seeded randomized time comparisons. This formalizes the existing ID-012 policy; endpoint integration and production acceptance remain separate.

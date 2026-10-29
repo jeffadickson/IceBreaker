@@ -50,7 +50,9 @@ public sealed class TimekeeperWindow : Window
     private readonly TextBox _penaltyTeam = new() { Watermark = "home / away", Width = 130 };
     private readonly TextBox _penaltyPlayer = new() { Watermark = "Jersey #", Width = 95 };
     private readonly TextBox _penaltyInfraction = new() { Watermark = "Infraction", Width = 180 };
-    private readonly ComboBox _penaltyClass = new() { ItemsSource = new[] { "MINOR", "DOUBLE_MINOR", "MAJOR", "MISCONDUCT", "GAME_MISCONDUCT", "MATCH", "OTHER" }, SelectedIndex = 0, Width = 185 };\n    private readonly CheckBox _penaltyCoincidental = new() { Content = "Coincidental penalty" };\n    private readonly TextBox _penaltySeconds = new() { Watermark = "Seconds", Text = "120", Width = 100 };
+    private readonly ComboBox _penaltyClass = new() { ItemsSource = new[] { "MINOR", "DOUBLE_MINOR", "MAJOR", "MISCONDUCT", "GAME_MISCONDUCT", "MATCH", "OTHER" }, SelectedIndex = 0, Width = 185 };
+    private readonly CheckBox _penaltyCoincidental = new() { Content = "Coincidental penalty" };
+    private readonly TextBox _penaltySeconds = new() { Watermark = "Seconds", Text = "120", Width = 100 };
     private readonly TextBox _setTime = new() { Watermark = "MM:SS", Width = 110 };
     private readonly TextBox _reason = new() { Watermark = "Reason for correction", Width = 250 };
     private readonly CheckBox _confirm = new() { Content = "Confirm clock correction" };
@@ -160,11 +162,14 @@ public sealed class TimekeeperWindow : Window
                 {
                     type = "PENALTY_ASSESSED", team,
                     player, infraction, duration = seconds,
-                    classification = _penaltyClass.SelectedItem?.ToString() ?? "MINOR",\n                    coincidental = _penaltyCoincidental.IsChecked == true
+                    classification = _penaltyClass.SelectedItem?.ToString() ?? "MINOR",
+                    coincidental = _penaltyCoincidental.IsChecked == true
                 });
                 _penaltyPlayer.Text = "";
                 _penaltyInfraction.Text = "";
-                _penaltySeconds.Text = "120";\n                _penaltyClass.SelectedIndex = 0;\n                _penaltyCoincidental.IsChecked = false;
+                _penaltySeconds.Text = "120";
+                _penaltyClass.SelectedIndex = 0;
+                _penaltyCoincidental.IsChecked = false;
             }, closeOnSuccess: true)));
         var goalieBody = new StackPanel { Spacing = 15, Margin = new Thickness(18) };
         goalieBody.Children.Add(Label("GOALIE CHANGE", 18));
@@ -313,7 +318,13 @@ public sealed class TimekeeperWindow : Window
         _poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         _poll.Tick += async (_, _) => await RefreshAsync();
         _poll.Start();
-        Opened += async (_, _) => await RefreshAsync();
+        // Load authenticated roster suggestions after the initial authority snapshot.
+        Opened += async (_, _) =>
+        {
+            await RefreshAsync();
+            await LoadRosterSuggestionsAsync("home");
+            await LoadRosterSuggestionsAsync("away");
+        };
         Closed += (_, _) => { _poll.Stop(); _http.Dispose(); _paQueue.Dispose(); };
         SetEnabled(false);
     }
@@ -445,7 +456,8 @@ public sealed class TimekeeperWindow : Window
             var team = root.GetProperty("teams").GetProperty(side);
             if (!team.GetProperty("confirmed").GetBoolean() || !team.GetProperty("eligible").GetBoolean())
                 throw new InvalidOperationException("Selected team's lineup is not eligible");
-            ApplyRosterChoices(side, team.GetProperty("players"));\n            var jerseys = team.GetProperty("players").EnumerateArray()
+            ApplyRosterChoices(side, team.GetProperty("players"));
+            var jerseys = team.GetProperty("players").EnumerateArray()
                 .Select(p => p.GetProperty("jersey").ToString()).Distinct().ToArray();
             _status.Text = side.ToUpperInvariant() + " approved jerseys: " + string.Join(", ", jerseys);
         }

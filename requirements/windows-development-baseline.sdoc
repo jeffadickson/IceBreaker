@@ -1,0 +1,26 @@
+[DOCUMENT]
+TITLE: Windows development resource and IPC baseline
+
+[REQUIREMENT]
+UID: WIN-RES-001
+TITLE: Release failed authority initialization resources
+STATEMENT: Authority initialization failures shall close the newly opened SQLite connection before rethrowing the original failure. Rejected timing-policy changes shall not leave database files locked.
+COMMENT: Implementation: apps/rink-local/server/authority-sqlite.js constructor. Verification: division-timing-rules.test.js, game rules persist across restart and cannot silently change; Windows directory cleanup verifies resource release.
+
+[REQUIREMENT]
+UID: WIN-IPC-001
+TITLE: Local malware scanner transport
+STATEMENT: The malware scanner shall accept only bounded local IPC endpoint paths appropriate to the host: absolute Unix socket paths on Unix and local named pipes on Windows. Remote endpoints, malformed input and invalid scanner replies shall fail closed.
+COMMENT: Implementation: apps/rink-local/server/malware-scanner.js. Verification: malware-scanner.test.js, real INSTREAM clean/infected/error transport cases, invalid input and seeded endpoint checks.
+
+[REQUIREMENT]
+UID: WIN-UI-001
+TITLE: Authenticated initial desktop roster suggestions
+STATEMENT: Desktop startup shall request roster suggestions for both teams through the authenticated authority client. Suggestions shall be populated only from confirmed eligible lineups, and command validation shall remain authoritative on the server.
+COMMENT: Implementation: TimekeeperWindow.cs Opened and LoadRosterSuggestionsAsync. Verification: native-operator-ui-contract.test.js and desktop compilation. Actual Avalonia interaction and reconnect freshness remain unverified.
+
+[REQUIREMENT]
+UID: WIN-RES-002
+TITLE: Release announcement queue connection on disposal
+STATEMENT: The desktop announcement queue shall own an unpooled SQLite connection so disposal releases the local database handle without waiting for a connection pool to expire.
+COMMENT: Implementation: AnnouncementQueue.cs constructor. Verification: DesktopAnnouncementTests.QueueIsIdempotentAndCrashRecoveryNeedsManualReview, reopen semantics and Windows database deletion.
