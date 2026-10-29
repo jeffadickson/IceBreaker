@@ -37,6 +37,28 @@ python tools/icebreaker.py camera-test
 
 ## 3. Everyday commands
 
+### Using an isolated pinned SDK on Windows
+
+Check installed SDKs before installing anything. If `global.json` cannot resolve an installed SDK, a project-local SDK can be installed under ignored `out/tools/dotnet8` using Microsoft's [official dotnet-install script](https://learn.microsoft.com/dotnet/core/tools/dotnet-install-script), specifying `-Version 8.0.400 -InstallDir <resolved-directory> -NoPath`. This leaves the SDK pin and global PATH unchanged. Download the script from the official source, verify the output directory's parent exists, and reuse an existing installation when present.
+
+Once that local SDK exists, run from the checkout root:
+
+```powershell
+$repo = (Get-Location).Path
+if (-not (Test-Path -LiteralPath $repo -PathType Container)) { throw 'Repository missing' }
+$sdkDirectory = Join-Path $repo 'out/tools/dotnet8'
+if (-not (Test-Path -LiteralPath $sdkDirectory -PathType Container)) { throw 'Resolve an installed SDK directory first' }
+$dotnet = Join-Path $sdkDirectory 'dotnet.exe'
+if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf)) { throw 'Local dotnet executable missing' }
+& $dotnet --version
+& $dotnet restore apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj --locked-mode
+if ($LASTEXITCODE -ne 0) { throw 'Locked restore failed' }
+& $dotnet test apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj -c Release --no-restore
+if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+```
+
+The Node suite includes a documentation-audit integration test, so Python must be available as `python` alongside Node. On Windows use `python -X utf8 tools/check_docs.py` to avoid the system legacy encoding when reading UTF-8 HTML. StrictDoc 0.30.4 successfully exports `requirements/identity-policy.sdoc` and `requirements/windows-development-baseline.sdoc` using `export ... --no-parallelization`; other legacy `.sdoc` files still require a separate validation/migration effort.
+
 | Command | Action |
 |---|---|
 | `python tools/icebreaker.py doctor` | Print tool versions and missing prerequisites |

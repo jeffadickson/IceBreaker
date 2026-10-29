@@ -24,3 +24,9 @@ UID: WIN-RES-002
 TITLE: Release announcement queue connection on disposal
 STATEMENT: The desktop announcement queue shall own an unpooled SQLite connection so disposal releases the local database handle without waiting for a connection pool to expire.
 COMMENT: Implementation: AnnouncementQueue.cs constructor. Verification: DesktopAnnouncementTests.QueueIsIdempotentAndCrashRecoveryNeedsManualReview, reopen semantics and Windows database deletion.
+
+[REQUIREMENT]
+UID: DOC-AUDIT-001
+TITLE: Reconciled documentation inventory
+STATEMENT: The documentation audit shall execute successfully on valid tracked source and publish per-file declaration and missing-documentation counts that reconcile with the language totals and individual findings. An exceeded explicit threshold shall return failure without suppressing the diagnostic summary. Malformed threshold input shall be rejected.
+COMMENT: Inferred development tooling requirement, draft; no product acceptance status is implied. Implementation: tools/audit_code_docs.py. Verification: apps/rink-local/tests/browser/code-documentation-audit.test.js and Python trace coverage. Declaration heuristics remain approximate, not proof of semantic documentation quality.

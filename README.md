@@ -120,7 +120,7 @@ The [beta acceptance runbook](docs/architecture/beta-acceptance-runbook.md) and 
 - **Browse the complete HTML manual:** open [`docs/site/index.html`](docs/site/index.html).
 - **Windows:** double-click `START_ICEBREAKER_WINDOWS.cmd`.
 - **Run the local rink, parent live, and league demo:** install Node.js >=22.13; run `node apps/rink-local/server/rink-server.js` from the repository root; visit `http://127.0.0.1:8090/operator.html`, `/live.html`, and `/league.html`.
-- **Run Node test suite:** `node --test apps/rink-local/tests/browser/*.test.js`.
+- **Run Node test suite:** `node --test apps/rink-local/tests/browser/*.test.js` (Node 22.16.0 and Python on PATH for documentation-audit integration). Include `tests/integration/*.test.js tests/architecture/*.test.js` for distributed and architecture checks.
 - **Run .NET tests when .NET SDK 8+ is installed:** `dotnet test apps/rink-local/tests/Icebreaker.Core.Tests/Icebreaker.Core.Tests.csproj`.
 
 See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for source inventory, incomplete features, and safe push procedure.

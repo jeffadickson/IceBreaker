@@ -71,7 +71,8 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--max-missing", type=int)
     args = parser.parse_args()
-    by_language = Counter()\n    by_file = []
+    by_language = Counter()
+    by_file = []
     findings = []
     failures = []
     for path in tracked_files():
@@ -79,14 +80,16 @@ def main() -> int:
         try:
             total, missing = (python_findings(path) if path.suffix == ".py"
                               else source_findings(path))
-            by_language[path.suffix] += total\n            by_file.append({"path": relative, "declarations": total, "missing": len(missing)})
+            by_language[path.suffix] += total
+            by_file.append({"path": relative, "declarations": total, "missing": len(missing)})
             findings.extend({"path": relative, **item} for item in missing)
         except (SyntaxError, UnicodeError, OSError) as exc:
             failures.append({"path": relative, "error": str(exc)})
     result = {"method": "Python AST + conservative JS/TS/C# declaration heuristics",
               "tracked_files": len(tracked_files()),
               "declarations": dict(sorted(by_language.items())),
-              "missing_count": len(findings), "findings": findings,\n              "files": by_file,
+              "missing_count": len(findings), "findings": findings,
+              "files": by_file,
               "parse_failures": failures,
               "limitations": "Not full JS/TS/C# AST; does not judge comment quality or all exports."}
     payload = json.dumps(result, indent=2) + "\n"

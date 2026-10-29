@@ -6,6 +6,8 @@ Repository: https://github.com/jeffadickson/IceBreaker
 
 ## Current continuation baseline — 2026-10-28
 
+The fixes and handoff were pushed as `191ac58`. Follow-up development corrected literal backslash-n tokens in `tools/audit_code_docs.py`, added report reconciliation and negative CLI tests, and fixed Windows integration-fixture disposal order. The combined Node unit/integration/architecture run passes **292 tests** on Node 22.16.0. An isolated SDK **8.0.400** now passes locked .NET restore and **41 tests** from the repository root; the earlier fallback-SDK limitation is resolved for this local install. The two continuation StrictDoc documents now contain six IDs including draft tooling requirement DOC-AUDIT-001. See `docs/development/pinned-baseline-verification-2026-10-28.md` for exact scope, coverage, mutation results, source hashes and remaining gaps. Treat the earlier paragraph below as the initial push's historical verification.
+
 Fresh validation passed 256 Node tests on Node 22.16.0 and 41 .NET tests using installed SDK 10.0.403 while targeting net8.0. See `docs/development/continuation-verification-2026-10-28.md` for commands, scope and limitations. StrictDoc 0.30.4 is now available locally: both continuation requirement documents parsed and exported successfully after correcting invalid legacy-style requirement terminators. These results supersede the earlier statement that StrictDoc was unavailable for these two documents; the rest of the legacy requirement files have not been validated.
 
 The existing CI workflow had literal backslash-n tokens in an artifact-upload step. These were repaired and the YAML parsed; its trigger policy remains unchanged. Always derive paths from the current checkout and user environment, check directories with `Test-Path -LiteralPath ... -PathType Container` before using them, and reuse installed tools before installing anything. Prefer maintained property/fuzz tools and Stryker.NET for future .NET mutation campaigns; the earlier small custom checks are historical evidence, not a substitute for such campaigns.
@@ -113,8 +115,8 @@ Follow `docs/build-and-release.md` for the repository's Python-based existing to
 
 ## Recommended next work
 
-1. Establish pinned Node/npm and .NET SDK tooling, rerun the documented baseline and preserve exact commands/results.
-2. Validate StrictDoc and reconcile the new traceability with existing Markdown requirements without renumbering stable IDs.
+1. Reuse the pinned Node and isolated .NET 8.0.400 setup documented in `docs/build-and-release.md`; check availability on each new machine. Continue enforcing locked restores.
+2. Preserve the successfully exported continuation StrictDoc documents; validate and migrate the remaining legacy requirement files without renumbering stable IDs.
 3. Add real Avalonia interaction tests for initial/reconnected rosters, eligibility changes, modal drafts, failed submissions and disconnected operation. Source regex tests and compilation do not prove UI behavior.
 4. Review desktop roster freshness after initial startup; refresh policy must preserve drafts and avoid treating old choices as authorization.
 5. Continue identity endpoint integration: trusted principal construction, durable role grants/revocation, session isolation, OIDC negative cases and cross-tenant checks. Keep production onboarding gated.

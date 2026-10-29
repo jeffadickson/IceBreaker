@@ -1,0 +1,34 @@
+[
+  {
+    "path": "tools/audit_code_docs.py",
+    "sha256": "d59cbd115a7580b532afdaa106bbb7ca76469a7d3b2e1c75ae432094ddd07fbe"
+  },
+  {
+    "path": "apps/rink-local/tests/browser/code-documentation-audit.test.js",
+    "sha256": "0139cc878339b0c538b22dd3e09e63a6b18ce922a9b7faca9878e3475e5bb967"
+  },
+  {
+    "path": "tests/integration/remote-sync.test.js",
+    "sha256": "5b1cfdfc2f0b75f04eb4d64145fec0291fdc11615f6fc6fa3d714e6f7bd2a8d7"
+  },
+  {
+    "path": "requirements/windows-development-baseline.sdoc",
+    "sha256": "dd45ad7a1821a8d0d3ebd1b5427751e1fc67dbb2b5061233958550db67ee8348"
+  },
+  {
+    "path": "apps/rink-local/src/Icebreaker.Timekeeper.Desktop/TimekeeperWindow.cs",
+    "sha256": "bec3f1fe36775ac95d7700f09db585aab1da7f62f8479f22ed2c54c75e4c20d9"
+  },
+  {
+    "path": "apps/rink-local/src/Icebreaker.Timekeeper.Desktop/AnnouncementQueue.cs",
+    "sha256": "1fa8aef66e9a841db03798a52d7cf584ff2323d431447d393f5db8cea1716e63"
+  },
+  {
+    "path": "global.json",
+    "sha256": "b245497a2898df63c85fa09a4e0117613552d3d97f4b40f9ecc72e7c734b4b8c"
+  },
+  {
+    "path": ".nvmrc",
+    "sha256": "09b66276f4b145c339ff6761b22b8deee1d59639cb69a776fe873e4247771d0d"
+  }
+]
